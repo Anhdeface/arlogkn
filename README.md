@@ -2,7 +2,7 @@
 
 **Version:** 1.0.0 | **Platform:** Arch Linux and derivatives
 
-Read-only system diagnostic tool for analyzing logs, checking hardware, and exporting reports.
+***Read-only*** system diagnostic tool for analyzing logs, checking hardware, and exporting reports.
 
 ## Requirements
 
