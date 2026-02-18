@@ -1588,88 +1588,251 @@ declare -ga WIKI_GROUP_NAMES=(
     "emergency recovery"
 )
 
-# Find group index by keyword match (returns 0-based index or -1)
-# Note: i++ is intentionally outside the qword loop - we check ALL keywords
-# in the query against the current group before moving to the next group.
-# This ensures "sound graphics" matches group 16 (graphics) even if group 15
-# (memory swap) doesn't match "sound".
-find_wiki_group() {
+# Alias mapping for common shorthand/alternative names
+declare -A WIKI_ALIASES=(
+    ["gpu"]="graphics"
+    ["net"]="network"
+    ["pkg"]="pacman"
+    ["mem"]="memory"
+    ["sys"]="system"
+    ["proc"]="process"
+    ["hw"]="hardware"
+    ["audio"]="sound"
+    ["display"]="graphics"
+    ["cpu"]="system"
+    ["drive"]="disk"
+    ["storage"]="disk"
+    ["service"]="process"
+    ["journal"]="logs"
+    ["perm"]="file"
+    ["recover"]="emergency"
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BACKUP: Levenshtein distance (commented out - replaced with awk version)
+# ─────────────────────────────────────────────────────────────────────────────
+# levenshtein() {
+#     local s1="$1" s2="$2" len1=${#s1} len2=${#s2}
+#     [[ $len1 -eq 0 ]] && echo $len2 && return
+#     [[ $len2 -eq 0 ]] && echo $len1 && return
+#     if [[ $len1 -gt $len2 ]]; then
+#         local tmp="$s1"; s1="$s2"; s2="$tmp"
+#         local tmp=$len1; len1=$len2; len2=$tmp
+#     fi
+#     local -a costs; local i j
+#     for ((i=0; i<=len2; i++)); do costs[$i]=$i; done
+#     for ((i=1; i<=len1; i++)); do
+#         local prev=${costs[0]}; costs[0]=$i; local c1="${s1:i-1:1}"
+#         for ((j=1; j<=len2; j++)); do
+#             local temp=${costs[$j]}; local c2="${s2:j-1:1}"
+#             if [[ "$c1" == "$c2" ]]; then costs[$j]=$prev
+#             else
+#                 local min=${costs[$j]}
+#                 [[ ${costs[$((j-1))]} -lt $min ]] && min=${costs[$((j-1))]}
+#                 [[ $prev -lt $min ]] && min=$prev
+#                 costs[$j]=$((min + 1))
+#             fi
+#             prev=$temp
+#         done
+#     done
+#     echo ${costs[$len2]}
+# }
+# get_threshold() {
+#     local word="$1" len=${#word}
+#     if [[ $len -le 4 ]]; then echo 1
+#     elif [[ $len -le 8 ]]; then echo 2
+#     else echo 3; fi
+# }
+# ─────────────────────────────────────────────────────────────────────────────
+
+# AWK-based fuzzy matching - optimized for speed
+# Uses Levenshtein distance with awk
+awk_fuzzy_match() {
     local query="$1"
-    local i=0
+    local groups="$2"
+    
+    # Use awk for fast string processing
+    echo "$groups" | awk -v q="$query" '
+    BEGIN {
+        best_idx = -1
+        best_dist = 999
+    }
+    
+    function min3(a, b, c) {
+        return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
+    }
+    
+    function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
+        len1 = length(s1)
+        len2 = length(s2)
+        if (len1 == 0) return len2
+        if (len2 == 0) return len1
+        if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
+        
+        # Clear array to prevent memory accumulation
+        split("", d)
+        
+        for (j = 0; j <= len2; j++) d[0, j] = j
+        for (i = 1; i <= len1; i++) {
+            d[i, 0] = i
+            c1 = substr(s1, i, 1)
+            for (j = 1; j <= len2; j++) {
+                c2 = substr(s2, j, 1)
+                cost = (c1 == c2) ? 0 : 1
+                d[i, j] = min3(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + cost)
+            }
+        }
+        return d[len1, len2]
+    }
+    
+    function get_threshold(len) {
+        if (len <= 4) return 1
+        if (len <= 8) return 2
+        return 3
+    }
+    
+    {
+        idx = NR - 1
+        split($0, parts, " ")
+        keyword = parts[1]
+        
+        dist = levenshtein(q, keyword)
+        threshold = get_threshold(length(keyword))
+        
+        if (dist <= threshold && dist < best_dist) {
+            best_dist = dist
+            best_idx = idx
+            if (dist == 0) exit
+        }
+    }
+    
+    END {
+        print best_idx ":" best_dist
+    }
+    '
+}
 
-    # Normalize query: lowercase, trim whitespace
-    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -s ' ')"
+# Find best match using awk fuzzy matching
+find_wiki_group_awk() {
+    local query="$1"
 
-    for group in "${WIKI_GROUP_NAMES[@]}"; do
-        # Check if any keyword in query matches any keyword in group
-        local qword
-        for qword in $query; do
-            if [[ "$group" == *"$qword"* ]]; then
-                echo "$i"
-                return 0
-            fi
+    # Normalize query
+    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    
+    # Early exit for empty query
+    if [[ -z "$query" ]]; then
+        echo "-1"
+        return 1
+    fi
+
+    # FAST PATH 1: Alias lookup
+    if [[ -n "${WIKI_ALIASES[$query]:-}" ]]; then
+        local target="${WIKI_ALIASES[$query]}"
+        local i=0
+        for group in "${WIKI_GROUP_NAMES[@]}"; do
+            [[ "$group" == *"$target"* ]] && echo $i && return 0
+            ((i++))
         done
+    fi
+    
+    # FAST PATH 2: Exact match
+    local i=0
+    for group in "${WIKI_GROUP_NAMES[@]}"; do
+        [[ "$group" == *"$query"* ]] && echo $i && return 0
         ((i++))
     done
-
+    
+    # AWK PATH: Fuzzy matching
+    local groups_str
+    groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
+    local result
+    result="$(awk_fuzzy_match "$query" "$groups_str")"
+    
+    local best_idx="${result%%:*}"
+    local best_dist="${result##*:}"
+    
+    if [[ "$best_idx" -ge 0 && "$best_dist" -le 3 ]]; then
+        echo "$best_idx" && return 0
+    fi
+    
     echo "-1"
     return 1
 }
 
-# Get similar group suggestions (for typos)
-suggest_wiki_groups() {
+# Get suggestions using awk
+suggest_wiki_groups_awk() {
     local query="$1"
-    local suggestions=()
-    
-    # Normalize query
+
+    # Normalize
     query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    local query_len=${#query}
     
-    for group in "${WIKI_GROUP_NAMES[@]}"; do
-        # Check all words in the group
-        local word
-        for word in $group; do
-            local word_len=${#word}
-            
-            # Check if query is similar to word (within 2 chars difference)
-            local len_diff=$((query_len - word_len))
-            [[ $len_diff -lt 0 ]] && len_diff=$((-len_diff))
-            
-            # Substring match or close length match
-            if [[ "$word" == *"$query"* ]] || [[ "$query" == *"$word"* ]]; then
-                suggestions+=("$group")
-                break
-            fi
-            
-            # Check for common typos (missing one char)
-            if [[ $len_diff -eq 1 ]] || [[ $len_diff -eq -1 ]]; then
-                # Check if query without one char matches word
-                local shorter longer
-                if [[ $query_len -lt $word_len ]]; then
-                    shorter="$query"
-                    longer="$word"
-                else
-                    shorter="$word"
-                    longer="$query"
-                fi
-                
-                # Try removing each char from longer and compare
-                local i
-                for ((i=0; i<${#longer}; i++)); do
-                    local modified="${longer:0:i}${longer:i+1}"
-                    if [[ "$modified" == "$shorter" ]]; then
-                        suggestions+=("$group")
-                        break 2
-                    fi
-                done
-            fi
-        done
-    done
-    
-    # Return suggestions
-    if [[ ${#suggestions[@]} -gt 0 ]]; then
-        printf '%s\n' "${suggestions[@]}" | head -3
+    # Early exit for empty query
+    if [[ -z "$query" ]]; then
+        return 1
     fi
+
+    local groups_str
+    groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
+    
+    echo "$groups_str" | awk -v q="$query" '
+    function min3(a, b, c) { return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c) }
+    
+    function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
+        len1 = length(s1); len2 = length(s2)
+        if (len1 == 0) return len2
+        if (len2 == 0) return len1
+        if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
+        # Clear array to prevent memory accumulation
+        split("", d)
+        for (j = 0; j <= len2; j++) d[0, j] = j
+        for (i = 1; i <= len1; i++) {
+            d[i, 0] = i; c1 = substr(s1, i, 1)
+            for (j = 1; j <= len2; j++) {
+                c2 = substr(s2, j, 1); cost = (c1 == c2) ? 0 : 1
+                d[i, j] = min3(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + cost)
+            }
+        }
+        return d[len1, len2]
+    }
+    
+    function get_threshold(len) { if (len <= 4) return 1; if (len <= 8) return 2; return 3 }
+    
+    {
+        idx = NR - 1
+        split($0, parts, " ")
+        keyword = parts[1]
+        dist = levenshtein(q, keyword)
+        threshold = get_threshold(length(keyword))
+        if (dist <= threshold) {
+            suggestions[++count] = $0
+            distances[count] = dist
+        }
+    }
+    
+    END {
+        # Simple bubble sort by distance
+        for (i = 1; i < count; i++) {
+            for (j = i + 1; j <= count; j++) {
+                if (distances[j] < distances[i]) {
+                    tmp = suggestions[i]; suggestions[i] = suggestions[j]; suggestions[j] = tmp
+                    tmp = distances[i]; distances[i] = distances[j]; distances[j] = tmp
+                }
+            }
+        }
+        # Print top 3
+        for (i = 1; i <= 3 && i <= count; i++) print suggestions[i]
+    }
+    '
+}
+
+# Find group index using awk fuzzy matching (optimized)
+find_wiki_group() {
+    find_wiki_group_awk "$1"
+}
+
+# Get suggestions using awk (optimized)
+suggest_wiki_groups() {
+    suggest_wiki_groups_awk "$1"
 }
 
 # Display a single wiki group by index (0-based)
