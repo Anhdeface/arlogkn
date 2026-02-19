@@ -1,6 +1,6 @@
 # arlogkn
 
-**Version:** 1.0.0 | **Platform:** Arch Linux and derivatives
+**Version:** 1.0.1 | **Platform:** Arch Linux and derivatives
 
 ***Read-only*** system diagnostic tool for analyzing logs, checking hardware, and exporting reports.
 

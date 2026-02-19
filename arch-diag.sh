@@ -8,7 +8,7 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.0"
+readonly VERSION="1.0.1"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 # Color state (set dynamically)
@@ -45,9 +45,30 @@ declare -g CPU_GOVERNOR="unknown"
 declare -g GPU_INFO=""
 declare -g DISPLAY_INFO=""
 
+# Performance caches (avoid redundant system calls)
+declare -g _DRIVERS_CACHE=""
+declare -g _LSPCI_CACHE=""
+
 # ─────────────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Get lspci output with caching (single call per session)
+_get_lspci() {
+    if [[ -z "$_LSPCI_CACHE" ]]; then
+        _LSPCI_CACHE="$(lspci -k 2>/dev/null)"
+    fi
+    echo "$_LSPCI_CACHE"
+}
+
+# Get lspci -knn output with caching (for export)
+_get_lspci_knn() {
+    local cache_var="_LSPCI_KNN_CACHE"
+    if [[ -z "${!cache_var:-}" ]]; then
+        printf -v "$cache_var" '%s' "$(lspci -knn 2>/dev/null)"
+    fi
+    echo "${!cache_var}"
+}
 
 die() {
     printf '%s[ERROR]%s %s\n' "${C_RED}" "${C_RESET}" "$1" >&2
@@ -258,27 +279,243 @@ detect_display() {
     DISPLAY_INFO="No display detected"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPREHENSIVE DRIVER DETECTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Helper: Get driver from /sys/class device link
+get_driver_from_sys() {
+    local class_path="$1"
+    local driver=""
+    
+    if [[ -L "${class_path}/device/driver" ]]; then
+        driver="$(readlink "${class_path}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+    fi
+    echo "$driver"
+}
+
+# Helper: Get driver from lspci with pattern
+get_pci_driver() {
+    local pattern="$1"
+    local driver=""
+    
+    if command -v lspci &>/dev/null; then
+        driver="$(lspci -k 2>/dev/null | grep -A2 -iE "$pattern" | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    fi
+    echo "$driver"
+}
+
+# Main driver detection - multi-source comprehensive
 detect_drivers() {
-    # Get loaded kernel drivers/modules count
+    # Return cached result if available (drivers don't change during session)
+    [[ -n "$_DRIVERS_CACHE" ]] && echo "$_DRIVERS_CACHE" && return 0
+
     local loaded_count
     loaded_count="$(lsmod 2>/dev/null | wc -l)"
     
-    # Check for common driver categories
-    local gpu_driver="N/A"
-    local network_driver="N/A"
-    local audio_driver="N/A"
+    # Initialize all driver variables
+    local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
+    local storage_driver="N/A" usb_driver="N/A" thunderbolt_driver="N/A"
+    local input_driver="N/A" platform_driver="N/A" virtual_driver="N/A"
+    local nvme_driver="N/A" sata_driver="N/A" raid_driver="N/A"
+    local i2c_driver="N/A" smbus_driver="N/A" watchdog_driver="N/A"
     
-    if command -v lspci &>/dev/null; then
-        gpu_driver="$(lspci -k 2>/dev/null | grep -A2 -i 'vga\|3d' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        network_driver="$(lspci -k 2>/dev/null | grep -A2 -i 'ethernet\|network' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        audio_driver="$(lspci -k 2>/dev/null | grep -A2 -i 'audio' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    # ─────────────────────────────────────────────────────────────────────────
+    # SOURCE 1: /sys/class detection (most reliable)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # GPU from DRM (nullglob prevents literal pattern if no matches)
+    if [[ -d /sys/class/drm ]]; then
+        shopt -s nullglob
+        local card_path driver
+        for card_path in /sys/class/drm/card*; do
+            [[ ! -d "$card_path" ]] && continue
+            driver="$(get_driver_from_sys "$card_path")"
+            [[ -n "$driver" && "$driver" != "N/A" ]] && gpu_driver="$driver"
+        done
+        shopt -u nullglob
+    fi
+
+    # Network from net class
+    if [[ -d /sys/class/net ]]; then
+        shopt -s nullglob
+        local net_path iface_driver
+        for net_path in /sys/class/net/*; do
+            [[ ! -d "$net_path" ]] && continue
+            [[ "$(basename "$net_path")" == "lo" ]] && continue
+            iface_driver="$(get_driver_from_sys "$net_path")"
+            if [[ -n "$iface_driver" && "$iface_driver" != "N/A" ]]; then
+                network_driver="$iface_driver"
+                break
+            fi
+        done
+        shopt -u nullglob
+    fi
+
+    # Audio from sound class
+    if [[ -d /sys/class/sound ]]; then
+        shopt -s nullglob
+        local sound_path audio_drv
+        for sound_path in /sys/class/sound/*; do
+            [[ ! -d "$sound_path" ]] && continue
+            audio_drv="$(get_driver_from_sys "$sound_path")"
+            [[ -n "$audio_drv" && "$audio_drv" != "N/A" ]] && audio_driver="$audio_drv" && break
+        done
+        shopt -u nullglob
     fi
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # SOURCE 2: lspci -k fallback/enhancement
+    # ─────────────────────────────────────────────────────────────────────────
+
+    if command -v lspci &>/dev/null; then
+        # Use cached lspci output (single subprocess per session)
+        local lspci_output
+        lspci_output="$(_get_lspci)"
+
+        # GPU (enhanced patterns)
+        [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(echo "$lspci_output" | grep -A2 -iE 'vga|3d|display' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        
+        # Network (enhanced patterns)
+        [[ "$network_driver" == "N/A" ]] && network_driver="$(echo "$lspci_output" | grep -A2 -iE 'ethernet|network|wireless|wifi' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        
+        # Audio
+        [[ "$audio_driver" == "N/A" ]] && audio_driver="$(echo "$lspci_output" | grep -A2 -iE 'audio|hdmi|hd-audio' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        
+        # Storage controllers
+        storage_driver="$(echo "$lspci_output" | grep -A2 -iE 'sata|ahci|ide|storage' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ -z "$storage_driver" ]] && storage_driver="N/A"
+        
+        # NVMe
+        nvme_driver="$(echo "$lspci_output" | grep -A2 -iE 'nvme' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ -z "$nvme_driver" ]] && nvme_driver="N/A"
+        
+        # USB Controller
+        usb_driver="$(echo "$lspci_output" | grep -A2 -iE 'usb|xhci|ehci|ohci|uhci' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ -z "$usb_driver" ]] && usb_driver="N/A"
+        
+        # Thunderbolt
+        thunderbolt_driver="$(echo "$lspci_output" | grep -A2 -iE 'thunderbolt' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ -z "$thunderbolt_driver" ]] && thunderbolt_driver="N/A"
+        
+        # I2C/SMBus
+        smbus_driver="$(echo "$lspci_output" | grep -A2 -iE 'smbus|i2c' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
+        
+        # ISA/LPC Bridge (platform)
+        platform_driver="$(echo "$lspci_output" | grep -A2 -iE 'isa|lpc|bridge' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ -z "$platform_driver" ]] && platform_driver="N/A"
+    fi
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # SOURCE 3: /sys/bus detection
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Virtual drivers from /sys/bus/pci/drivers
+    if [[ -d /sys/bus/pci/drivers ]]; then
+        shopt -s nullglob
+        for drv_dir in /sys/bus/pci/drivers/*; do
+            local drv_name
+            drv_name="$(basename "$drv_dir")"
+            case "$drv_name" in
+                virtio_*|virtio-pci) virtual_driver="virtio" ;;
+                vmwgfx) virtual_driver="vmware" ;;
+                vboxvideo|vboxguest) virtual_driver="virtualbox" ;;
+                xen-*|xenplatform) virtual_driver="xen" ;;
+            esac
+        done
+        shopt -u nullglob
+        [[ -z "$virtual_driver" ]] && virtual_driver="N/A"
+    fi
+
+    # Input drivers from /sys/class/input
+    if [[ -d /sys/class/input ]]; then
+        shopt -s nullglob
+        local input_path
+        for input_path in /sys/class/input/*; do
+            [[ ! -d "$input_path" ]] && continue
+            local inp_drv
+            inp_drv="$(get_driver_from_sys "$input_path")"
+            if [[ -n "$inp_drv" && "$inp_drv" != "N/A" ]]; then
+                input_driver="$inp_drv"
+                break
+            fi
+        done
+        shopt -u nullglob
+        [[ -z "$input_driver" || "$input_driver" == "N/A" ]] && input_driver="N/A"
+    fi
+
+    # Watchdog
+    if [[ -d /sys/class/watchdog ]]; then
+        shopt -s nullglob
+        local wd_path
+        for wd_path in /sys/class/watchdog/*; do
+            [[ ! -d "$wd_path" ]] && continue
+            local wd_drv
+            wd_drv="$(get_driver_from_sys "$wd_path")"
+            [[ -n "$wd_drv" && "$wd_drv" != "N/A" ]] && watchdog_driver="$wd_drv" && break
+        done
+        shopt -u nullglob
+        [[ -z "$watchdog_driver" || "$watchdog_driver" == "N/A" ]] && watchdog_driver="N/A"
+    fi
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # SOURCE 4: lsmod category detection
+    # ─────────────────────────────────────────────────────────────────────────
+    
+    if command -v lsmod &>/dev/null; then
+        local lsmod_output
+        lsmod_output="$(lsmod 2>/dev/null)"
+        
+        # RAID detection
+        if echo "$lsmod_output" | grep -qE '^raid|^dm_raid'; then
+            raid_driver="mdraid/dm-raid"
+        else
+            raid_driver="N/A"
+        fi
+        
+        # SATA enhancement
+        if [[ "$sata_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^ahci|^sata_'; then
+            sata_driver="$(echo "$lsmod_output" | grep -E '^ahci|^sata_' | head -1 | awk '{print $1}')"
+            [[ -z "$sata_driver" ]] && sata_driver="N/A"
+        fi
+        
+        # I2C enhancement
+        if [[ "$i2c_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^i2c_'; then
+            i2c_driver="$(echo "$lsmod_output" | grep -E '^i2c_' | head -1 | awk '{print $1}')"
+            [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
+        fi
+    fi
+    
+    # Set defaults for any remaining empty values
     [[ -z "$gpu_driver" ]] && gpu_driver="N/A"
     [[ -z "$network_driver" ]] && network_driver="N/A"
     [[ -z "$audio_driver" ]] && audio_driver="N/A"
-    
-    printf '%s|%s|%s|%s' "$loaded_count" "$gpu_driver" "$network_driver" "$audio_driver"
+    [[ -z "$storage_driver" ]] && storage_driver="N/A"
+    [[ -z "$usb_driver" ]] && usb_driver="N/A"
+    [[ -z "$thunderbolt_driver" ]] && thunderbolt_driver="N/A"
+    [[ -z "$input_driver" ]] && input_driver="N/A"
+    [[ -z "$platform_driver" ]] && platform_driver="N/A"
+    [[ -z "$virtual_driver" ]] && virtual_driver="N/A"
+    [[ -z "$nvme_driver" ]] && nvme_driver="N/A"
+    [[ -z "$sata_driver" ]] && sata_driver="N/A"
+    [[ -z "$raid_driver" ]] && raid_driver="N/A"
+    [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
+    [[ -z "$watchdog_driver" ]] && watchdog_driver="N/A"
+
+    # Build result string
+    local result
+    result="$(printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \
+        "$loaded_count" \
+        "$gpu_driver" "$network_driver" "$audio_driver" \
+        "$storage_driver" "$usb_driver" "$thunderbolt_driver" \
+        "$input_driver" "$platform_driver" "$virtual_driver" \
+        "$nvme_driver" "$sata_driver" "$raid_driver" \
+        "$i2c_driver" "$smbus_driver" "$watchdog_driver")"
+
+    # Cache result for session (drivers don't change during run)
+    _DRIVERS_CACHE="$result"
+    echo "$result"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -501,13 +738,13 @@ scan_kernel_logs() {
 
     draw_section_header "KERNEL CRITICAL"
 
-    # Check journal accessibility (not integrity - that requires root)
-    if ! journalctl -n 1 --quiet 2>/dev/null; then
+    # Check journal accessibility (10s timeout prevents hang on corrupted journal)
+    if ! timeout 10 journalctl -n 1 --quiet 2>/dev/null; then
         warn "Cannot access system journal (try running as root for full access)"
     fi
 
     # Fetch kernel errors (priority 3 = ERR)
-    journal_output="$(journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]] || ! printf '%s' "$journal_output" | grep -q .; then
         draw_empty_box
@@ -558,7 +795,7 @@ scan_user_services() {
 
     draw_section_header "SYSTEM SERVICES"
 
-    journal_output="$(journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]] || ! printf '%s' "$journal_output" | grep -q .; then
         draw_empty_box
@@ -879,25 +1116,66 @@ scan_drivers() {
 
     local drivers_info
     drivers_info="$(detect_drivers)"
-    
-    local loaded_count gpu_drv net_drv audio_drv
-    loaded_count="$(echo "$drivers_info" | cut -d'|' -f1)"
-    gpu_drv="$(echo "$drivers_info" | cut -d'|' -f2)"
-    net_drv="$(echo "$drivers_info" | cut -d'|' -f3)"
-    audio_drv="$(echo "$drivers_info" | cut -d'|' -f4)"
+
+    # Parse all driver fields (16 fields) using IFS - single parse, no subprocesses
+    local loaded_count gpu_drv net_drv audio_drv storage_drv usb_drv
+    local thunderbolt_drv input_drv platform_drv virtual_drv
+    local nvme_drv sata_drv raid_drv i2c_drv smbus_drv watchdog_drv
+
+    IFS='|' read -r loaded_count gpu_drv net_drv audio_drv storage_drv \
+        usb_drv thunderbolt_drv input_drv platform_drv virtual_drv \
+        nvme_drv sata_drv raid_drv i2c_drv smbus_drv watchdog_drv \
+        <<< "$drivers_info"
+
+    # Helper function for status display
+    local status_active="${C_GREEN}Active${C_RESET}"
+    local status_na="${C_YELLOW}N/A${C_RESET}"
 
     # Loaded modules count
     draw_box_line "${C_BOLD}Loaded Kernel Modules:${C_RESET} ${C_CYAN}${loaded_count}${C_RESET}"
     printf '\n'
 
-    # Driver table
-    draw_table_begin "Category" 15 "Driver" 45 "Status" 10
-    tbl_row "GPU" "${gpu_drv}" "$([[ "$gpu_drv" != "N/A" ]] && echo "${C_GREEN}Active${C_RESET}" || echo "${C_YELLOW}N/A${C_RESET}")"
-    tbl_row "Network" "${net_drv}" "$([[ "$net_drv" != "N/A" ]] && echo "${C_GREEN}Active${C_RESET}" || echo "${C_YELLOW}N/A${C_RESET}")"
-    tbl_row "Audio" "${audio_drv}" "$([[ "$audio_drv" != "N/A" ]] && echo "${C_GREEN}Active${C_RESET}" || echo "${C_YELLOW}N/A${C_RESET}")"
+    # Primary drivers table (always shown)
+    draw_table_begin "Category" 14 "Driver" 35 "Status" 10
+    tbl_row "GPU" "${gpu_drv}" "$([[ "$gpu_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+    tbl_row "Network" "${net_drv}" "$([[ "$net_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+    tbl_row "Audio" "${audio_drv}" "$([[ "$audio_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+    tbl_row "Storage" "${storage_drv}" "$([[ "$storage_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+    tbl_row "USB Controller" "${usb_drv}" "$([[ "$usb_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
     draw_table_end
 
     printf '\n'
+
+    # Secondary drivers table (shown if any detected)
+    local has_secondary=0
+    [[ "$thunderbolt_drv" != "N/A" ]] && has_secondary=1
+    [[ "$input_drv" != "N/A" ]] && has_secondary=1
+    [[ "$platform_drv" != "N/A" ]] && has_secondary=1
+    [[ "$virtual_drv" != "N/A" ]] && has_secondary=1
+    [[ "$nvme_drv" != "N/A" ]] && has_secondary=1
+    [[ "$sata_drv" != "N/A" ]] && has_secondary=1
+    [[ "$raid_drv" != "N/A" ]] && has_secondary=1
+    [[ "$i2c_drv" != "N/A" ]] && has_secondary=1
+    [[ "$smbus_drv" != "N/A" ]] && has_secondary=1
+    [[ "$watchdog_drv" != "N/A" ]] && has_secondary=1
+
+    if [[ "$has_secondary" -eq 1 ]]; then
+        draw_box_line "${C_BOLD}Additional Drivers:${C_RESET}"
+        printf '\n'
+        draw_table_begin "Category" 14 "Driver" 35 "Status" 10
+        tbl_row "Thunderbolt" "${thunderbolt_drv}" "$([[ "$thunderbolt_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "Input/HID" "${input_drv}" "$([[ "$input_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "Platform" "${platform_drv}" "$([[ "$platform_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "Virtual" "${virtual_drv}" "$([[ "$virtual_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "NVMe" "${nvme_drv}" "$([[ "$nvme_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "SATA" "${sata_drv}" "$([[ "$sata_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "RAID" "${raid_drv}" "$([[ "$raid_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "I2C" "${i2c_drv}" "$([[ "$i2c_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "SMBus" "${smbus_drv}" "$([[ "$smbus_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        tbl_row "Watchdog" "${watchdog_drv}" "$([[ "$watchdog_drv" != "N/A" ]] && echo "$status_active" || echo "$status_na")"
+        draw_table_end
+        printf '\n'
+    fi
 }
 
 scan_system_basics() {
@@ -1025,7 +1303,7 @@ export_kernel_logs() {
     local output_file="${OUTPUT_DIR}/kernel_errors.txt"
     local journal_output
 
-    journal_output="$(journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
         printf 'No kernel errors found for boot: %s\n' "$boot_flag" > "$output_file"
@@ -1057,7 +1335,7 @@ export_user_services() {
     local output_file="${OUTPUT_DIR}/service_errors.txt"
     local journal_output
 
-    journal_output="$(journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
         printf 'No service errors found for boot: %s\n' "$boot_flag" > "$output_file"
@@ -1214,19 +1492,172 @@ export_drivers() {
         warn "export_drivers: OUTPUT_DIR not set or invalid"
         return 1
     fi
-    
+
     local output_file="${OUTPUT_DIR}/drivers.txt"
 
     {
         printf '=============================================================\n'
-        printf 'DRIVER STATUS\n'
+        printf 'DRIVER STATUS - COMPREHENSIVE REPORT\n'
+        printf '=============================================================\n'
+        printf 'Generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
         printf '=============================================================\n\n'
 
-        printf 'Loaded Kernel Modules:\n'
-        lsmod 2>/dev/null | head -50 || true
+        # Section 1: Kernel modules
+        printf '=============================================================\n'
+        printf '[1] LOADED KERNEL MODULES\n'
+        printf '=============================================================\n\n'
+        lsmod 2>/dev/null || printf 'Unable to list kernel modules\n'
+        printf '\n\n'
 
-        printf '\n\nPCI Devices with Drivers:\n'
-        lspci -k 2>/dev/null | head -50 || true
+        # Section 2: PCI devices with drivers
+        printf '=============================================================\n'
+        printf '[2] PCI DEVICES WITH DRIVERS\n'
+        printf '=============================================================\n\n'
+        _get_lspci_knn || printf 'lspci not available\n'
+        printf '\n\n'
+
+        # Section 3: USB devices
+        printf '=============================================================\n'
+        printf '[3] USB DEVICES\n'
+        printf '=============================================================\n\n'
+        if command -v lsusb &>/dev/null; then
+            lsusb -v 2>/dev/null | head -200 || lsusb 2>/dev/null || true
+        else
+            printf 'lsusb not available\n'
+        fi
+        printf '\n\n'
+
+        # Section 4: DRM/GPU drivers
+        printf '=============================================================\n'
+        printf '[4] GPU/DRM DRIVERS\n'
+        printf '=============================================================\n\n'
+        if [[ -d /sys/class/drm ]]; then
+            shopt -s nullglob
+            for card in /sys/class/drm/card*; do
+                [[ ! -d "$card" ]] && continue
+                printf 'Device: %s\n' "$(basename "$card")"
+                if [[ -L "${card}/device/driver" ]]; then
+                    printf 'Driver: %s\n' "$(readlink "${card}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                fi
+                printf '\n'
+            done
+            shopt -u nullglob
+        else
+            printf 'DRM subsystem not available\n'
+        fi
+        printf '\n'
+
+        # Section 5: Network drivers
+        printf '=============================================================\n'
+        printf '[5] NETWORK DRIVERS\n'
+        printf '=============================================================\n\n'
+        if [[ -d /sys/class/net ]]; then
+            shopt -s nullglob
+            for iface in /sys/class/net/*; do
+                [[ ! -d "$iface" ]] && continue
+                local iface_name
+                iface_name="$(basename "$iface")"
+                printf 'Interface: %s\n' "$iface_name"
+                if [[ -L "${iface}/device/driver" ]]; then
+                    printf 'Driver: %s\n' "$(readlink "${iface}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                fi
+                printf '\n'
+            done
+            shopt -u nullglob
+        else
+            printf 'Network subsystem not available\n'
+        fi
+        printf '\n'
+
+        # Section 6: Audio drivers
+        printf '=============================================================\n'
+        printf '[6] AUDIO DRIVERS\n'
+        printf '=============================================================\n\n'
+        if [[ -d /sys/class/sound ]]; then
+            shopt -s nullglob
+            for sound in /sys/class/sound/*; do
+                [[ ! -d "$sound" ]] && continue
+                printf 'Device: %s\n' "$(basename "$sound")"
+                if [[ -L "${sound}/device/driver" ]]; then
+                    printf 'Driver: %s\n' "$(readlink "${sound}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                fi
+                printf '\n'
+            done
+            shopt -u nullglob
+        else
+            printf 'Sound subsystem not available\n'
+        fi
+        printf '\n'
+
+        # Section 7: Storage drivers
+        printf '=============================================================\n'
+        printf '[7] STORAGE DRIVERS\n'
+        printf '=============================================================\n\n'
+        if [[ -d /sys/block ]]; then
+            shopt -s nullglob
+            for block in /sys/block/*; do
+                [[ ! -d "$block" ]] && continue
+                local bname
+                bname="$(basename "$block")"
+                printf 'Device: %s\n' "$bname"
+                if [[ -L "${block}/device/driver" ]]; then
+                    printf 'Driver: %s\n' "$(readlink "${block}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                fi
+                printf '\n'
+            done
+            shopt -u nullglob
+        else
+            printf 'Block subsystem not available\n'
+        fi
+        printf '\n'
+
+        # Section 8: Input drivers
+        printf '=============================================================\n'
+        printf '[8] INPUT/HID DRIVERS\n'
+        printf '=============================================================\n\n'
+        if [[ -d /sys/class/input ]]; then
+            shopt -s nullglob
+            for input in /sys/class/input/*; do
+                [[ ! -d "$input" ]] && continue
+                printf 'Device: %s\n' "$(basename "$input")"
+                if [[ -L "${input}/device/driver" ]]; then
+                    printf 'Driver: %s\n' "$(readlink "${input}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                fi
+                printf '\n'
+            done
+            shopt -u nullglob
+        else
+            printf 'Input subsystem not available\n'
+        fi
+        printf '\n'
+
+        # Section 9: Platform drivers
+        printf '=============================================================\n'
+        printf '[9] PLATFORM DRIVERS\n'
+        printf '=============================================================\n\n'
+        if [[ -d /sys/bus/platform/drivers ]]; then
+            ls -1 /sys/bus/platform/drivers/ 2>/dev/null | head -50 || printf 'Unable to list platform drivers\n'
+        else
+            printf 'Platform bus not available\n'
+        fi
+        printf '\n'
+
+        # Section 10: Virtual drivers
+        printf '=============================================================\n'
+        printf '[10] VIRTUAL/HYPERVISOR DRIVERS\n'
+        printf '=============================================================\n\n'
+        if [[ -d /sys/bus/pci/drivers ]]; then
+            printf 'PCI Drivers indicating virtualization:\n'
+            ls -1 /sys/bus/pci/drivers/ 2>/dev/null | grep -iE 'virtio|vmware|vbox|xen|qxl|virtio' || printf 'No virtual drivers detected\n'
+        else
+            printf 'PCI bus not available\n'
+        fi
+        printf '\n'
+
+        printf '=============================================================\n'
+        printf 'END OF DRIVER REPORT\n'
+        printf '=============================================================\n'
+
     } > "$output_file"
 
     info "Drivers exported: drivers.txt"
@@ -1242,7 +1673,7 @@ export_summary() {
     local output_file="${OUTPUT_DIR}/summary.txt"
     local boot_flag="$1"
 
-    # Wait a moment for all files to be written (0.3s to avoid race condition)
+    # Wait for all file writes to complete (0.3s balances speed vs reliability)
     sleep 0.3
 
     cat > "$output_file" <<EOF
@@ -1314,7 +1745,7 @@ export_all_logs() {
         printf '[1] KERNEL LOGS (Priority ≤3 - Errors)\n'
         printf '=============================================================\n'
         local kernel_output
-        kernel_output="$(journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+        kernel_output="$(timeout 10 journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
         if [[ -n "$kernel_output" ]]; then
             printf '%s\n' "$kernel_output"
         else
@@ -1329,7 +1760,7 @@ export_all_logs() {
         printf '[2] USER SERVICES (Failed Services)\n'
         printf '=============================================================\n'
         local service_output
-        service_output="$(journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+        service_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
         if [[ -n "$service_output" ]]; then
             printf '%s\n' "$service_output"
         else
@@ -1716,11 +2147,11 @@ awk_fuzzy_match() {
 find_wiki_group_awk() {
     local query="$1"
 
-    # Normalize query
-    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    
-    # Early exit for empty query
-    if [[ -z "$query" ]]; then
+    # Normalize query: lowercase, trim whitespace, remove special chars (security)
+    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_ -')"
+
+    # Early exit for empty or invalid query
+    if [[ -z "$query" || ${#query} -gt 50 ]]; then
         echo "-1"
         return 1
     fi
@@ -1763,11 +2194,11 @@ find_wiki_group_awk() {
 suggest_wiki_groups_awk() {
     local query="$1"
 
-    # Normalize
-    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    
-    # Early exit for empty query
-    if [[ -z "$query" ]]; then
+    # Normalize: lowercase, trim, remove special chars (security)
+    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_ -')"
+
+    # Early exit for empty or too long query (DoS prevention)
+    if [[ -z "$query" || ${#query} -gt 50 ]]; then
         return 1
     fi
 
@@ -1794,7 +2225,11 @@ suggest_wiki_groups_awk() {
         }
         return d[len1, len2]
     }
-    
+
+    # Threshold: max allowed Levenshtein distance based on word length
+    # len<=4: max 1 typo (e.g., "soud" → "sound")
+    # len<=8: max 2 typos (e.g., "netwok" → "network")
+    # len>8:  max 3 typos for long words
     function get_threshold(len) { if (len <= 4) return 1; if (len <= 8) return 2; return 3 }
     
     {
