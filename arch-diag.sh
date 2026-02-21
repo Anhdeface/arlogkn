@@ -311,8 +311,10 @@ detect_drivers() {
     # Return cached result if available (drivers don't change during session)
     [[ -n "$_DRIVERS_CACHE" ]] && echo "$_DRIVERS_CACHE" && return 0
 
+    local lsmod_output
+    lsmod_output="$(lsmod 2>/dev/null)" || true
     local loaded_count
-    loaded_count="$(lsmod 2>/dev/null | wc -l)"
+    loaded_count="$(wc -l <<< "$lsmod_output")"
     
     # Initialize all driver variables
     local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
@@ -464,28 +466,23 @@ detect_drivers() {
     # SOURCE 4: lsmod category detection
     # ─────────────────────────────────────────────────────────────────────────
     
-    if command -v lsmod &>/dev/null; then
-        local lsmod_output
-        lsmod_output="$(lsmod 2>/dev/null)"
-        
-        # RAID detection
-        if echo "$lsmod_output" | grep -qE '^raid|^dm_raid'; then
-            raid_driver="mdraid/dm-raid"
-        else
-            raid_driver="N/A"
-        fi
-        
-        # SATA enhancement
-        if [[ "$sata_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^ahci|^sata_'; then
-            sata_driver="$(echo "$lsmod_output" | grep -E '^ahci|^sata_' | head -1 | awk '{print $1}')"
-            [[ -z "$sata_driver" ]] && sata_driver="N/A"
-        fi
-        
-        # I2C enhancement
-        if [[ "$i2c_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^i2c_'; then
-            i2c_driver="$(echo "$lsmod_output" | grep -E '^i2c_' | head -1 | awk '{print $1}')"
-            [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
-        fi
+    # RAID detection
+    if echo "$lsmod_output" | grep -qE '^raid|^dm_raid'; then
+        raid_driver="mdraid/dm-raid"
+    else
+        raid_driver="N/A"
+    fi
+    
+    # SATA enhancement
+    if [[ "$sata_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^ahci|^sata_'; then
+        sata_driver="$(echo "$lsmod_output" | grep -E '^ahci|^sata_' | head -1 | awk '{print $1}')"
+        [[ -z "$sata_driver" ]] && sata_driver="N/A"
+    fi
+    
+    # I2C enhancement
+    if [[ "$i2c_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^i2c_'; then
+        i2c_driver="$(echo "$lsmod_output" | grep -E '^i2c_' | head -1 | awk '{print $1}')"
+        [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
     fi
     
     # Set defaults for any remaining empty values
