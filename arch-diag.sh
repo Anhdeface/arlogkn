@@ -2429,8 +2429,8 @@ export_all_logs() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 parse_args() {
-    local arg
-    for arg in "$@"; do
+    while [[ $# -gt 0 ]]; do
+        local arg="$1"
         case "$arg" in
             --all)
                 SCAN_ALL=1
@@ -2438,6 +2438,7 @@ parse_args() {
                 SCAN_USER=0
                 SCAN_MOUNT=0
                 SCAN_USB=0
+                shift
                 ;;
             --kernel)
                 SCAN_ALL=0
@@ -2445,6 +2446,7 @@ parse_args() {
                 SCAN_USER=0
                 SCAN_MOUNT=0
                 SCAN_USB=0
+                shift
                 ;;
             --user)
                 SCAN_ALL=0
@@ -2452,40 +2454,55 @@ parse_args() {
                 SCAN_USER=1
                 SCAN_MOUNT=0
                 SCAN_USB=0
+                shift
                 ;;
             --mount)
                 SCAN_ALL=0
                 SCAN_MOUNT=1
+                shift
                 ;;
             --usb)
                 SCAN_ALL=0
                 SCAN_USB=1
+                shift
                 ;;
             --driver)
                 SCAN_ALL=0
                 SCAN_DRIVER=1
+                shift
                 ;;
             --vga)
                 SCAN_ALL=0
                 SCAN_VGA=1
+                shift
                 ;;
             --system)
-                # Full system scan (mount + usb + driver + vga + system info)
                 SCAN_ALL=0
                 SCAN_SYSTEM=1
+                shift
                 ;;
-            --wiki|--wiki=*)
+            --wiki)
                 SCAN_ALL=0
                 SCAN_WIKI=1
-                # Handle optional group argument: --wiki or --wiki=group
-                if [[ "$arg" == --wiki=* ]]; then
-                    WIKI_GROUP="${arg#--wiki=}"
+                # Check if next argument is a group name (doesn't start with -)
+                if [[ $# -gt 1 && ! "$2" =~ ^- ]]; then
+                    WIKI_GROUP="$2"
+                    shift 2
+                else
+                    shift
                 fi
+                ;;
+            --wiki=*)
+                SCAN_ALL=0
+                SCAN_WIKI=1
+                WIKI_GROUP="${arg#--wiki=}"
+                shift
                 ;;
             --wiki-group=*)
                 SCAN_ALL=0
                 SCAN_WIKI=1
                 WIKI_GROUP="${arg#--wiki-group=}"
+                shift
                 ;;
             --boot=*)
                 BOOT_OFFSET="${arg#--boot=}"
@@ -2493,12 +2510,15 @@ parse_args() {
                 if ! [[ "$BOOT_OFFSET" =~ ^-?[0-9]+$ ]]; then
                     die "Invalid boot offset: $BOOT_OFFSET (must be integer)"
                 fi
+                shift
                 ;;
             --save)
                 SAVE_LOGS=1
+                shift
                 ;;
             --save-all)
                 SAVE_ALL=1
+                shift
                 ;;
             --help|-h)
                 show_help
@@ -3746,7 +3766,7 @@ main() {
 
     detect_distro
     detect_system_info
-    check_internet
+    check_internet || true
     detect_gpu
     detect_display
 
