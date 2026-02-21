@@ -314,7 +314,7 @@ detect_drivers() {
     local lsmod_output
     lsmod_output="$(lsmod 2>/dev/null)" || true
     local loaded_count
-    loaded_count="$(wc -l <<< "$lsmod_output")"
+    loaded_count="$(echo "$lsmod_output" | tail -n +2 | wc -l)"
     
     # Initialize all driver variables
     local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
@@ -1277,7 +1277,11 @@ scan_usb_devices() {
             *Audio*|*Headset*|*Speaker*|*Headphone*) dev_type="Audio" ;;
         esac
 
-        draw_table_row "${vendor}:????" "${product:0:29}" "Bus ${bus_id}" "$dev_type"
+        # Read product ID from sysfs
+        local product_id
+        product_id="$(cat "$dev_path/idProduct" 2>/dev/null || echo "????")" 
+
+        draw_table_row "${vendor}:${product_id}" "${product:0:29}" "Bus ${bus_id}" "$dev_type"
         count=$((count + 1))
     done
 

@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 34 (21 bug fixes, 5 feature additions, 8 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 36 (23 bug fixes, 5 feature additions, 8 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -31,6 +31,10 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 34 (
 - Eliminated redundant file I/O operations by removing unused MAC address parsing in network interface scans.
 - Consolidated memory data retrieval to a single process substitution command, replacing three separate subshell invocations of `free`.
 - Merged duplicate `lsmod` invocations in `detect_drivers` into a single call, deriving `loaded_count` from the cached output.
+
+### Data Accuracy Bugs (Phase 13)
+- Corrected off-by-one error in kernel module count by skipping the `lsmod` header line (`tail -n +2`) before counting.
+- Added missing `idProduct` sysfs read in `scan_usb_devices`, replacing hardcoded `????` placeholder with the actual USB product ID.
 
 ### Command Excecution Bugs (Phase 8 & 10)
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
@@ -65,4 +69,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 34 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-12 modifications finalized and staged.
+- Git state: Phase 1-13 modifications finalized and staged.
