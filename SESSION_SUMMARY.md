@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 27 (18 bug fixes, 5 feature additions, 4 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 29 (18 bug fixes, 5 feature additions, 6 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -27,6 +27,10 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 27 (
 - Prevented abrupt script termination during `check_internet` failures under `set -e` execution.
 - Refactored CLI argument parsing (`parse_args`) to properly consume space-delimited values for the `--wiki` flag.
 
+### Minor Cleanups (Phase 7)
+- Eliminated redundant file I/O operations by removing unused MAC address parsing in network interface scans.
+- Consolidated memory data retrieval to a single process substitution command, replacing three separate subshell invocations of `free`.
+
 ### Polish and Consistency (Phase 5)
 - Optimized network interface table width for 80-column TTY compatibility while retaining full IPv6 support.
 - Unified network interface speed calculations to consistently present Gbps for high-speed adapters.
@@ -50,4 +54,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 27 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-6 modifications finalized and staged.
+- Git state: Phase 1-7 modifications finalized and staged.

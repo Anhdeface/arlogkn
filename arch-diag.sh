@@ -1113,10 +1113,6 @@ scan_network_interfaces() {
             fi
         fi
 
-        # Read MAC address
-        local mac="N/A"
-        [[ -f "${net_path}/address" ]] && mac="$(cat "${net_path}/address" 2>/dev/null)"
-
         # Get IP from our lookup table
         local ip="${iface_ips[$iface]:-N/A}"
 
@@ -1450,9 +1446,10 @@ scan_system_basics() {
     # RAM
     local ram_total ram_used ram_avail
     if command -v free &>/dev/null; then
-        ram_total="$(free -h 2>/dev/null | awk '/^Mem:/ {print $2}')"
-        ram_used="$(free -h 2>/dev/null | awk '/^Mem:/ {print $3}')"
-        ram_avail="$(free -h 2>/dev/null | awk '/^Mem:/ {print $7}')"
+        read -r ram_total ram_used ram_avail < <(free -h 2>/dev/null | awk '/^Mem:/ {print $2, $3, $7}') || true
+        [[ -z "$ram_total" ]] && ram_total="N/A"
+        [[ -z "$ram_used" ]]  && ram_used="N/A"
+        [[ -z "$ram_avail" ]] && ram_avail="N/A"
         draw_box_line "${C_BOLD}RAM:${C_RESET} Total: ${ram_total} | Used: ${ram_used} | Available: ${ram_avail}"
     fi
 
