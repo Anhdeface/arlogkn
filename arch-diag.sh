@@ -1050,7 +1050,7 @@ scan_boot_timing() {
             draw_box_line "  ${color}${time_val}${C_RESET} ${unit}"
         done
     else
-        draw_box_line "${C_GREEN}✓ No boot timing data available${C_RESET}"
+        draw_box_line "${C_YELLOW}⚠ No boot timing data available${C_RESET}"
     fi
 
     draw_footer

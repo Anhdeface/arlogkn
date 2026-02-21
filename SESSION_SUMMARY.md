@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 30 (19 bug fixes, 5 feature additions, 6 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 31 (19 bug fixes, 5 feature additions, 7 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -34,6 +34,9 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 30 (
 ### Command Excecution Bugs (Phase 8)
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
 
+### UI Polish (Phase 9)
+- Corrected misleading green checkmark (`✓`) to a yellow warning indicator (`⚠`) for missing boot timing data, properly representing the degraded data state.
+
 ### Polish and Consistency (Phase 5)
 - Optimized network interface table width for 80-column TTY compatibility while retaining full IPv6 support.
 - Unified network interface speed calculations to consistently present Gbps for high-speed adapters.
@@ -57,4 +60,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 30 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-8 modifications finalized and staged.
+- Git state: Phase 1-9 modifications finalized and staged.
