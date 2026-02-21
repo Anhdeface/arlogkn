@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 36 (23 bug fixes, 5 feature additions, 8 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 39 (26 bug fixes, 5 feature additions, 8 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -36,6 +36,11 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 36 (
 - Corrected off-by-one error in kernel module count by skipping the `lsmod` header line (`tail -n +2`) before counting.
 - Added missing `idProduct` sysfs read in `scan_usb_devices`, replacing hardcoded `????` placeholder with the actual USB product ID.
 
+### Dispatch and Detection Bugs (Phase 14)
+- Refactored individual scan flag dispatch from a mutually exclusive `elif` chain to independent `if` blocks, enabling combined flag usage (e.g., `--driver --vga`).
+- Fixed `detect_display` to accumulate all connected monitors into a comma-separated list instead of returning on the first match.
+- Fixed timestamp stripping regex in `cluster_errors` and `export_kernel_logs` to handle both `+0700` and `+07:00` RFC 3339 timezone formats using `[+-][0-9]{2}:?[0-9]{2}`.
+
 ### Command Excecution Bugs (Phase 8 & 10)
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
 - Redesigned `systemd-analyze blame` parser to accurately process string-separated multi-word time formats (e.g., `3min 31s`), avoiding cross-contamination of time values into systemd service names.
@@ -69,4 +74,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 36 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-13 modifications finalized and staged.
+- Git state: Phase 1-14 modifications finalized and staged.

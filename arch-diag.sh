@@ -246,6 +246,7 @@ detect_display() {
     local connector status
     
     # Check DRM connectors directly from /sys (works without X11/Wayland)
+    local display_parts=()
     shopt -s nullglob
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
@@ -263,13 +264,18 @@ detect_display() {
                 res="$(head -1 "$modes_file" 2>/dev/null)"
             fi
 
-            DISPLAY_INFO="${name} connected"
-            [[ -n "$res" ]] && DISPLAY_INFO="$DISPLAY_INFO ($res)"
-            shopt -u nullglob
-            return 0
+            local entry="${name}"
+            [[ -n "$res" ]] && entry="${entry} ($res)"
+            display_parts+=("$entry")
         fi
     done
     shopt -u nullglob
+
+    if [[ ${#display_parts[@]} -gt 0 ]]; then
+        DISPLAY_INFO="$(printf '%s, ' "${display_parts[@]}")"
+        DISPLAY_INFO="${DISPLAY_INFO%, }"  # Remove trailing comma+space
+        return 0
+    fi
 
     # Fallback: check if any DRM device exists
     if ls /sys/class/drm/card* &>/dev/null; then
@@ -722,7 +728,7 @@ cluster_errors() {
     # Normalize: extract message, count duplicates
     printf '%s\n' "$input" | \
         sed -E 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' | \
-        sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4} [^ ]+ //' | \
+        sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' | \
         sort | uniq -c | sort -rn | \
         while read -r count msg; do
             if [[ "$count" -gt 1 ]]; then
@@ -1619,7 +1625,7 @@ export_kernel_logs() {
     local clustered_file="${OUTPUT_DIR}/kernel_errors_clustered.txt"
     printf '%s\n' "$journal_output" | \
         sed -E 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' | \
-        sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4} [^ ]+ //' | \
+        sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' | \
         sort | uniq -c | sort -rn > "$clustered_file"
 
     info "Kernel logs exported: kernel_errors.txt, kernel_errors_clustered.txt"
@@ -3909,144 +3915,56 @@ main() {
             fi
             draw_footer
         fi
-    elif [[ "$SCAN_DRIVER" -eq 1 ]]; then
+    if [[ "$SCAN_DRIVER" -eq 1 ]]; then
         scan_drivers
-
-        if [[ "$SAVE_LOGS" -eq 1 ]]; then
-            printf '\n'
-            draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
-            
-            local export_failed=0
-            export_drivers || { warn "Export drivers failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
-                draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
-            fi
-            draw_footer
-        fi
-    elif [[ "$SCAN_VGA" -eq 1 ]]; then
+    fi
+    if [[ "$SCAN_VGA" -eq 1 ]]; then
         scan_vga_info
-
-        if [[ "$SAVE_LOGS" -eq 1 ]]; then
-            printf '\n'
-            draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
-            
-            local export_failed=0
-            export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
-                draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
-            fi
-            draw_footer
-        fi
-    elif [[ "$SCAN_KERNEL" -eq 1 ]]; then
+    fi
+    if [[ "$SCAN_KERNEL" -eq 1 ]]; then
         scan_kernel_logs
-
-        if [[ "$SAVE_LOGS" -eq 1 ]]; then
-            printf '\n'
-            draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
-            
-            local export_failed=0
-            export_kernel_logs || { warn "Export kernel logs failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
-                draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
-            fi
-            draw_footer
-        fi
-    elif [[ "$SCAN_USER" -eq 1 ]]; then
+    fi
+    if [[ "$SCAN_USER" -eq 1 ]]; then
         scan_user_services
         scan_coredumps
-
-        if [[ "$SAVE_LOGS" -eq 1 ]]; then
-            printf '\n'
-            draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
-            
-            local export_failed=0
-            export_user_services || { warn "Export user services failed"; export_failed=1; }
-            export_coredumps || { warn "Export coredumps failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
-                draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
-            fi
-            draw_footer
-        fi
-    elif [[ "$SCAN_MOUNT" -eq 1 && "$SCAN_USB" -eq 1 ]]; then
-        # --system flag: mount + USB only
+    fi
+    if [[ "$SCAN_MOUNT" -eq 1 && "$SCAN_USB" -ne 1 ]]; then
+        scan_mounts
+    fi
+    if [[ "$SCAN_USB" -eq 1 && "$SCAN_MOUNT" -ne 1 ]]; then
+        scan_usb_devices
+    fi
+    if [[ "$SCAN_MOUNT" -eq 1 && "$SCAN_USB" -eq 1 ]]; then
         scan_mounts
         scan_usb_devices
+    fi
 
-        if [[ "$SAVE_LOGS" -eq 1 ]]; then
-            printf '\n'
-            draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
-            
-            local export_failed=0
-            export_mounts || { warn "Export mounts failed"; export_failed=1; }
-            export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
-                draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
-            fi
-            draw_footer
-        fi
-    elif [[ "$SCAN_MOUNT" -eq 1 ]]; then
-        scan_mounts
+    # Export logic for individual flag combinations
+    local any_individual_scan=0
+    [[ "$SCAN_DRIVER" -eq 1 || "$SCAN_VGA" -eq 1 || "$SCAN_KERNEL" -eq 1 || "$SCAN_USER" -eq 1 || "$SCAN_MOUNT" -eq 1 || "$SCAN_USB" -eq 1 ]] && any_individual_scan=1
 
-        if [[ "$SAVE_LOGS" -eq 1 ]]; then
-            printf '\n'
-            draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
-            
-            local export_failed=0
-            export_mounts || { warn "Export mounts failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
-                draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
-            fi
-            draw_footer
-        fi
-    elif [[ "$SCAN_USB" -eq 1 ]]; then
-        scan_usb_devices
+    if [[ "$any_individual_scan" -eq 1 && "$SAVE_LOGS" -eq 1 ]]; then
+        printf '\n'
+        draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
+        draw_footer
 
-        if [[ "$SAVE_LOGS" -eq 1 ]]; then
-            printf '\n'
-            draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
-            
-            local export_failed=0
-            export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
-                draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
-            fi
-            draw_footer
+        local export_failed=0
+        [[ "$SCAN_DRIVER" -eq 1 ]] && { export_drivers || { warn "Export drivers failed"; export_failed=1; }; }
+        [[ "$SCAN_VGA" -eq 1 ]] && { export_vga_info || { warn "Export VGA info failed"; export_failed=1; }; }
+        [[ "$SCAN_KERNEL" -eq 1 ]] && { export_kernel_logs || { warn "Export kernel logs failed"; export_failed=1; }; }
+        [[ "$SCAN_USER" -eq 1 ]] && { export_user_services || { warn "Export user services failed"; export_failed=1; }; }
+        [[ "$SCAN_USER" -eq 1 ]] && { export_coredumps || { warn "Export coredumps failed"; export_failed=1; }; }
+        [[ "$SCAN_MOUNT" -eq 1 ]] && { export_mounts || { warn "Export mounts failed"; export_failed=1; }; }
+        [[ "$SCAN_USB" -eq 1 ]] && { export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }; }
+        export_summary || { warn "Export summary failed"; export_failed=1; }
+
+        if [[ "$export_failed" -eq 1 ]]; then
+            draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
+        else
+            draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
         fi
+        draw_footer
+    fi
     fi
 
     # Footer
