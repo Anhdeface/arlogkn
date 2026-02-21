@@ -338,8 +338,9 @@ detect_drivers() {
     if [[ -d /sys/class/drm ]]; then
         shopt -s nullglob
         local card_path driver
-        for card_path in /sys/class/drm/card*; do
+        for card_path in /sys/class/drm/card[0-9]*; do
             [[ ! -d "$card_path" ]] && continue
+            [[ "$(basename "$card_path")" == *-* ]] && continue
             driver="$(get_driver_from_sys "$card_path")"
             [[ -n "$driver" && "$driver" != "N/A" ]] && gpu_driver="$driver"
         done
@@ -747,9 +748,13 @@ scan_kernel_logs() {
 
     draw_section_header "KERNEL CRITICAL"
 
-    # Check journal accessibility (10s timeout prevents hang on corrupted journal)
-    if ! timeout 10 journalctl -n 1 --quiet 2>/dev/null; then
-        warn "Cannot access system journal (try running as root for full access)"
+    # Check journal accessibility
+    # journalctl returns 1 if journal is empty (valid state). 
+    # We only want to warn if accessibility is restricted (e.g., EACCES).
+    if ! timeout 10 journalctl -n 1 --quiet 2>/tmp/.jctl_err; then
+        if grep -q 'Permission denied\|Failed to open' /tmp/.jctl_err 2>/dev/null; then
+            warn "Cannot access system journal (try running as root for full access)"
+        fi
     fi
 
     # Fetch kernel errors (priority 3 = ERR)

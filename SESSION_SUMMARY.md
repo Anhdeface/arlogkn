@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 49 (36 bug fixes, 5 feature additions, 8 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 51 (38 bug fixes, 5 feature additions, 8 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -57,6 +57,10 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 49 (
 ### Symlink Path Resolution (Phase 18)
 - Fixed `check_disk_space` to resolve symlinks via `readlink -f` before path tests, preventing cross-filesystem symlinks from pointing `df` at the wrong filesystem.
 
+### Consistency and Error Handling Bugs (Phase 20)
+- Brought `detect_drivers` GPU glob logic in line with `detect_gpu` by tightening `card*` to `card[0-9]*` and skipping `*-*` connectors, avoiding dozens of empty loop iterations on multi-monitor setups.
+- Eliminated false-positive journal access warning in `scan_kernel_logs` on systems with empty journals (e.g., fresh installs or after vacuuming). Warning now correctly triggers only on explicit permission errors (`EACCES`).
+
 ### Flag Collision and Double Scans (Phase 19)
 - Fixed `--system` combined with individual flags (e.g., `--driver`) causing double-scans and double-exports. Added logic to clear individual scan flags at the end of `SCAN_ALL` and `SCAN_SYSTEM` blocks so the independent `if` blocks don't re-execute scans that were already covered.
 - Fixed `--kernel` and `--user` mutually annihilation in `parse_args`. Removed the zeroing of other flags when parsing `--kernel` and `--user`, allowing them to be combined cleanly like `--driver --vga`.
@@ -94,4 +98,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 49 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-19 modifications finalized and staged.
+- Git state: Phase 1-20 modifications finalized and staged.
