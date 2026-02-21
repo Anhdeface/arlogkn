@@ -2475,17 +2475,11 @@ parse_args() {
             --kernel)
                 SCAN_ALL=0
                 SCAN_KERNEL=1
-                SCAN_USER=0
-                SCAN_MOUNT=0
-                SCAN_USB=0
                 shift
                 ;;
             --user)
                 SCAN_ALL=0
-                SCAN_KERNEL=0
                 SCAN_USER=1
-                SCAN_MOUNT=0
-                SCAN_USB=0
                 shift
                 ;;
             --mount)
@@ -3892,6 +3886,10 @@ main() {
             fi
             draw_footer
         fi
+
+        # Clear individual flags to prevent double execution in independent blocks
+        SCAN_DRIVER=0 SCAN_VGA=0 SCAN_KERNEL=0 SCAN_USER=0 SCAN_MOUNT=0 SCAN_USB=0
+
     elif [[ "$SCAN_SYSTEM" -eq 1 ]]; then
         # --system flag: full system scan without logs
         scan_system_basics
@@ -3935,6 +3933,9 @@ main() {
             fi
             draw_footer
         fi
+
+        # Clear individual flags covered by SCAN_SYSTEM to prevent double execution
+        SCAN_DRIVER=0 SCAN_VGA=0 SCAN_MOUNT=0 SCAN_USB=0
     fi
 
     # Individual scan flags (independent of SCAN_ALL/SCAN_SYSTEM)

@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 47 (34 bug fixes, 5 feature additions, 8 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 49 (36 bug fixes, 5 feature additions, 8 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -57,6 +57,10 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 47 (
 ### Symlink Path Resolution (Phase 18)
 - Fixed `check_disk_space` to resolve symlinks via `readlink -f` before path tests, preventing cross-filesystem symlinks from pointing `df` at the wrong filesystem.
 
+### Flag Collision and Double Scans (Phase 19)
+- Fixed `--system` combined with individual flags (e.g., `--driver`) causing double-scans and double-exports. Added logic to clear individual scan flags at the end of `SCAN_ALL` and `SCAN_SYSTEM` blocks so the independent `if` blocks don't re-execute scans that were already covered.
+- Fixed `--kernel` and `--user` mutually annihilation in `parse_args`. Removed the zeroing of other flags when parsing `--kernel` and `--user`, allowing them to be combined cleanly like `--driver --vga`.
+
 ### Command Excecution Bugs (Phase 8 & 10)
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
 - Redesigned `systemd-analyze blame` parser to accurately process string-separated multi-word time formats (e.g., `3min 31s`), avoiding cross-contamination of time values into systemd service names.
@@ -90,4 +94,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 47 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-18 modifications finalized and staged.
+- Git state: Phase 1-19 modifications finalized and staged.
