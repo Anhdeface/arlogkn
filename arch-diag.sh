@@ -1070,7 +1070,7 @@ scan_network_interfaces() {
         return 0
     fi
 
-    draw_table_begin "Interface" 14 "State" 8 "Speed" 10 "MAC" 20 "IP" 42
+    draw_table_begin "Interface" 14 "State" 8 "Speed" 10 "IP" 30
 
     # Get IP addresses: try ip command, fallback to /proc/net/fib_trie
     declare -A iface_ips
@@ -1125,7 +1125,7 @@ scan_network_interfaces() {
         [[ "$state" == "up" ]] && state_color="$C_GREEN"
         [[ "$state" == "down" ]] && state_color="$C_RED"
 
-        tbl_row "$iface" "${state_color}${state}${C_RESET}" "$speed" "$mac" "$ip"
+        tbl_row "$iface" "${state_color}${state}${C_RESET}" "$speed" "$ip"
         found=1
     done
     shopt -u nullglob

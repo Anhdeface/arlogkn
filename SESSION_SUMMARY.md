@@ -24,7 +24,7 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 25 (
 - Enhanced coredump parsing logic to accommodate variable systemd timestamp formats.
 
 ### Polish and Consistency (Phase 5)
-- Expanded network interface tabular column width to prevent IPv6 truncation.
+- Optimized network interface table width for 80-column TTY compatibility while retaining full IPv6 support.
 - Unified network interface speed calculations to consistently present Gbps for high-speed adapters.
 - Extended IPv6 fallback logic to the unified configuration export path.
 - Sequentially restructured and renumbered comprehensive log export indices [1]-[13] for standardized output.
