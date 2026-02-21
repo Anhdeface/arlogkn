@@ -1039,8 +1039,8 @@ scan_boot_timing() {
             # Extract service name (last word) and full time string
             local unit="${line##* }"
             local time_str="${line% "$unit"}"
-            # Trim trailing spaces from time string
-            time_str="${time_str%% }"
+            # Trim leading/trailing spaces from time string
+            time_str="$(echo "$time_str" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             # Extract just the first part for coloring logic (e.g. "3min" from "3min 31s")
             local time_val="${time_str%% *}"
             
@@ -1160,15 +1160,18 @@ scan_mounts() {
     declare -A df_sizes
     while IFS=' ' read -r fs size rest; do
         if [[ -n "$fs" && "$size" =~ ^[0-9]+$ ]]; then
+            # Resolve symlinks so keys match /proc/mounts
+            local resolved_fs
+            resolved_fs="$(readlink -f "$fs" 2>/dev/null)" || resolved_fs="$fs"
             # Convert KB to human-readable
             if [[ $size -ge 1073741824 ]]; then
-                df_sizes["$fs"]="$((size / 1073741824))T"
+                df_sizes["$resolved_fs"]="$((size / 1073741824))T"
             elif [[ $size -ge 1048576 ]]; then
-                df_sizes["$fs"]="$((size / 1048576))G"
+                df_sizes["$resolved_fs"]="$((size / 1048576))G"
             elif [[ $size -ge 1024 ]]; then
-                df_sizes["$fs"]="$((size / 1024))M"
+                df_sizes["$resolved_fs"]="$((size / 1024))M"
             else
-                df_sizes["$fs"]="${size}K"
+                df_sizes["$resolved_fs"]="${size}K"
             fi
         fi
     done < <(df -P 2>/dev/null | tail -n +2)
@@ -1183,8 +1186,10 @@ scan_mounts() {
         [[ "$source" =~ ^# ]] && continue
         [[ "$fstype" == "autofs" ]] && continue
         
-        # Get size from df cache
-        local size="${df_sizes[$source]:-N/A}"
+        # Get size from df cache (resolve symlink to match df keys)
+        local resolved_source
+        resolved_source="$(readlink -f "$source" 2>/dev/null)" || resolved_source="$source"
+        local size="${df_sizes[$resolved_source]:-${df_sizes[$source]:-N/A}}"
         local color="$C_RESET"
         
         case "$fstype" in
