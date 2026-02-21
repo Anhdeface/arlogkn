@@ -48,6 +48,7 @@ declare -g DISPLAY_INFO=""
 # Performance caches (avoid redundant system calls)
 declare -g _DRIVERS_CACHE=""
 declare -g _LSPCI_CACHE=""
+declare -g _LSPCI_KNN_CACHE=""
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
@@ -155,7 +156,8 @@ detect_system_info() {
     if [[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]]; then
         CPU_GOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "unknown")"
     elif command -v cpupower &>/dev/null; then
-        CPU_GOVERNOR="$(cpupower frequency-info 2>/dev/null | grep -oP 'current policy:.*?\K\w+' | head -1 || echo "unknown")"
+        CPU_GOVERNOR="$(cpupower frequency-info 2>/dev/null | sed -n 's/.*current policy:[[:space:]]*\([a-zA-Z0-9_]*\).*/\1/p' | head -1)"
+        CPU_GOVERNOR="${CPU_GOVERNOR:-unknown}"
     fi
 }
 
@@ -164,13 +166,14 @@ detect_system_info() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 check_internet() {
-    # Check internet connection
+    # Check internet connection (try both ping and curl independently)
     if command -v ping &>/dev/null; then
         if ping -c1 -W2 8.8.8.8 &>/dev/null; then
             INTERNET_STATUS="connected"
             return 0
         fi
-    elif command -v curl &>/dev/null; then
+    fi
+    if command -v curl &>/dev/null; then
         if curl -s --connect-timeout 2 https://www.google.com &>/dev/null; then
             INTERNET_STATUS="connected"
             return 0
@@ -248,19 +251,17 @@ detect_display() {
         [[ ! -f "$connector" ]] && continue
         status="$(cat "$connector" 2>/dev/null)"
         if [[ "$status" == "connected" ]]; then
-            local name
-            name="$(basename "$(dirname "$connector")")"
+            local name connector_dir
+            connector_dir="$(dirname "$connector")"
+            name="$(basename "$connector_dir")"
             name="${name#card*-}"  # Remove "card*-" prefix
 
-            # Get resolution if available
+            # Get resolution from THIS connector's modes file
             local res=""
-            local modes_file
-            for modes_file in /sys/class/drm/card*/card*-*/modes; do
-                if [[ -f "$modes_file" ]]; then
-                    res="$(cat "$modes_file" 2>/dev/null | head -1)"
-                    break
-                fi
-            done
+            local modes_file="${connector_dir}/modes"
+            if [[ -f "$modes_file" ]]; then
+                res="$(head -1 "$modes_file" 2>/dev/null)"
+            fi
 
             DISPLAY_INFO="${name} connected"
             [[ -n "$res" ]] && DISPLAY_INFO="$DISPLAY_INFO ($res)"
@@ -607,16 +608,17 @@ draw_info_box() {
         padding=0
     fi
 
-    printf ' %s%s%*s\n' "$C_BOLD" "$full_line" "$padding" "" "$C_RESET"
+    printf ' %s%s%*s%s\n' "$C_BOLD" "$full_line" "$padding" "" "$C_RESET"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TABLE DRAWING UTILITIES (Clean, minimal borders, ANSI-aware)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Strip ANSI codes (bash-only, no external deps)
+# Strip ANSI codes (script variables + raw escape sequences)
 strip_ansi() {
     local s="$1"
+    # Strip script color variables
     s="${s//${C_RED}/}"
     s="${s//${C_GREEN}/}"
     s="${s//${C_YELLOW}/}"
@@ -624,6 +626,8 @@ strip_ansi() {
     s="${s//${C_CYAN}/}"
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
+    # Strip any remaining raw ANSI escape sequences (e.g. from journalctl)
+    s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
     printf '%s' "$s"
 }
 
@@ -678,17 +682,18 @@ tbl_row() {
         local val="${vals[$i]:-}"
         local vlen
         vlen=$(visible_len "$val")
-        local clean
-        clean=$(strip_ansi "$val")
+        local display_val="$val"
         
-        # Truncate if too long
+        # Truncate if too long (strip ANSI for truncation, but lose color)
         if [[ $vlen -gt $width ]]; then
-            clean="${clean:0:$((width-3))}..."
+            local clean
+            clean=$(strip_ansi "$val")
+            display_val="${clean:0:$((width-3))}..."
             vlen=$width
         fi
         
         local pad=$((width - vlen))
-        printf ' %s%*s' "$clean" "$pad" ""
+        printf ' %s%*s' "$display_val" "$pad" ""
     done
     printf '\n'
 }
@@ -847,13 +852,14 @@ scan_coredumps() {
     fi
 
     printf '%s\n' "$coredumps" | while read -r line; do
-        # Parse coredumpctl output: TIME PID UID GID SIG COREFILE EXE
-        local time pid exe size
-        time="$(echo "$line" | awk '{print $1, $2}')"
-        pid="$(echo "$line" | awk '{print $3}')"
-        size="$(echo "$line" | awk '{print $(NF-1)}')"
+        # Parse coredumpctl output
+        # Format varies by systemd version; exe is always last, use NF safely
+        local time pid exe sig
+        time="$(echo "$line" | awk '{print $1, $2, $3}')"
+        pid="$(echo "$line" | awk '{print $4}')"
+        sig="$(echo "$line" | awk '{print $(NF-2)}')"
         exe="$(echo "$line" | awk '{print $NF}')"
-        draw_box_line "${C_CYAN}[$time]${C_RESET} PID ${C_BOLD}$pid${C_RESET} - ${C_YELLOW}$exe${C_RESET} ($size)"
+        draw_box_line "${C_CYAN}[$time]${C_RESET} PID ${C_BOLD}$pid${C_RESET} - ${C_YELLOW}$exe${C_RESET} (signal: $sig)"
     done
 
     draw_footer
@@ -3211,6 +3217,13 @@ EOF
 main() {
     parse_args "$@"
     init_colors
+
+    # Wiki mode: skip all system detection, just show wiki and exit
+    if [[ "$SCAN_WIKI" -eq 1 ]]; then
+        show_wiki
+        return 0
+    fi
+
     detect_distro
     detect_system_info
     check_internet
@@ -3339,9 +3352,6 @@ main() {
             fi
             draw_footer
         fi
-    elif [[ "$SCAN_WIKI" -eq 1 ]]; then
-        # --wiki flag: show Arch Linux command wiki
-        show_wiki
     elif [[ "$SCAN_DRIVER" -eq 1 ]]; then
         scan_drivers
 
