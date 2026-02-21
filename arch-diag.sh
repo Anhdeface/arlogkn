@@ -845,7 +845,7 @@ scan_user_services() {
     fi
 
     # Header info
-    draw_box_line "${C_BOLD}Failed services (current boot)${C_RESET}"
+    draw_box_line "${C_BOLD}Service Journal Errors (current boot)${C_RESET}"
     printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
 
     printf '%s\n' "$output" | head -15 | while read -r line; do
@@ -1070,7 +1070,7 @@ scan_network_interfaces() {
         return 0
     fi
 
-    draw_table_begin "Interface" 14 "State" 8 "Speed" 10 "MAC" 20 "IP" 16
+    draw_table_begin "Interface" 14 "State" 8 "Speed" 10 "MAC" 20 "IP" 42
 
     # Get IP addresses: try ip command, fallback to /proc/net/fib_trie
     declare -A iface_ips
@@ -1078,7 +1078,11 @@ scan_network_interfaces() {
         while read -r iface state addr_line; do
             [[ -z "$iface" ]] && continue
             local ip_addr
+            # Match IPv4 first, fallback to IPv6
             ip_addr="$(echo "$addr_line" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+            if [[ -z "$ip_addr" ]]; then
+                ip_addr="$(echo "$addr_line" | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
+            fi
             [[ -n "$ip_addr" ]] && iface_ips["$iface"]="$ip_addr"
         done < <(ip -br addr 2>/dev/null | grep -v '^lo ')
     fi
@@ -1752,6 +1756,128 @@ export_usb_devices() {
     info "USB devices exported: usb_devices.txt"
 }
 
+export_temperatures() {
+    # Guard: validate OUTPUT_DIR
+    if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
+        warn "export_temperatures: OUTPUT_DIR not set or invalid"
+        return 1
+    fi
+
+    local output_file="${OUTPUT_DIR}/temperatures.txt"
+
+    {
+        printf '=============================================================\n'
+        printf 'HARDWARE TEMPERATURES\n'
+        printf '=============================================================\n\n'
+
+        if [[ -d /sys/class/hwmon ]]; then
+            printf '%-30s %s\n' 'Sensor' 'Temperature'
+            printf '%-30s %s\n' '──────────────' '───────────'
+            shopt -s nullglob
+            for hw_dir in /sys/class/hwmon/hwmon*; do
+                [[ ! -d "$hw_dir" ]] && continue
+                local hw_name=""
+                [[ -f "${hw_dir}/name" ]] && hw_name="$(cat "${hw_dir}/name" 2>/dev/null)"
+                for ti in "${hw_dir}"/temp*_input; do
+                    [[ ! -f "$ti" ]] && continue
+                    local tr_val
+                    tr_val="$(cat "$ti" 2>/dev/null)" || continue
+                    [[ -z "$tr_val" || ! "$tr_val" =~ ^-?[0-9]+$ ]] && continue
+                    local lbl_file="${ti%_input}_label"
+                    local lbl="${hw_name:-hwmon}"
+                    [[ -f "$lbl_file" ]] && lbl="$(cat "$lbl_file" 2>/dev/null)"
+                    printf '%-30s %d°C\n' "${hw_name:-hwmon}/${lbl}" $((tr_val / 1000))
+                done
+            done
+            shopt -u nullglob
+        else
+            printf 'hwmon not available.\n'
+        fi
+    } > "$output_file"
+
+    info "Temperatures exported: temperatures.txt"
+}
+
+export_boot_timing() {
+    # Guard: validate OUTPUT_DIR
+    if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
+        warn "export_boot_timing: OUTPUT_DIR not set or invalid"
+        return 1
+    fi
+
+    local output_file="${OUTPUT_DIR}/boot_timing.txt"
+
+    {
+        printf '=============================================================\n'
+        printf 'BOOT TIMING (systemd-analyze)\n'
+        printf '=============================================================\n\n'
+
+        if command -v systemd-analyze &>/dev/null; then
+            systemd-analyze 2>/dev/null | head -1 || true
+            printf '\nTop 20 slowest services:\n'
+            systemd-analyze blame --no-pager 2>/dev/null | head -20 || true
+        else
+            printf 'systemd-analyze not available.\n'
+        fi
+    } > "$output_file"
+
+    info "Boot timing exported: boot_timing.txt"
+}
+
+export_network_interfaces() {
+    # Guard: validate OUTPUT_DIR
+    if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
+        warn "export_network_interfaces: OUTPUT_DIR not set or invalid"
+        return 1
+    fi
+
+    local output_file="${OUTPUT_DIR}/network_interfaces.txt"
+
+    {
+        printf '=============================================================\n'
+        printf 'NETWORK INTERFACES\n'
+        printf '=============================================================\n\n'
+
+        if [[ -d /sys/class/net ]]; then
+            printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
+            printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
+            for net_path in /sys/class/net/*; do
+                [[ ! -d "$net_path" ]] && continue
+                local iface_name
+                iface_name="$(basename "$net_path")"
+                [[ "$iface_name" == "lo" ]] && continue
+                local e_state="unknown" e_speed="N/A" e_mac="N/A"
+                [[ -f "${net_path}/operstate" ]] && e_state="$(cat "${net_path}/operstate" 2>/dev/null)"
+                if [[ -f "${net_path}/speed" ]]; then
+                    local rs
+                    rs="$(cat "${net_path}/speed" 2>/dev/null)" || true
+                    if [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]]; then
+                        if [[ "$rs" -ge 1000 ]]; then
+                            e_speed="$((rs / 1000))Gbps"
+                        else
+                            e_speed="${rs}Mbps"
+                        fi
+                    fi
+                fi
+                [[ -f "${net_path}/address" ]] && e_mac="$(cat "${net_path}/address" 2>/dev/null)"
+                local e_ip="N/A"
+                if command -v ip &>/dev/null; then
+                    e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+                    if [[ -z "$e_ip" ]]; then
+                        e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
+                    fi
+                    [[ -z "$e_ip" ]] && e_ip="N/A"
+                fi
+                printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
+            done
+        else
+            printf '/sys/class/net not available.\n'
+        fi
+    } > "$output_file"
+
+    info "Network interfaces exported: network_interfaces.txt"
+}
+
 export_vga_info() {
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
@@ -2048,7 +2174,7 @@ export_all_logs() {
         # BOOT TIMING
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[1.5] BOOT TIMING (systemd-analyze)\n'
+        printf '[2] BOOT TIMING (systemd-analyze)\n'
         printf '=============================================================\n'
         if command -v systemd-analyze &>/dev/null; then
             systemd-analyze 2>/dev/null | head -1 || true
@@ -2062,7 +2188,7 @@ export_all_logs() {
         # USER SERVICES
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[2] USER SERVICES (Failed Services)\n'
+        printf '[3] USER SERVICES\n'
         printf '=============================================================\n'
         local service_output
         service_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
@@ -2077,7 +2203,7 @@ export_all_logs() {
         # FAILED SERVICES (systemctl --failed)
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[2.5] FAILED SERVICES (systemctl --failed)\n'
+        printf '[4] FAILED SERVICES (systemctl --failed)\n'
         printf '=============================================================\n'
         if command -v systemctl &>/dev/null; then
             local failed_svc
@@ -2096,7 +2222,7 @@ export_all_logs() {
         # CORE DUMPS
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[3] CORE DUMPS\n'
+        printf '[5] CORE DUMPS\n'
         printf '=============================================================\n'
         if command -v coredumpctl &>/dev/null; then
             local coredumps
@@ -2115,7 +2241,7 @@ export_all_logs() {
         # PACMAN LOGS
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[4] PACMAN LOGS (Errors & Warnings)\n'
+        printf '[6] PACMAN LOGS (Errors & Warnings)\n'
         printf '=============================================================\n'
         local pacman_log="/var/log/pacman.log"
         if [[ -f "$pacman_log" ]]; then
@@ -2135,7 +2261,7 @@ export_all_logs() {
         # MOUNTED FILESYSTEMS
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[5] MOUNTED FILESYSTEMS\n'
+        printf '[7] MOUNTED FILESYSTEMS\n'
         printf '=============================================================\n'
         if command -v findmnt &>/dev/null; then
             findmnt -rn -o SOURCE,TARGET,FSTYPE,SIZE 2>/dev/null || true
@@ -2148,7 +2274,7 @@ export_all_logs() {
         # DISK USAGE
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[6] DISK USAGE\n'
+        printf '[8] DISK USAGE\n'
         printf '=============================================================\n'
         df -h 2>/dev/null || true
         printf '\n\n'
@@ -2157,7 +2283,7 @@ export_all_logs() {
         # USB DEVICES
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[7] USB DEVICES\n'
+        printf '[9] USB DEVICES\n'
         printf '=============================================================\n'
         if command -v lsusb &>/dev/null; then
             lsusb -v 2>/dev/null | head -100 || true
@@ -2170,7 +2296,7 @@ export_all_logs() {
         # NETWORK INTERFACES
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[7.5] NETWORK INTERFACES\n'
+        printf '[10] NETWORK INTERFACES\n'
         printf '=============================================================\n'
         if [[ -d /sys/class/net ]]; then
             printf '%-16s %-8s %-10s %-20s\n' 'Interface' 'State' 'Speed' 'MAC'
@@ -2185,12 +2311,21 @@ export_all_logs() {
                 if [[ -f "${net_path}/speed" ]]; then
                     local rs
                     rs="$(cat "${net_path}/speed" 2>/dev/null)" || true
-                    [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]] && e_speed="${rs}Mbps"
+                    if [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]]; then
+                        if [[ "$rs" -ge 1000 ]]; then
+                            e_speed="$((rs / 1000))Gbps"
+                        else
+                            e_speed="${rs}Mbps"
+                        fi
+                    fi
                 fi
                 [[ -f "${net_path}/address" ]] && e_mac="$(cat "${net_path}/address" 2>/dev/null)"
                 local e_ip="N/A"
                 if command -v ip &>/dev/null; then
                     e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+                    if [[ -z "$e_ip" ]]; then
+                        e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
+                    fi
                     [[ -z "$e_ip" ]] && e_ip="N/A"
                 fi
                 printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
@@ -2201,7 +2336,7 @@ export_all_logs() {
         printf '\n\n'
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[8] GPU / VGA INFO\n'
+        printf '[11] GPU / VGA INFO\n'
         printf '=============================================================\n'
         printf 'Graphics Card: %s\n\n' "${GPU_INFO}"
         printf 'Display: %s\n\n' "${DISPLAY_INFO}"
@@ -2215,7 +2350,7 @@ export_all_logs() {
         # DRIVER STATUS
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[9] DRIVER STATUS\n'
+        printf '[12] DRIVER STATUS\n'
         printf '=============================================================\n'
         printf 'Loaded Kernel Modules:\n'
         lsmod 2>/dev/null | head -50 || true
@@ -2227,7 +2362,7 @@ export_all_logs() {
         # SYSTEM INFO
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
-        printf '[10] SYSTEM INFO\n'
+        printf '[13] SYSTEM INFO\n'
         printf '=============================================================\n'
         printf 'Internet: %s\n' "$INTERNET_STATUS"
         printf 'CPU: %s\n' "$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d':' -f2 | sed 's/^ *//' || echo 'Unknown')"
@@ -3683,6 +3818,9 @@ main() {
             export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
             export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
             export_drivers || { warn "Export drivers failed"; export_failed=1; }
+            export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
+            export_boot_timing || { warn "Export boot timing failed"; export_failed=1; }
+            export_network_interfaces || { warn "Export network interfaces failed"; export_failed=1; }
             export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
@@ -3709,6 +3847,7 @@ main() {
         scan_temperatures
         scan_vga_info
         scan_drivers
+        scan_boot_timing
         scan_mounts
         scan_usb_devices
         scan_network_interfaces
@@ -3723,6 +3862,9 @@ main() {
             export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
             export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
             export_drivers || { warn "Export drivers failed"; export_failed=1; }
+            export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
+            export_boot_timing || { warn "Export boot timing failed"; export_failed=1; }
+            export_network_interfaces || { warn "Export network interfaces failed"; export_failed=1; }
             export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
