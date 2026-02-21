@@ -640,7 +640,7 @@ strip_ansi() {
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
     # Strip any remaining raw ANSI escape sequences using bash built-in
-    while [[ "$s" =~ $'\e'\[[0-9\;]*[a-zA-Z] ]]; do
+    while [[ -n "$s" && "$s" =~ $'\e'\[[0-9\;]*[a-zA-Z] && -n "${BASH_REMATCH[0]}" ]]; do
         s="${s//${BASH_REMATCH[0]}/}"
     done
     printf '%s' "$s"
@@ -762,12 +762,12 @@ scan_kernel_logs() {
     # We only want to warn if accessibility is restricted (e.g., EACCES).
     local jctl_err
     jctl_err="$(mktemp)"
+    trap 'rm -f "$jctl_err" 2>/dev/null' RETURN
     if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
         if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
             warn "Cannot access system journal (try running as root for full access)"
         fi
     fi
-    rm -f "$jctl_err"
 
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -914,7 +914,7 @@ scan_coredumps() {
         
         # Extract time from beginning by stripping the last 6 fields
         # (UID, GID, SIG, COREFILE, EXE, and PID/COMM)
-        time="$(echo "$line" | awk '{NF-=6; print $0}')"
+        time="$(echo "$line" | awk '{for(i=1; i<=NF-6; i++) printf "%s ", $i; print ""}')"
         pid="$(echo "$line" | awk '{print $(NF-5)}')"
         sig="$(echo "$line" | awk '{print $(NF-2)}')"
         exe="$(echo "$line" | awk '{print $NF}')"
@@ -1795,7 +1795,7 @@ export_usb_devices() {
         printf '=============================================================\n\n'
 
         if command -v lsusb &>/dev/null; then
-            lsusb -v 2>/dev/null | head -100 || true
+            timeout 15 lsusb -v 2>/dev/null | head -100 || true
         else
             printf 'lsusb not available\n'
         fi
@@ -2145,9 +2145,6 @@ export_summary() {
     
     local output_file="${OUTPUT_DIR}/summary.txt"
 
-    # Wait for all file writes to complete (0.3s balances speed vs reliability)
-    sleep 0.3
-
     cat > "$output_file" <<EOF
 =============================================================
 ARLOGKN - Export Summary
@@ -2341,7 +2338,7 @@ export_all_logs() {
         printf '[9] USB DEVICES\n'
         printf '=============================================================\n'
         if command -v lsusb &>/dev/null; then
-            lsusb -v 2>/dev/null | head -100 || true
+            timeout 15 lsusb -v 2>/dev/null | head -100 || true
         else
             printf 'lsusb not available.\n'
         fi

@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 61 (46 bug fixes, 5 feature additions, 10 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 67 (52 bug fixes, 5 feature additions, 10 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -72,8 +72,14 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 61 (
 - Removed invisible `$C_CYAN` space-based separator lines from table outputs to cleanly separate content.
 - Rewrote `strip_ansi()` to use pure bash regex replacement instead of a `sed` subshell, speeding up execution significantly for large amounts of table rows.
 - Refactored `draw_empty_box()` to count visible string length dynamically using `visible_len` instead of a mathematically fragile hardcode.
-- Upgraded `detect_drivers()` to accumulate all network interface drivers into a comma-separated list rather than stopping after capturing the first interface.
-- Protected `scan_coredumps()` against empty log spam by adding an `NF < 6` `awk` guard that intercepts mismatched lines.
+
+### Final System Audit - Round 2 (Phase 23)
+- Prevented potential `jctl_err` temp file leaks in `scan_kernel_logs` by adding a `trap 'rm -f ...' RETURN` to ensure cleanup even on `SIGINT` (Ctrl+C).
+- Added missing `timeout 15` guards to all remaining `lsusb -v` calls in `export_usb_devices` and `export_all_logs`.
+- Upgraded `detect_drivers()` to accumulate all network interface drivers correctly using a bash array to avoid multi-monitor/hybrid offset overlap bugs.
+- Protected `scan_coredumps()` against empty log spam by safely handling `NF < 6` conditions natively within the parsing logic structure.
+- Removed synchronous `sleep 0.3` anti-pattern from `export_summary` because disk writes via bash redirection (`>`) are blocking and inherently complete synchronously.
+- Bulletproofed `strip_ansi()` native string replacement by guarding the `while` loop against infinite `BASH_REMATCH[0]` empty string captures.
 
 ### Flag Collision and Double Scans (Phase 19)
 - Fixed `--system` combined with individual flags (e.g., `--driver`) causing double-scans and double-exports. Added logic to clear individual scan flags at the end of `SCAN_ALL` and `SCAN_SYSTEM` blocks so the independent `if` blocks don't re-execute scans that were already covered.
@@ -112,4 +118,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 61 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-22 modifications finalized and staged.
+- Git state: Phase 1-23 modifications finalized and staged.
