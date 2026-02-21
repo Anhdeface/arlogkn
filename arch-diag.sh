@@ -1030,8 +1030,17 @@ scan_boot_timing() {
         draw_box_line "${C_BOLD}Top 10 Slowest Services:${C_RESET}"
         printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
 
-        printf '%s\n' "$blame_output" | while read -r time_val unit; do
-            [[ -z "$unit" ]] && continue
+        printf '%s\n' "$blame_output" | while read -r line; do
+            [[ -z "$line" ]] && continue
+            
+            # Extract service name (last word) and full time string
+            local unit="${line##* }"
+            local time_str="${line% "$unit"}"
+            # Trim trailing spaces from time string
+            time_str="${time_str%% }"
+            # Extract just the first part for coloring logic (e.g. "3min" from "3min 31s")
+            local time_val="${time_str%% *}"
+            
             local color="$C_GREEN"
 
             # Parse time value for coloring (handle "Xs", "Xms", "Xmin")
@@ -1047,7 +1056,7 @@ scan_boot_timing() {
             [[ "$time_sec" -ge 5 ]] && color="$C_YELLOW"
             [[ "$time_sec" -ge 10 ]] && color="$C_RED"
 
-            draw_box_line "  ${color}${time_val}${C_RESET} ${unit}"
+            draw_box_line "  ${color}${time_str}${C_RESET} ${unit}"
         done
     else
         draw_box_line "${C_YELLOW}⚠ No boot timing data available${C_RESET}"

@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 31 (19 bug fixes, 5 feature additions, 7 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 32 (20 bug fixes, 5 feature additions, 7 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -31,8 +31,9 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 31 (
 - Eliminated redundant file I/O operations by removing unused MAC address parsing in network interface scans.
 - Consolidated memory data retrieval to a single process substitution command, replacing three separate subshell invocations of `free`.
 
-### Command Excecution Bugs (Phase 8)
+### Command Excecution Bugs (Phase 8 & 10)
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
+- Redesigned `systemd-analyze blame` parser to accurately process string-separated multi-word time formats (e.g., `3min 31s`), avoiding cross-contamination of time values into systemd service names.
 
 ### UI Polish (Phase 9)
 - Corrected misleading green checkmark (`✓`) to a yellow warning indicator (`⚠`) for missing boot timing data, properly representing the degraded data state.
@@ -60,4 +61,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 31 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-9 modifications finalized and staged.
+- Git state: Phase 1-10 modifications finalized and staged.
