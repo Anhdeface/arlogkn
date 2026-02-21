@@ -2316,8 +2316,8 @@ export_all_logs() {
         printf '[10] NETWORK INTERFACES\n'
         printf '=============================================================\n'
         if [[ -d /sys/class/net ]]; then
-            printf '%-16s %-8s %-10s %-20s\n' 'Interface' 'State' 'Speed' 'MAC'
-            printf '%-16s %-8s %-10s %-20s\n' '─────────' '─────' '─────' '───'
+            printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
+            printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
             for net_path in /sys/class/net/*; do
                 [[ ! -d "$net_path" ]] && continue
                 local iface_name
@@ -3920,6 +3920,9 @@ main() {
             fi
             draw_footer
         fi
+    fi
+
+    # Individual scan flags (independent of SCAN_ALL/SCAN_SYSTEM)
     if [[ "$SCAN_DRIVER" -eq 1 ]]; then
         scan_drivers
     fi
@@ -3933,14 +3936,10 @@ main() {
         scan_user_services
         scan_coredumps
     fi
-    if [[ "$SCAN_MOUNT" -eq 1 && "$SCAN_USB" -ne 1 ]]; then
+    if [[ "$SCAN_MOUNT" -eq 1 ]]; then
         scan_mounts
     fi
-    if [[ "$SCAN_USB" -eq 1 && "$SCAN_MOUNT" -ne 1 ]]; then
-        scan_usb_devices
-    fi
-    if [[ "$SCAN_MOUNT" -eq 1 && "$SCAN_USB" -eq 1 ]]; then
-        scan_mounts
+    if [[ "$SCAN_USB" -eq 1 ]]; then
         scan_usb_devices
     fi
 
@@ -3969,7 +3968,6 @@ main() {
             draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
         fi
         draw_footer
-    fi
     fi
 
     # Footer

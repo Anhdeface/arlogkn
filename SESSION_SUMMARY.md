@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 41 (28 bug fixes, 5 feature additions, 8 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 43 (30 bug fixes, 5 feature additions, 8 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -45,6 +45,10 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 41 (
 - Replaced single-character `%%` trim in `scan_boot_timing` with `sed` to correctly strip all leading/trailing whitespace from time strings.
 - Resolved filesystem path mismatch in `scan_mounts` by normalizing both `df` keys and `/proc/mounts` sources via `readlink -f`, with fallback to raw path for virtual filesystems.
 
+### Dispatch Regression and Export Alignment (Phase 16)
+- Fixed critical regression where individual scan `if` blocks were nested inside `elif SCAN_SYSTEM`, causing `--driver`, `--vga`, `--kernel`, `--user`, `--mount`, `--usb` to silently produce no output. Added `fi` to close the `if SCAN_ALL / elif SCAN_SYSTEM` chain before independent scan blocks.
+- Added missing 'IP' column header to `export_all_logs` network interface section, aligning header with 5-column data rows.
+
 ### Command Excecution Bugs (Phase 8 & 10)
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
 - Redesigned `systemd-analyze blame` parser to accurately process string-separated multi-word time formats (e.g., `3min 31s`), avoiding cross-contamination of time values into systemd service names.
@@ -78,4 +82,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 41 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-15 modifications finalized and staged.
+- Git state: Phase 1-16 modifications finalized and staged.
