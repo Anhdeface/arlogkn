@@ -800,6 +800,36 @@ scan_user_services() {
 
     draw_section_header "SYSTEM SERVICES"
 
+    # ── FAILED SERVICES (systemctl --failed) ──
+    local failed_output=""
+    if command -v systemctl &>/dev/null; then
+        failed_output="$(systemctl --failed --no-legend --no-pager 2>/dev/null)" || true
+    fi
+
+    if [[ -n "$failed_output" ]] && printf '%s' "$failed_output" | grep -q .; then
+        draw_box_line "${C_RED}${C_BOLD}⚠ Failed Services (systemctl --failed):${C_RESET}"
+        printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+
+        printf '%s\n' "$failed_output" | head -10 | while read -r unit load active sub description; do
+            [[ -z "$unit" ]] && continue
+            draw_box_line "  ${C_RED}●${C_RESET} ${C_BOLD}${unit}${C_RESET} — ${C_YELLOW}${sub}${C_RESET} (${description})"
+        done
+
+        local failed_count
+        failed_count="$(printf '%s\n' "$failed_output" | grep -c . || echo 0)"
+        if [[ "$failed_count" -gt 10 ]]; then
+            draw_box_line "${C_YELLOW}... and $((failed_count - 10)) more failed units${C_RESET}"
+        fi
+        printf '\n'
+    else
+        draw_box_line "${C_GREEN}✓ No failed services${C_RESET}"
+        printf '\n'
+    fi
+
+    # ── JOURNAL SERVICE ERRORS ──
+    draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
+    printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+
     journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]] || ! printf '%s' "$journal_output" | grep -q .; then
@@ -899,6 +929,209 @@ scan_pacman_logs() {
         fi
         draw_box_line "$colored_line"
     done
+
+    draw_footer
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HARDWARE TEMPERATURE SCANNING (zero-dependency, /sys/class/hwmon)
+# ─────────────────────────────────────────────────────────────────────────────
+
+scan_temperatures() {
+    draw_section_header "HARDWARE TEMPERATURES"
+    printf '\n'
+
+    if [[ ! -d /sys/class/hwmon ]]; then
+        draw_box_line "${C_YELLOW}hwmon subsystem not available${C_RESET}"
+        draw_footer
+        return 0
+    fi
+
+    local found=0
+    draw_table_begin "Sensor" 30 "Temperature" 18
+
+    shopt -s nullglob
+    for hwmon_dir in /sys/class/hwmon/hwmon*; do
+        [[ ! -d "$hwmon_dir" ]] && continue
+
+        # Get chip name
+        local chip_name=""
+        if [[ -f "${hwmon_dir}/name" ]]; then
+            chip_name="$(cat "${hwmon_dir}/name" 2>/dev/null)"
+        fi
+
+        for temp_input in "${hwmon_dir}"/temp*_input; do
+            [[ ! -f "$temp_input" ]] && continue
+
+            local temp_raw label temp_c color
+            temp_raw="$(cat "$temp_input" 2>/dev/null)" || continue
+            [[ -z "$temp_raw" || ! "$temp_raw" =~ ^-?[0-9]+$ ]] && continue
+
+            # Convert millidegrees to degrees
+            temp_c=$((temp_raw / 1000))
+
+            # Get label (e.g. "Core 0", "Tctl")
+            local label_file="${temp_input%_input}_label"
+            if [[ -f "$label_file" ]]; then
+                label="$(cat "$label_file" 2>/dev/null)"
+            else
+                label="${chip_name:-hwmon}"
+            fi
+
+            # Color-code by severity
+            color="$C_GREEN"
+            [[ "$temp_c" -gt 60 ]] && color="$C_YELLOW"
+            [[ "$temp_c" -gt 80 ]] && color="$C_RED"
+
+            tbl_row "${chip_name:+${chip_name}/}${label}" "${color}${temp_c}°C${C_RESET}"
+            found=1
+        done
+    done
+    shopt -u nullglob
+
+    if [[ "$found" -eq 0 ]]; then
+        draw_table_end
+        draw_box_line "${C_YELLOW}No temperature sensors detected${C_RESET}"
+    else
+        draw_table_end
+    fi
+
+    draw_footer
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BOOT TIMING ANALYSIS (systemd-analyze)
+# ─────────────────────────────────────────────────────────────────────────────
+
+scan_boot_timing() {
+    draw_section_header "BOOT TIMING (systemd-analyze)"
+
+    if ! command -v systemd-analyze &>/dev/null; then
+        draw_box_line "${C_YELLOW}systemd-analyze not available${C_RESET}"
+        draw_footer
+        return 0
+    fi
+
+    # Overall boot time
+    local boot_time
+    boot_time="$(systemd-analyze 2>/dev/null | head -1)" || true
+
+    if [[ -n "$boot_time" ]]; then
+        draw_box_line "${C_BOLD}${boot_time}${C_RESET}"
+    fi
+
+    printf '\n'
+
+    # Top 10 slowest services
+    local blame_output
+    blame_output="$(systemd-analyze blame --no-pager 2>/dev/null | head -10)" || true
+
+    if [[ -n "$blame_output" ]]; then
+        draw_box_line "${C_BOLD}Top 10 Slowest Services:${C_RESET}"
+        printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+
+        printf '%s\n' "$blame_output" | while read -r time_val unit; do
+            [[ -z "$unit" ]] && continue
+            local color="$C_GREEN"
+
+            # Parse time value for coloring (handle "Xs", "Xms", "Xmin")
+            local time_sec=0
+            if [[ "$time_val" =~ ^([0-9]+)min ]]; then
+                time_sec=$((${BASH_REMATCH[1]} * 60))
+            elif [[ "$time_val" =~ ^([0-9]+\.[0-9]+)s$ || "$time_val" =~ ^([0-9]+)s$ ]]; then
+                time_sec="${BASH_REMATCH[1]%%.*}"
+            elif [[ "$time_val" =~ ^([0-9]+)ms$ ]]; then
+                time_sec=0
+            fi
+
+            [[ "$time_sec" -ge 5 ]] && color="$C_YELLOW"
+            [[ "$time_sec" -ge 10 ]] && color="$C_RED"
+
+            draw_box_line "  ${color}${time_val}${C_RESET} ${unit}"
+        done
+    else
+        draw_box_line "${C_GREEN}✓ No boot timing data available${C_RESET}"
+    fi
+
+    draw_footer
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NETWORK INTERFACE SCANNING (zero-dependency, /sys/class/net)
+# ─────────────────────────────────────────────────────────────────────────────
+
+scan_network_interfaces() {
+    draw_section_header "NETWORK INTERFACES"
+    printf '\n'
+
+    if [[ ! -d /sys/class/net ]]; then
+        draw_box_line "${C_YELLOW}/sys/class/net not available${C_RESET}"
+        draw_footer
+        return 0
+    fi
+
+    draw_table_begin "Interface" 14 "State" 8 "Speed" 10 "MAC" 20 "IP" 16
+
+    # Get IP addresses: try ip command, fallback to /proc/net/fib_trie
+    declare -A iface_ips
+    if command -v ip &>/dev/null; then
+        while read -r iface state addr_line; do
+            [[ -z "$iface" ]] && continue
+            local ip_addr
+            ip_addr="$(echo "$addr_line" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+            [[ -n "$ip_addr" ]] && iface_ips["$iface"]="$ip_addr"
+        done < <(ip -br addr 2>/dev/null | grep -v '^lo ')
+    fi
+
+    local found=0
+    shopt -s nullglob
+    for net_path in /sys/class/net/*; do
+        [[ ! -d "$net_path" ]] && continue
+        local iface
+        iface="$(basename "$net_path")"
+        [[ "$iface" == "lo" ]] && continue
+
+        # Read operstate
+        local state="unknown"
+        [[ -f "${net_path}/operstate" ]] && state="$(cat "${net_path}/operstate" 2>/dev/null)"
+
+        # Read speed (may not exist for wireless or down interfaces)
+        local speed="N/A"
+        if [[ -f "${net_path}/speed" ]]; then
+            local raw_speed
+            raw_speed="$(cat "${net_path}/speed" 2>/dev/null)" || true
+            if [[ -n "$raw_speed" && "$raw_speed" =~ ^[0-9]+$ && "$raw_speed" -gt 0 ]]; then
+                if [[ "$raw_speed" -ge 1000 ]]; then
+                    speed="$((raw_speed / 1000))Gbps"
+                else
+                    speed="${raw_speed}Mbps"
+                fi
+            fi
+        fi
+
+        # Read MAC address
+        local mac="N/A"
+        [[ -f "${net_path}/address" ]] && mac="$(cat "${net_path}/address" 2>/dev/null)"
+
+        # Get IP from our lookup table
+        local ip="${iface_ips[$iface]:-N/A}"
+
+        # Color by state
+        local state_color="$C_YELLOW"
+        [[ "$state" == "up" ]] && state_color="$C_GREEN"
+        [[ "$state" == "down" ]] && state_color="$C_RED"
+
+        tbl_row "$iface" "${state_color}${state}${C_RESET}" "$speed" "$mac" "$ip"
+        found=1
+    done
+    shopt -u nullglob
+
+    if [[ "$found" -eq 0 ]]; then
+        draw_table_end
+        draw_box_line "${C_YELLOW}No network interfaces detected (excluding lo)${C_RESET}"
+    else
+        draw_table_end
+    fi
 
     draw_footer
 }
@@ -1217,6 +1450,56 @@ scan_system_basics() {
         ram_used="$(free -h 2>/dev/null | awk '/^Mem:/ {print $3}')"
         ram_avail="$(free -h 2>/dev/null | awk '/^Mem:/ {print $7}')"
         draw_box_line "${C_BOLD}RAM:${C_RESET} Total: ${ram_total} | Used: ${ram_used} | Available: ${ram_avail}"
+    fi
+
+    # Swap status from /proc/swaps
+    if [[ -f /proc/swaps ]]; then
+        local swap_lines
+        swap_lines="$(tail -n +2 /proc/swaps 2>/dev/null)"
+        if [[ -n "$swap_lines" ]]; then
+            draw_box_line "${C_BOLD}Swap:${C_RESET}"
+            printf '%s\n' "$swap_lines" | while read -r filename stype size used priority; do
+                [[ -z "$filename" ]] && continue
+                # Convert KB to human readable
+                local size_h used_h
+                if [[ "$size" -ge 1048576 ]]; then
+                    size_h="$((size / 1048576))G"
+                elif [[ "$size" -ge 1024 ]]; then
+                    size_h="$((size / 1024))M"
+                else
+                    size_h="${size}K"
+                fi
+                if [[ "$used" -ge 1048576 ]]; then
+                    used_h="$((used / 1048576))G"
+                elif [[ "$used" -ge 1024 ]]; then
+                    used_h="$((used / 1024))M"
+                else
+                    used_h="${used}K"
+                fi
+                local use_pct=0
+                [[ "$size" -gt 0 ]] && use_pct=$((used * 100 / size))
+                local color="$C_GREEN"
+                [[ "$use_pct" -gt 70 ]] && color="$C_YELLOW"
+                [[ "$use_pct" -gt 90 ]] && color="$C_RED"
+                draw_box_line "  ${C_CYAN}${filename}${C_RESET} (${stype}) — ${color}${used_h}/${size_h} (${use_pct}%)${C_RESET} pri=${priority}"
+            done
+            # Check for zram specifically
+            shopt -s nullglob
+            for zram_dev in /sys/block/zram*; do
+                if [[ -f "${zram_dev}/comp_algorithm" && -f "${zram_dev}/disksize" ]]; then
+                    local algo disksize_bytes
+                    algo="$(cat "${zram_dev}/comp_algorithm" 2>/dev/null | sed 's/.*\[\([^]]*\)\].*/\1/')"
+                    disksize_bytes="$(cat "${zram_dev}/disksize" 2>/dev/null)"
+                    local disksize_mb=$((disksize_bytes / 1048576))
+                    draw_box_line "  ${C_CYAN}$(basename "$zram_dev")${C_RESET} algorithm: ${algo} | capacity: ${disksize_mb}M"
+                fi
+            done
+            shopt -u nullglob
+        else
+            draw_box_line "${C_YELLOW}Swap: Not configured${C_RESET}"
+        fi
+    else
+        draw_box_line "${C_YELLOW}Swap: /proc/swaps not available${C_RESET}"
     fi
 
     # Disk
@@ -1762,6 +2045,20 @@ export_all_logs() {
         printf '\n\n'
 
         # ─────────────────────────────────────────────────────────────────────
+        # BOOT TIMING
+        # ─────────────────────────────────────────────────────────────────────
+        printf '=============================================================\n'
+        printf '[1.5] BOOT TIMING (systemd-analyze)\n'
+        printf '=============================================================\n'
+        if command -v systemd-analyze &>/dev/null; then
+            systemd-analyze 2>/dev/null | head -1 || true
+            printf '\nTop 15 slowest services:\n'
+            systemd-analyze blame --no-pager 2>/dev/null | head -15 || true
+        else
+            printf 'systemd-analyze not available.\n'
+        fi
+        printf '\n\n'
+        # ─────────────────────────────────────────────────────────────────────
         # USER SERVICES
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
@@ -1773,6 +2070,25 @@ export_all_logs() {
             printf '%s\n' "$service_output"
         else
             printf 'No service errors found.\n'
+        fi
+        printf '\n\n'
+
+        # ─────────────────────────────────────────────────────────────────────
+        # FAILED SERVICES (systemctl --failed)
+        # ─────────────────────────────────────────────────────────────────────
+        printf '=============================================================\n'
+        printf '[2.5] FAILED SERVICES (systemctl --failed)\n'
+        printf '=============================================================\n'
+        if command -v systemctl &>/dev/null; then
+            local failed_svc
+            failed_svc="$(systemctl --failed --no-pager 2>/dev/null)" || true
+            if [[ -n "$failed_svc" ]]; then
+                printf '%s\n' "$failed_svc"
+            else
+                printf 'No failed services.\n'
+            fi
+        else
+            printf 'systemctl not available.\n'
         fi
         printf '\n\n'
 
@@ -1851,7 +2167,38 @@ export_all_logs() {
         printf '\n\n'
 
         # ─────────────────────────────────────────────────────────────────────
-        # GPU / VGA INFO
+        # NETWORK INTERFACES
+        # ─────────────────────────────────────────────────────────────────────
+        printf '=============================================================\n'
+        printf '[7.5] NETWORK INTERFACES\n'
+        printf '=============================================================\n'
+        if [[ -d /sys/class/net ]]; then
+            printf '%-16s %-8s %-10s %-20s\n' 'Interface' 'State' 'Speed' 'MAC'
+            printf '%-16s %-8s %-10s %-20s\n' '─────────' '─────' '─────' '───'
+            for net_path in /sys/class/net/*; do
+                [[ ! -d "$net_path" ]] && continue
+                local iface_name
+                iface_name="$(basename "$net_path")"
+                [[ "$iface_name" == "lo" ]] && continue
+                local e_state="unknown" e_speed="N/A" e_mac="N/A"
+                [[ -f "${net_path}/operstate" ]] && e_state="$(cat "${net_path}/operstate" 2>/dev/null)"
+                if [[ -f "${net_path}/speed" ]]; then
+                    local rs
+                    rs="$(cat "${net_path}/speed" 2>/dev/null)" || true
+                    [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]] && e_speed="${rs}Mbps"
+                fi
+                [[ -f "${net_path}/address" ]] && e_mac="$(cat "${net_path}/address" 2>/dev/null)"
+                local e_ip="N/A"
+                if command -v ip &>/dev/null; then
+                    e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+                    [[ -z "$e_ip" ]] && e_ip="N/A"
+                fi
+                printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
+            done
+        else
+            printf '/sys/class/net not available.\n'
+        fi
+        printf '\n\n'
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
         printf '[8] GPU / VGA INFO\n'
@@ -1887,7 +2234,41 @@ export_all_logs() {
         printf 'CPU Cores: %s\n' "$(nproc 2>/dev/null || echo '?')"
         printf 'Memory:\n'
         free -h 2>/dev/null || true
+        printf '\nSwap:\n'
+        if [[ -f /proc/swaps ]]; then
+            cat /proc/swaps 2>/dev/null || true
+        else
+            printf '/proc/swaps not available.\n'
+        fi
         printf '\nUptime: %s\n' "$(uptime -p 2>/dev/null || uptime | sed 's/.*up /up /' | cut -d',' -f1-2)"
+        printf '\n'
+
+        # Hardware temperatures
+        printf 'Temperatures:\n'
+        if [[ -d /sys/class/hwmon ]]; then
+            shopt -s nullglob
+            local temp_found=0
+            for hw_dir in /sys/class/hwmon/hwmon*; do
+                [[ ! -d "$hw_dir" ]] && continue
+                local hw_name=""
+                [[ -f "${hw_dir}/name" ]] && hw_name="$(cat "${hw_dir}/name" 2>/dev/null)"
+                for ti in "${hw_dir}"/temp*_input; do
+                    [[ ! -f "$ti" ]] && continue
+                    local tr_val
+                    tr_val="$(cat "$ti" 2>/dev/null)" || continue
+                    [[ -z "$tr_val" || ! "$tr_val" =~ ^-?[0-9]+$ ]] && continue
+                    local lbl_file="${ti%_input}_label"
+                    local lbl="${hw_name:-hwmon}"
+                    [[ -f "$lbl_file" ]] && lbl="$(cat "$lbl_file" 2>/dev/null)"
+                    printf '  %s/%s: %d°C\n' "${hw_name:-hwmon}" "$lbl" $((tr_val / 1000))
+                    temp_found=1
+                done
+            done
+            shopt -u nullglob
+            [[ "$temp_found" -eq 0 ]] && printf '  No temperature sensors detected.\n'
+        else
+            printf '  hwmon not available.\n'
+        fi
         printf '\n\n'
 
         printf '=============================================================\n'
@@ -3274,14 +3655,17 @@ main() {
     # Execute scans based on flags
     if [[ "$SCAN_ALL" -eq 1 ]]; then
         scan_system_basics
+        scan_temperatures
         scan_vga_info
         scan_drivers
         scan_kernel_logs "$boot_flag"
+        scan_boot_timing
         scan_user_services "$boot_flag"
         scan_coredumps
         scan_pacman_logs
         scan_mounts
         scan_usb_devices
+        scan_network_interfaces
 
         # Export logs if --save is set (separate files)
         if [[ "$SAVE_LOGS" -eq 1 ]]; then
@@ -3322,10 +3706,12 @@ main() {
     elif [[ "$SCAN_SYSTEM" -eq 1 ]]; then
         # --system flag: full system scan without logs
         scan_system_basics
+        scan_temperatures
         scan_vga_info
         scan_drivers
         scan_mounts
         scan_usb_devices
+        scan_network_interfaces
 
         if [[ "$SAVE_LOGS" -eq 1 ]]; then
             printf '\n'
