@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 53 (40 bug fixes, 5 feature additions, 8 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 61 (46 bug fixes, 5 feature additions, 10 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -65,6 +65,16 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 53 (
 - Fixed `_get_lspci` and `_get_lspci_knn` cache failure when `lspci` is not installed by converting cache checks to use a `"__UNSET__"` sentinel value instead of empty strings, preventing redundant forks.
 - Removed unreachable dead-code `[[ -z "$driver" ]] && driver="N/A"` checks for `virtual_driver` and `input_driver` loops, as these were correctly pre-initialized to `"N/A"`.
 
+### Final System Audit (Phase 22)
+- Replaced hardcoded `/tmp/.jctl_err` with a secure `mktemp` approach to prevent symlink/TOCTOU attacks.
+- Wrapped slow `lsusb -v` calls in `export_usb_devices` and `export_all_logs` with a 15-second `timeout` to prevent indefinite hangs.
+- Moved `init_colors` before `parse_args` in `main()` to ensure `--help` output renders with colors instead of empty strings.
+- Removed invisible `$C_CYAN` space-based separator lines from table outputs to cleanly separate content.
+- Rewrote `strip_ansi()` to use pure bash regex replacement instead of a `sed` subshell, speeding up execution significantly for large amounts of table rows.
+- Refactored `draw_empty_box()` to count visible string length dynamically using `visible_len` instead of a mathematically fragile hardcode.
+- Upgraded `detect_drivers()` to accumulate all network interface drivers into a comma-separated list rather than stopping after capturing the first interface.
+- Protected `scan_coredumps()` against empty log spam by adding an `NF < 6` `awk` guard that intercepts mismatched lines.
+
 ### Flag Collision and Double Scans (Phase 19)
 - Fixed `--system` combined with individual flags (e.g., `--driver`) causing double-scans and double-exports. Added logic to clear individual scan flags at the end of `SCAN_ALL` and `SCAN_SYSTEM` blocks so the independent `if` blocks don't re-execute scans that were already covered.
 - Fixed `--kernel` and `--user` mutually annihilation in `parse_args`. Removed the zeroing of other flags when parsing `--kernel` and `--user`, allowing them to be combined cleanly like `--driver --vga`.
@@ -102,4 +112,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 53 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-21 modifications finalized and staged.
+- Git state: Phase 1-22 modifications finalized and staged.

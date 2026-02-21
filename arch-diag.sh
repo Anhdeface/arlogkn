@@ -350,16 +350,26 @@ detect_drivers() {
     if [[ -d /sys/class/net ]]; then
         shopt -s nullglob
         local net_path iface_driver
+        local -a net_drvs=()
         for net_path in /sys/class/net/*; do
             [[ ! -d "$net_path" ]] && continue
             [[ "$(basename "$net_path")" == "lo" ]] && continue
             iface_driver="$(get_driver_from_sys "$net_path")"
             if [[ -n "$iface_driver" && "$iface_driver" != "N/A" ]]; then
-                network_driver="$iface_driver"
-                break
+                # Avoid duplicates
+                local dup=0
+                for d in "${net_drvs[@]}"; do
+                    [[ "$d" == "$iface_driver" ]] && dup=1 && break
+                done
+                [[ "$dup" -eq 0 ]] && net_drvs+=("$iface_driver")
             fi
         done
         shopt -u nullglob
+        
+        if [[ ${#net_drvs[@]} -gt 0 ]]; then
+            network_driver="$(printf '%s, ' "${net_drvs[@]}")"
+            network_driver="${network_driver%, }"
+        fi
     fi
 
     # Audio from sound class
@@ -584,7 +594,8 @@ draw_box_line() {
 draw_empty_box() {
     local width="${1:-70}"
     local message="✓ No Critical Issues Found"
-    local msg_len=26
+    local msg_len
+    msg_len=$(visible_len "$message")
     local padding=$((width - msg_len))
     local half_pad=$((padding / 2))
     local remainder=$((padding - half_pad))
@@ -628,8 +639,10 @@ strip_ansi() {
     s="${s//${C_CYAN}/}"
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
-    # Strip any remaining raw ANSI escape sequences (e.g. from journalctl)
-    s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
+    # Strip any remaining raw ANSI escape sequences using bash built-in
+    while [[ "$s" =~ $'\e'\[[0-9\;]*[a-zA-Z] ]]; do
+        s="${s//${BASH_REMATCH[0]}/}"
+    done
     printf '%s' "$s"
 }
 
@@ -746,13 +759,15 @@ scan_kernel_logs() {
     draw_section_header "KERNEL CRITICAL"
 
     # Check journal accessibility
-    # journalctl returns 1 if journal is empty (valid state). 
     # We only want to warn if accessibility is restricted (e.g., EACCES).
-    if ! timeout 10 journalctl -n 1 --quiet 2>/tmp/.jctl_err; then
-        if grep -q 'Permission denied\|Failed to open' /tmp/.jctl_err 2>/dev/null; then
+    local jctl_err
+    jctl_err="$(mktemp)"
+    if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
+        if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
             warn "Cannot access system journal (try running as root for full access)"
         fi
     fi
+    rm -f "$jctl_err"
 
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -778,7 +793,7 @@ scan_kernel_logs() {
     draw_box_line "$info_line"
 
     # Separator line
-    printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+    draw_box_line ""
 
     # Error entries with color highlighting
     printf '%s\n' "$output" | head -20 | while read -r line; do
@@ -814,7 +829,7 @@ scan_user_services() {
 
     if [[ -n "$failed_output" ]] && printf '%s' "$failed_output" | grep -q .; then
         draw_box_line "${C_RED}${C_BOLD}⚠ Failed Services (systemctl --failed):${C_RESET}"
-        printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+        draw_box_line ""
 
         printf '%s\n' "$failed_output" | head -10 | while read -r unit load active sub description; do
             [[ -z "$unit" ]] && continue
@@ -852,7 +867,7 @@ scan_user_services() {
 
     # Header info
     draw_box_line "${C_BOLD}Service Journal Errors (current boot)${C_RESET}"
-    printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+    draw_box_line ""
 
     printf '%s\n' "$output" | head -15 | while read -r line; do
         # Highlight service names
@@ -888,11 +903,17 @@ scan_coredumps() {
     fi
 
     printf '%s\n' "$coredumps" | while read -r line; do
-        # Parse coredumpctl output
-        # Format varies by systemd version; exe is always last, use NF safely
+        # Parse coredumpctl output robustly
+        # Format varies by systemd version.
         local time pid exe sig
+        # Check if line has enough fields. If NF < 6, fallback to raw string.
+        if ! echo "$line" | awk '{if(NF<6) exit 1}'; then
+            draw_box_line "${C_YELLOW}$line${C_RESET}"
+            continue
+        fi
+        
         # Extract time from beginning by stripping the last 6 fields
-        # (UID, GID, SIG, COREFILE, EXE, and PID)
+        # (UID, GID, SIG, COREFILE, EXE, and PID/COMM)
         time="$(echo "$line" | awk '{NF-=6; print $0}')"
         pid="$(echo "$line" | awk '{print $(NF-5)}')"
         sig="$(echo "$line" | awk '{print $(NF-2)}')"
@@ -1973,7 +1994,7 @@ export_drivers() {
         printf '[3] USB DEVICES\n'
         printf '=============================================================\n\n'
         if command -v lsusb &>/dev/null; then
-            lsusb -v 2>/dev/null | head -200 || lsusb 2>/dev/null || true
+            timeout 15 lsusb -v 2>/dev/null | head -200 || timeout 5 lsusb 2>/dev/null || true
         else
             printf 'lsusb not available\n'
         fi
@@ -3783,8 +3804,8 @@ EOF
 # ─────────────────────────────────────────────────────────────────────────────
 
 main() {
-    parse_args "$@"
     init_colors
+    parse_args "$@"
 
     # Wiki mode: skip all system detection, just show wiki and exit
     if [[ "$SCAN_WIKI" -eq 1 ]]; then
