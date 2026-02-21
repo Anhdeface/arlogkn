@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 43 (30 bug fixes, 5 feature additions, 8 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 46 (33 bug fixes, 5 feature additions, 8 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -49,6 +49,11 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 43 (
 - Fixed critical regression where individual scan `if` blocks were nested inside `elif SCAN_SYSTEM`, causing `--driver`, `--vga`, `--kernel`, `--user`, `--mount`, `--usb` to silently produce no output. Added `fi` to close the `if SCAN_ALL / elif SCAN_SYSTEM` chain before independent scan blocks.
 - Added missing 'IP' column header to `export_all_logs` network interface section, aligning header with 5-column data rows.
 
+### Table, GPU, and Timing Bugs (Phase 17)
+- Fixed off-by-n separator width in `tbl_begin` by changing `+2` to `+1` per column to match the single leading space used in header/row formatting.
+- Tightened GPU detection glob from `card*` to `card[0-9]*` and added connector entry skip (`*-*`), eliminating wasteful iteration over `card0-HDMI-A-1` style entries.
+- Replaced float truncation with `printf '%.0f'` rounding in boot timing coloring so `4.999s` correctly rounds to 5 and triggers the yellow threshold. Also added combined `Xmin Ys` parsing for accurate total time.
+
 ### Command Excecution Bugs (Phase 8 & 10)
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
 - Redesigned `systemd-analyze blame` parser to accurately process string-separated multi-word time formats (e.g., `3min 31s`), avoiding cross-contamination of time values into systemd service names.
@@ -82,4 +87,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 43 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-16 modifications finalized and staged.
+- Git state: Phase 1-17 modifications finalized and staged.

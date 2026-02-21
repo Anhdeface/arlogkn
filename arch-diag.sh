@@ -191,11 +191,12 @@ detect_gpu() {
 
     # Check all DRM cards (supports multiple GPUs, e.g., hybrid graphics)
     shopt -s nullglob
-    for card_path in /sys/class/drm/card*; do
+    for card_path in /sys/class/drm/card[0-9]*; do
         [[ ! -d "$card_path" ]] && continue
         
-        # Skip render nodes (they're symlinks to cards)
+        # Skip render nodes and connector entries (e.g., card0-HDMI-A-1)
         [[ "$card_path" == *"render"* ]] && continue
+        [[ "$(basename "$card_path")" == *-* ]] && continue
         
         driver=""
         if [[ -L "${card_path}/device/driver" ]]; then
@@ -653,7 +654,7 @@ tbl_begin() {
     
     local i num_cols=$((${#_TBL_COLS[@]} / 2))
     for ((i=0; i<num_cols; i++)); do
-        _TBL_WIDTH=$((_TBL_WIDTH + ${_TBL_COLS[$((i*2+1))]} + 2))
+        _TBL_WIDTH=$((_TBL_WIDTH + ${_TBL_COLS[$((i*2+1))]} + 1))
     done
     
     # Header row with simple separator
@@ -1050,8 +1051,16 @@ scan_boot_timing() {
             local time_sec=0
             if [[ "$time_val" =~ ^([0-9]+)min ]]; then
                 time_sec=$((${BASH_REMATCH[1]} * 60))
-            elif [[ "$time_val" =~ ^([0-9]+\.[0-9]+)s$ || "$time_val" =~ ^([0-9]+)s$ ]]; then
-                time_sec="${BASH_REMATCH[1]%%.*}"
+                # Also add remaining seconds if present (e.g., "3min 31.5s")
+                local rest="${time_str#*min }"
+                if [[ "$rest" != "$time_str" && "$rest" =~ ^([0-9]+\.?[0-9]*)s ]]; then
+                    local extra_sec
+                    extra_sec="$(printf '%.0f' "${BASH_REMATCH[1]}" 2>/dev/null)" || extra_sec=0
+                    time_sec=$((time_sec + extra_sec))
+                fi
+            elif [[ "$time_val" =~ ^([0-9]+\.?[0-9]*)s$ ]]; then
+                # Round up: 4.999 → 5 for accurate threshold comparison
+                time_sec="$(printf '%.0f' "${BASH_REMATCH[1]}" 2>/dev/null)" || time_sec=0
             elif [[ "$time_val" =~ ^([0-9]+)ms$ ]]; then
                 time_sec=0
             fi
