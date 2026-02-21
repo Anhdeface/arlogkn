@@ -737,7 +737,7 @@ cluster_errors() {
 }
 
 scan_kernel_logs() {
-    local boot_flag="$1"
+    local -a boot_args=(-b "$BOOT_OFFSET")
     local output=""
     local journal_output=""
 
@@ -749,7 +749,7 @@ scan_kernel_logs() {
     fi
 
     # Fetch kernel errors (priority 3 = ERR)
-    journal_output="$(timeout 10 journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]] || ! printf '%s' "$journal_output" | grep -q .; then
         draw_empty_box
@@ -768,7 +768,7 @@ scan_kernel_logs() {
     first_ts="$(printf '%s\n' "$journal_output" | head -1 | awk '{print $1, $2, $3}')"
 
     # Info line with boot info
-    local info_line="${C_BLUE}Boot:${C_RESET} ${boot_flag:--b $BOOT_OFFSET} ${C_BLUE}|${C_RESET} First: $first_ts"
+    local info_line="${C_BLUE}Boot:${C_RESET} ${boot_args[*]} ${C_BLUE}|${C_RESET} First: $first_ts"
     draw_box_line "$info_line"
 
     # Separator line
@@ -794,7 +794,7 @@ scan_kernel_logs() {
 }
 
 scan_user_services() {
-    local boot_flag="$1"
+    local -a boot_args=(-b "$BOOT_OFFSET")
     local output=""
     local journal_output=""
 
@@ -830,7 +830,7 @@ scan_user_services() {
     draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
     printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
 
-    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]] || ! printf '%s' "$journal_output" | grep -q .; then
         draw_empty_box
@@ -1584,7 +1584,7 @@ init_output_dir() {
 }
 
 export_kernel_logs() {
-    local boot_flag="$1"
+    local -a boot_args=(-b "$BOOT_OFFSET")
     
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
@@ -1595,10 +1595,10 @@ export_kernel_logs() {
     local output_file="${OUTPUT_DIR}/kernel_errors.txt"
     local journal_output
 
-    journal_output="$(timeout 10 journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
-        printf 'No kernel errors found for boot: %s\n' "$boot_flag" > "$output_file"
+        printf 'No kernel errors found for boot: %s\n' "${boot_args[*]}" > "$output_file"
         return 0
     fi
 
@@ -1616,7 +1616,7 @@ export_kernel_logs() {
 }
 
 export_user_services() {
-    local boot_flag="$1"
+    local -a boot_args=(-b "$BOOT_OFFSET")
     
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
@@ -1627,10 +1627,10 @@ export_user_services() {
     local output_file="${OUTPUT_DIR}/service_errors.txt"
     local journal_output
 
-    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
-        printf 'No service errors found for boot: %s\n' "$boot_flag" > "$output_file"
+        printf 'No service errors found for boot: %s\n' "${boot_args[*]}" > "$output_file"
         return 0
     fi
 
@@ -2085,7 +2085,6 @@ export_summary() {
     fi
     
     local output_file="${OUTPUT_DIR}/summary.txt"
-    local boot_flag="$1"
 
     # Wait for all file writes to complete (0.3s balances speed vs reliability)
     sleep 0.3
@@ -2126,7 +2125,7 @@ EOF
 # ─────────────────────────────────────────────────────────────────────────────
 
 export_all_logs() {
-    local boot_flag="$1"
+    local -a boot_args=(-b "$BOOT_OFFSET")
     
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
@@ -2159,7 +2158,7 @@ export_all_logs() {
         printf '[1] KERNEL LOGS (Priority ≤3 - Errors)\n'
         printf '=============================================================\n'
         local kernel_output
-        kernel_output="$(timeout 10 journalctl -k -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+        kernel_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
         if [[ -n "$kernel_output" ]]; then
             printf '%s\n' "$kernel_output"
         else
@@ -2188,7 +2187,7 @@ export_all_logs() {
         printf '[3] USER SERVICES\n'
         printf '=============================================================\n'
         local service_output
-        service_output="$(timeout 10 journalctl -u "*.service" -p 3 "$boot_flag" --no-pager 2>/dev/null)" || true
+        service_output="$(timeout 10 journalctl -u "*.service" -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
         if [[ -n "$service_output" ]]; then
             printf '%s\n' "$service_output"
         else
@@ -3768,7 +3767,6 @@ main() {
     detect_display
 
     local width=70
-    local boot_flag="-b $BOOT_OFFSET"
 
     # Header
     printf '\n'
@@ -3810,9 +3808,9 @@ main() {
         scan_temperatures
         scan_vga_info
         scan_drivers
-        scan_kernel_logs "$boot_flag"
+        scan_kernel_logs
         scan_boot_timing
-        scan_user_services "$boot_flag"
+        scan_user_services
         scan_coredumps
         scan_pacman_logs
         scan_mounts
@@ -3827,8 +3825,8 @@ main() {
             
             local export_failed=0
             
-            export_kernel_logs "$boot_flag" || { warn "Export kernel logs failed"; export_failed=1; }
-            export_user_services "$boot_flag" || { warn "Export user services failed"; export_failed=1; }
+            export_kernel_logs || { warn "Export kernel logs failed"; export_failed=1; }
+            export_user_services || { warn "Export user services failed"; export_failed=1; }
             export_coredumps || { warn "Export coredumps failed"; export_failed=1; }
             export_pacman_logs || { warn "Export pacman logs failed"; export_failed=1; }
             export_mounts || { warn "Export mounts failed"; export_failed=1; }
@@ -3838,7 +3836,7 @@ main() {
             export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
             export_boot_timing || { warn "Export boot timing failed"; export_failed=1; }
             export_network_interfaces || { warn "Export network interfaces failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -3851,7 +3849,7 @@ main() {
             printf '\n'
             draw_box_line "${C_CYAN}Exporting all logs to single file...${C_RESET}"
             draw_footer
-            if export_all_logs "$boot_flag"; then
+            if export_all_logs; then
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}/arch-log-inspector-all.txt${C_RESET}"
             else
                 draw_box_line "${C_RED}✗ Export failed (check warnings above)${C_RESET}"
@@ -3882,7 +3880,7 @@ main() {
             export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
             export_boot_timing || { warn "Export boot timing failed"; export_failed=1; }
             export_network_interfaces || { warn "Export network interfaces failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -3894,7 +3892,7 @@ main() {
             printf '\n'
             draw_box_line "${C_CYAN}Exporting all logs to single file...${C_RESET}"
             draw_footer
-            if export_all_logs "$boot_flag"; then
+            if export_all_logs; then
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}/arch-log-inspector-all.txt${C_RESET}"
             else
                 draw_box_line "${C_RED}✗ Export failed (check warnings above)${C_RESET}"
@@ -3911,7 +3909,7 @@ main() {
             
             local export_failed=0
             export_drivers || { warn "Export drivers failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -3930,7 +3928,7 @@ main() {
             
             local export_failed=0
             export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -3940,7 +3938,7 @@ main() {
             draw_footer
         fi
     elif [[ "$SCAN_KERNEL" -eq 1 ]]; then
-        scan_kernel_logs "$boot_flag"
+        scan_kernel_logs
 
         if [[ "$SAVE_LOGS" -eq 1 ]]; then
             printf '\n'
@@ -3948,8 +3946,8 @@ main() {
             draw_footer
             
             local export_failed=0
-            export_kernel_logs "$boot_flag" || { warn "Export kernel logs failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_kernel_logs || { warn "Export kernel logs failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -3959,7 +3957,7 @@ main() {
             draw_footer
         fi
     elif [[ "$SCAN_USER" -eq 1 ]]; then
-        scan_user_services "$boot_flag"
+        scan_user_services
         scan_coredumps
 
         if [[ "$SAVE_LOGS" -eq 1 ]]; then
@@ -3968,9 +3966,9 @@ main() {
             draw_footer
             
             local export_failed=0
-            export_user_services "$boot_flag" || { warn "Export user services failed"; export_failed=1; }
+            export_user_services || { warn "Export user services failed"; export_failed=1; }
             export_coredumps || { warn "Export coredumps failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -3992,7 +3990,7 @@ main() {
             local export_failed=0
             export_mounts || { warn "Export mounts failed"; export_failed=1; }
             export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -4011,7 +4009,7 @@ main() {
             
             local export_failed=0
             export_mounts || { warn "Export mounts failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
@@ -4030,7 +4028,7 @@ main() {
             
             local export_failed=0
             export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
-            export_summary "$boot_flag" || { warn "Export summary failed"; export_failed=1; }
+            export_summary || { warn "Export summary failed"; export_failed=1; }
             
             if [[ "$export_failed" -eq 1 ]]; then
                 draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
