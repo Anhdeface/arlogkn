@@ -2711,7 +2711,7 @@ find_wiki_group_awk() {
         local i=0
         for group in "${WIKI_GROUP_NAMES[@]}"; do
             [[ "$group" == *"$target"* ]] && echo $i && return 0
-            ((i++))
+            i=$((i+1))
         done
     fi
     
@@ -2719,7 +2719,7 @@ find_wiki_group_awk() {
     local i=0
     for group in "${WIKI_GROUP_NAMES[@]}"; do
         [[ "$group" == *"$query"* ]] && echo $i && return 0
-        ((i++))
+        i=$((i+1))
     done
     
     # AWK PATH: Fuzzy matching

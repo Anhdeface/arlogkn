@@ -1,7 +1,7 @@
 # Session Summary: arch-diag.sh
 
 ## Overview
-Implementation status of modifications to arch-diag.sh. Total improvements: 32 (20 bug fixes, 5 feature additions, 7 polish/consistency updates).
+Implementation status of modifications to arch-diag.sh. Total improvements: 33 (21 bug fixes, 5 feature additions, 7 polish/consistency updates).
 
 ## Bug Fixes
 
@@ -35,6 +35,9 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 32 (
 - Refactored `journalctl` parameter passing by dynamically constructing local arrays (`boot_args=("${BOOT_OFFSET}")`) internally within scanning and logging functions. This prevents `"-b -1"` strings from bypassing tokenization and causing silent journalctl failures. Unused `boot_flag` parameters in `main()` were fully pruned.
 - Redesigned `systemd-analyze blame` parser to accurately process string-separated multi-word time formats (e.g., `3min 31s`), avoiding cross-contamination of time values into systemd service names.
 
+### Wiki Lookup Fatal Bug (Phase 11)
+- Replaced `((i++))` with `i=$((i+1))` in `find_wiki_group_awk` to prevent `set -e` from aborting the subshell when the pre-increment value is 0 (exit code 1). This caused every `--wiki` query except `pacman` to silently return group index 0.
+
 ### UI Polish (Phase 9)
 - Corrected misleading green checkmark (`✓`) to a yellow warning indicator (`⚠`) for missing boot timing data, properly representing the degraded data state.
 
@@ -61,4 +64,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 32 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-10 modifications finalized and staged.
+- Git state: Phase 1-11 modifications finalized and staged.
