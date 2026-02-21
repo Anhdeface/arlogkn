@@ -1564,15 +1564,21 @@ check_disk_space() {
     local min_free_kb="${2:-102400}"  # Default: 100MB
     local check_path="$target_dir"
 
-    # If target doesn't exist, check parent directory
-    if [[ ! -e "$target_dir" ]]; then
-        check_path="$(dirname "$target_dir")"
+    # Resolve symlinks to get real path (important for cross-filesystem symlinks)
+    local resolved
+    resolved="$(readlink -f "$target_dir" 2>/dev/null)" || resolved="$target_dir"
+
+    # If resolved target doesn't exist, check parent directory
+    if [[ ! -e "$resolved" ]]; then
+        check_path="$(dirname "$resolved")"
         # If parent doesn't exist either, check root
         [[ ! -d "$check_path" ]] && check_path="/"
+    elif [[ -f "$resolved" ]]; then
+        # Get parent directory if target is a file
+        check_path="$(dirname "$resolved")"
+    else
+        check_path="$resolved"
     fi
-    
-    # Get parent directory if target is a file
-    [[ -f "$target_dir" ]] && check_path="$(dirname "$target_dir")"
 
     # Get available space in KB
     local avail_kb
