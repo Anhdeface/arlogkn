@@ -855,8 +855,10 @@ scan_coredumps() {
         # Parse coredumpctl output
         # Format varies by systemd version; exe is always last, use NF safely
         local time pid exe sig
-        time="$(echo "$line" | awk '{print $1, $2, $3}')"
-        pid="$(echo "$line" | awk '{print $4}')"
+        # Extract time from beginning by stripping the last 6 fields
+        # (UID, GID, SIG, COREFILE, EXE, and PID)
+        time="$(echo "$line" | awk '{NF-=6; print $0}')"
+        pid="$(echo "$line" | awk '{print $(NF-5)}')"
         sig="$(echo "$line" | awk '{print $(NF-2)}')"
         exe="$(echo "$line" | awk '{print $NF}')"
         draw_box_line "${C_CYAN}[$time]${C_RESET} PID ${C_BOLD}$pid${C_RESET} - ${C_YELLOW}$exe${C_RESET} (signal: $sig)"
@@ -1730,8 +1732,8 @@ export_all_logs() {
     local temp_file
     temp_file="$(mktemp)"
 
-    # Cleanup trap: ensure temp file is removed on exit/error
-    trap 'rm -f "$temp_file" 2>/dev/null || true' RETURN EXIT
+    # Cleanup trap: ensure temp file is removed on exiting this function
+    trap 'rm -f "$temp_file" 2>/dev/null || true' RETURN
 
     {
         printf '=============================================================\n'
@@ -1901,7 +1903,7 @@ export_all_logs() {
     fi
 
     # Reset trap after successful move (temp file no longer exists)
-    trap - RETURN EXIT
+    trap - RETURN
 
     info "All logs exported to: ${output_file}"
 }
@@ -2681,14 +2683,16 @@ show_wiki() {
             if [[ -n "$suggestions" ]]; then
                 draw_box_line "${C_YELLOW}Did you mean one of these?${C_RESET}"
                 printf '\n'
-                draw_box_line "  ${C_CYAN}--wiki pacman${C_RESET}        - Package management"
-                draw_box_line "  ${C_CYAN}--wiki sound${C_RESET}         - Sound & audio"
-                draw_box_line "  ${C_CYAN}--wiki graphics${C_RESET}      - Graphics & display"
-                draw_box_line "  ${C_CYAN}--wiki network${C_RESET}       - Network diagnostics"
-                draw_box_line "  ${C_CYAN}--wiki boot${C_RESET}          - Boot & startup repair"
-                draw_box_line "  ${C_CYAN}--wiki memory${C_RESET}        - Memory & swap"
-                draw_box_line "  ${C_CYAN}--wiki systemd${C_RESET}       - Systemd journal"
-                draw_box_line "  ${C_CYAN}--wiki troubleshooting${C_RESET} - Troubleshooting"
+                # Parse dynamic suggestions from awk output
+                printf '%s\n' "$suggestions" | while read -r sug_line; do
+                    local cmd desc
+                    # First word is the keyword, the rest is description/aliases
+                    cmd="$(echo "$sug_line" | awk '{print $1}')"
+                    # We map back into our descriptive format. $sug_line contains the raw WIKI_GROUP_NAMES text
+                    # We use cut to skip the first word if needed, or just display the whole match as hint
+                    desc="$(echo "$sug_line" | cut -d' ' -f2-)"
+                    draw_box_line "  ${C_CYAN}--wiki ${cmd}${C_RESET} - Matches: ${desc}"
+                done
                 printf '\n'
                 draw_box_line "${C_CYAN}Tip: Use keywords like 'pacman', 'sound', 'gpu', 'boot', etc.${C_RESET}"
             else
