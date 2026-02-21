@@ -47,8 +47,8 @@ declare -g DISPLAY_INFO=""
 
 # Performance caches (avoid redundant system calls)
 declare -g _DRIVERS_CACHE=""
-declare -g _LSPCI_CACHE=""
-declare -g _LSPCI_KNN_CACHE=""
+declare -g _LSPCI_CACHE="__UNSET__"
+declare -g _LSPCI_KNN_CACHE="__UNSET__"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
@@ -56,19 +56,18 @@ declare -g _LSPCI_KNN_CACHE=""
 
 # Get lspci output with caching (single call per session)
 _get_lspci() {
-    if [[ -z "$_LSPCI_CACHE" ]]; then
-        _LSPCI_CACHE="$(lspci -k 2>/dev/null)"
+    if [[ "$_LSPCI_CACHE" == "__UNSET__" ]]; then
+        _LSPCI_CACHE="$(lspci -k 2>/dev/null || true)"
     fi
-    echo "$_LSPCI_CACHE"
+    [[ -n "$_LSPCI_CACHE" ]] && echo "$_LSPCI_CACHE"
 }
 
 # Get lspci -knn output with caching (for export)
 _get_lspci_knn() {
-    local cache_var="_LSPCI_KNN_CACHE"
-    if [[ -z "${!cache_var:-}" ]]; then
-        printf -v "$cache_var" '%s' "$(lspci -knn 2>/dev/null)"
+    if [[ "$_LSPCI_KNN_CACHE" == "__UNSET__" ]]; then
+        _LSPCI_KNN_CACHE="$(lspci -knn 2>/dev/null || true)"
     fi
-    echo "${!cache_var}"
+    [[ -n "$_LSPCI_KNN_CACHE" ]] && echo "$_LSPCI_KNN_CACHE"
 }
 
 die() {
@@ -436,7 +435,6 @@ detect_drivers() {
             esac
         done
         shopt -u nullglob
-        [[ -z "$virtual_driver" ]] && virtual_driver="N/A"
     fi
 
     # Input drivers from /sys/class/input
@@ -453,7 +451,6 @@ detect_drivers() {
             fi
         done
         shopt -u nullglob
-        [[ -z "$input_driver" || "$input_driver" == "N/A" ]] && input_driver="N/A"
     fi
 
     # Watchdog
