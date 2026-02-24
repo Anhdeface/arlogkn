@@ -643,10 +643,11 @@ strip_ansi() {
     s="${s//${C_CYAN}/}"
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
-    # Strip any remaining raw ANSI escape sequences using bash built-in
-    while [[ -n "$s" && "$s" =~ $'\e'\[[0-9\;]*[a-zA-Z] && -n "${BASH_REMATCH[0]}" ]]; do
-        s="${s//${BASH_REMATCH[0]}/}"
-    done
+    # Strip any remaining raw ANSI escape sequences using sed (O(n) single pass)
+    # This is faster than the bash regex loop which is O(n²) for long strings
+    if [[ -n "$s" ]]; then
+        s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
+    fi
     printf '%s' "$s"
 }
 
