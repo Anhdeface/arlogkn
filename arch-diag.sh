@@ -47,8 +47,10 @@ declare -g DISPLAY_INFO=""
 
 # Performance caches (avoid redundant system calls)
 declare -g _DRIVERS_CACHE=""
-declare -g _LSPCI_CACHE="__UNSET__"
-declare -g _LSPCI_KNN_CACHE="__UNSET__"
+declare -g _LSPCI_CACHE=""
+declare -g _LSPCI_CACHE_INIT=0
+declare -g _LSPCI_KNN_CACHE=""
+declare -g _LSPCI_KNN_CACHE_INIT=0
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
@@ -56,18 +58,20 @@ declare -g _LSPCI_KNN_CACHE="__UNSET__"
 
 # Get lspci output with caching (single call per session)
 _get_lspci() {
-    if [[ "$_LSPCI_CACHE" == "__UNSET__" ]]; then
+    if [[ "$_LSPCI_CACHE_INIT" -eq 0 ]]; then
         _LSPCI_CACHE="$(lspci -k 2>/dev/null || true)"
+        _LSPCI_CACHE_INIT=1
     fi
-    [[ -n "$_LSPCI_CACHE" ]] && echo "$_LSPCI_CACHE"
+    printf '%s' "$_LSPCI_CACHE"
 }
 
 # Get lspci -knn output with caching (for export)
 _get_lspci_knn() {
-    if [[ "$_LSPCI_KNN_CACHE" == "__UNSET__" ]]; then
+    if [[ "$_LSPCI_KNN_CACHE_INIT" -eq 0 ]]; then
         _LSPCI_KNN_CACHE="$(lspci -knn 2>/dev/null || true)"
+        _LSPCI_KNN_CACHE_INIT=1
     fi
-    [[ -n "$_LSPCI_KNN_CACHE" ]] && echo "$_LSPCI_KNN_CACHE"
+    printf '%s' "$_LSPCI_KNN_CACHE"
 }
 
 die() {
