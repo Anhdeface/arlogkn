@@ -652,9 +652,22 @@ strip_ansi() {
 }
 
 # Get visible length (excluding ANSI codes)
+# Inlined strip_ansi logic to avoid subshell overhead in tight loops (table rendering)
+# NOTE: If you update strip_ansi(), update this function too to keep logic in sync.
 visible_len() {
-    local s
-    s=$(strip_ansi "$1")
+    local s="$1"
+    # Strip script color variables (inline from strip_ansi)
+    s="${s//${C_RED}/}"
+    s="${s//${C_GREEN}/}"
+    s="${s//${C_YELLOW}/}"
+    s="${s//${C_BLUE}/}"
+    s="${s//${C_CYAN}/}"
+    s="${s//${C_BOLD}/}"
+    s="${s//${C_RESET}/}"
+    # Strip raw ANSI escape sequences using sed (single pass, O(n))
+    if [[ -n "$s" ]]; then
+        s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
+    fi
     printf '%d' "${#s}"
 }
 
