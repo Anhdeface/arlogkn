@@ -765,7 +765,7 @@ scan_kernel_logs() {
     # Check journal accessibility
     # We only want to warn if accessibility is restricted (e.g., EACCES).
     local jctl_err
-    jctl_err="$(mktemp)"
+    jctl_err="$(mktemp)" || { warn "Cannot create temp file for journal check"; return 1; }
     trap 'rm -f "$jctl_err" 2>/dev/null' RETURN
     if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
         if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
