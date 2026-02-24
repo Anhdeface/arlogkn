@@ -425,9 +425,14 @@ detect_drivers() {
         # I2C/SMBus
         smbus_driver="$(echo "$lspci_output" | grep -A2 -iE 'smbus|i2c' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
-        
+
         # ISA/LPC Bridge (platform)
-        platform_driver="$(echo "$lspci_output" | grep -A2 -iE 'isa|lpc|bridge' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        # Prioritize ISA/LPC matches (specific platform bridges), then fallback to PCH/platform
+        # Avoid generic 'bridge' pattern which matches PCIe/SATA bridges incorrectly
+        platform_driver="$(echo "$lspci_output" | grep -A2 -iE 'isa bridge|lpc bridge|isa|lpc' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        if [[ -z "$platform_driver" ]]; then
+            platform_driver="$(echo "$lspci_output" | grep -A2 -iE 'platform|pch' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        fi
         [[ -z "$platform_driver" ]] && platform_driver="N/A"
     fi
     
