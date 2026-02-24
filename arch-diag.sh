@@ -764,6 +764,9 @@ scan_kernel_logs() {
 
     # Check journal accessibility
     # We only want to warn if accessibility is restricted (e.g., EACCES).
+    # NOTE: RETURN trap is per-function in bash. If this function is called
+    # from another function with a RETURN trap, the caller's trap may be
+    # affected. Avoid nesting functions with RETURN traps when refactoring.
     local jctl_err
     jctl_err="$(mktemp)" || { warn "Cannot create temp file for journal check"; return 1; }
     trap 'rm -f "$jctl_err" 2>/dev/null' RETURN
@@ -772,6 +775,8 @@ scan_kernel_logs() {
             warn "Cannot access system journal (try running as root for full access)"
         fi
     fi
+    # Temp file no longer needed — clear trap early to avoid conflict with caller
+    trap - RETURN
 
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
