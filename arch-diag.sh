@@ -1216,8 +1216,13 @@ scan_mounts() {
     while IFS=' ' read -r fs size rest; do
         if [[ -n "$fs" && "$size" =~ ^[0-9]+$ ]]; then
             # Resolve symlinks so keys match /proc/mounts
+            # Only call readlink -f if path is actually a symlink (avoid fork overhead)
             local resolved_fs
-            resolved_fs="$(readlink -f "$fs" 2>/dev/null)" || resolved_fs="$fs"
+            if [[ -L "$fs" ]]; then
+                resolved_fs="$(readlink -f "$fs" 2>/dev/null)" || resolved_fs="$fs"
+            else
+                resolved_fs="$fs"
+            fi
             # Convert KB to human-readable
             if [[ $size -ge 1073741824 ]]; then
                 df_sizes["$resolved_fs"]="$((size / 1073741824))T"
@@ -1242,8 +1247,13 @@ scan_mounts() {
         [[ "$fstype" == "autofs" ]] && continue
         
         # Get size from df cache (resolve symlink to match df keys)
+        # Only call readlink -f if path is actually a symlink (avoid fork overhead)
         local resolved_source
-        resolved_source="$(readlink -f "$source" 2>/dev/null)" || resolved_source="$source"
+        if [[ -L "$source" ]]; then
+            resolved_source="$(readlink -f "$source" 2>/dev/null)" || resolved_source="$source"
+        else
+            resolved_source="$source"
+        fi
         local size="${df_sizes[$resolved_source]:-${df_sizes[$source]:-N/A}}"
         local color="$C_RESET"
         
