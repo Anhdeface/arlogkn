@@ -81,6 +81,21 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 67 (
 - Removed synchronous `sleep 0.3` anti-pattern from `export_summary` because disk writes via bash redirection (`>`) are blocking and inherently complete synchronously.
 - Bulletproofed `strip_ansi()` native string replacement by guarding the `while` loop against infinite `BASH_REMATCH[0]` empty string captures.
 
+### Trap and Cache Fixes (Phase 24)
+- Fixed `_get_lspci` cache to return empty string instead of nothing when `lspci` output is empty, preventing redundant forks on repeated calls.
+
+### Error Handling and Security (Phase 25-26)
+- Added error handling for `mktemp` failure in `scan_kernel_logs` to prevent silent failures when temp file creation fails.
+- Cleared RETURN trap early in `scan_kernel_logs` to avoid trap nesting conflict with inner error handlers.
+
+### Performance Optimization (Phase 27-29)
+- Replaced O(n²) bash regex loop with O(n) `sed` in `strip_ansi()` for significant performance improvement on large table outputs.
+- Inlined `strip_ansi` logic in `visible_len()` to eliminate subshell overhead in tight table-rendering loops.
+- Added symlink check before `readlink -f` in `scan_mounts()` to reduce fork overhead on common paths.
+
+### Driver Detection Accuracy (Phase 30)
+- Narrowed platform driver detection to ISA/LPC bridges only, avoiding false positives from PCIe/SATA bridges which incorrectly matched generic 'bridge' patterns.
+
 ### Flag Collision and Double Scans (Phase 19)
 - Fixed `--system` combined with individual flags (e.g., `--driver`) causing double-scans and double-exports. Added logic to clear individual scan flags at the end of `SCAN_ALL` and `SCAN_SYSTEM` blocks so the independent `if` blocks don't re-execute scans that were already covered.
 - Fixed `--kernel` and `--user` mutually annihilation in `parse_args`. Removed the zeroing of other flags when parsing `--kernel` and `--user`, allowing them to be combined cleanly like `--driver --vga`.
@@ -118,4 +133,4 @@ Implementation status of modifications to arch-diag.sh. Total improvements: 67 (
 ## Current Status
 - Script logic: Verified and syntax-checked (bash -n).
 - Compatibility: Standard Linux utilities and systemd.
-- Git state: Phase 1-23 modifications finalized and staged.
+- Git state: Phase 1-30 modifications finalized and staged.
