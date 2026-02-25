@@ -132,7 +132,8 @@ detect_distro() {
             DISTRO_TYPE="Pure Arch"
             ;;
         manjaro*|endeavouros*)
-            DISTRO_NAME="$(echo "$id" | sed 's/.*/\u&/')"
+            # Use bash built-in for portability (avoid GNU sed \u extension)
+            DISTRO_NAME="${id^}"
             DISTRO_TYPE="Arch-based"
             ;;
         *)
