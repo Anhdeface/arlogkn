@@ -307,8 +307,10 @@ detect_drivers() {
 
     local lsmod_output
     lsmod_output="$(lsmod 2>/dev/null)" || true
+    # Count loaded modules (skip header line) - awk counts directly
+    # Reduces from 3 subprocesses (echo|tail|wc) to 0 (builtin)
     local loaded_count
-    loaded_count="$(echo "$lsmod_output" | tail -n +2 | wc -l)"
+    loaded_count="$(awk 'END{print NR-1}' <<< "$lsmod_output")"
     
     # Initialize all driver variables
     local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
