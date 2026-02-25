@@ -300,17 +300,6 @@ get_driver_from_sys() {
     echo "$driver"
 }
 
-# Helper: Get driver from lspci with pattern
-get_pci_driver() {
-    local pattern="$1"
-    local driver=""
-    
-    if command -v lspci &>/dev/null; then
-        driver="$(lspci -k 2>/dev/null | grep -A2 -iE "$pattern" | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-    fi
-    echo "$driver"
-}
-
 # Main driver detection - multi-source comprehensive
 detect_drivers() {
     # Return cached result if available (drivers don't change during session)
