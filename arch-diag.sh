@@ -873,9 +873,13 @@ scan_user_services() {
     draw_box_line ""
 
     printf '%s\n' "$output" | head -15 | while read -r line; do
-        # Highlight service names
-        local colored_line
-        colored_line="$(echo "$line" | sed -E "s/([a-zA-Z0-9_-]+\.service)/${C_CYAN}\1${C_RESET}/g")"
+        # Highlight service names using bash regex (safe, no sed injection risk)
+        local colored_line="$line"
+        # Match service names and wrap with color codes
+        while [[ "$colored_line" =~ ([a-zA-Z0-9_-]+\.service) ]]; do
+            local svc="${BASH_REMATCH[1]}"
+            colored_line="${colored_line//"$svc"/"${C_CYAN}${svc}${C_RESET}"}"
+        done
         draw_box_line "$colored_line"
     done
 
