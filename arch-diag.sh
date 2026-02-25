@@ -598,9 +598,7 @@ draw_empty_box() {
     printf '%*s%s%s%s%*s\n' "$half_pad" "" "$C_GREEN" "$message" "$C_RESET" "$remainder" ""
 }
 
-draw_footer() {
-    : # No-op - removed for clean look
-}
+# draw_footer() removed — was no-op, eliminated 28 function calls for performance
 
 draw_info_box() {
     local label="$1"
@@ -823,7 +821,6 @@ scan_kernel_logs() {
         draw_box_line "${C_YELLOW}... and $((total_lines - 20)) more unique errors${C_RESET}"
     fi
 
-    draw_footer
 }
 
 scan_user_services() {
@@ -894,7 +891,6 @@ scan_user_services() {
         draw_box_line "${C_YELLOW}... and $((total_lines - 15)) more${C_RESET}"
     fi
 
-    draw_footer
 }
 
 scan_coredumps() {
@@ -902,7 +898,6 @@ scan_coredumps() {
 
     if ! command -v coredumpctl &>/dev/null; then
         draw_box_line "${C_YELLOW}coredumpctl not available${C_RESET}"
-        draw_footer
         return 0
     fi
 
@@ -942,7 +937,6 @@ scan_coredumps() {
         draw_box_line "${C_CYAN}[$time]${C_RESET} PID ${C_BOLD}$pid${C_RESET} - ${C_YELLOW}$exe${C_RESET} (signal: $sig)"
     done
 
-    draw_footer
 }
 
 scan_pacman_logs() {
@@ -952,7 +946,6 @@ scan_pacman_logs() {
 
     if [[ ! -f "$pacman_log" ]]; then
         draw_box_line "${C_YELLOW}Pacman log not found (may require root)${C_RESET}"
-        draw_footer
         return 0
     fi
 
@@ -978,7 +971,6 @@ scan_pacman_logs() {
         draw_box_line "$colored_line"
     done
 
-    draw_footer
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -991,7 +983,6 @@ scan_temperatures() {
 
     if [[ ! -d /sys/class/hwmon ]]; then
         draw_box_line "${C_YELLOW}hwmon subsystem not available${C_RESET}"
-        draw_footer
         return 0
     fi
 
@@ -1044,7 +1035,6 @@ scan_temperatures() {
         draw_table_end
     fi
 
-    draw_footer
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1056,7 +1046,6 @@ scan_boot_timing() {
 
     if ! command -v systemd-analyze &>/dev/null; then
         draw_box_line "${C_YELLOW}systemd-analyze not available${C_RESET}"
-        draw_footer
         return 0
     fi
 
@@ -1118,7 +1107,6 @@ scan_boot_timing() {
         draw_box_line "${C_YELLOW}⚠ No boot timing data available${C_RESET}"
     fi
 
-    draw_footer
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1131,7 +1119,6 @@ scan_network_interfaces() {
 
     if [[ ! -d /sys/class/net ]]; then
         draw_box_line "${C_YELLOW}/sys/class/net not available${C_RESET}"
-        draw_footer
         return 0
     fi
 
@@ -1198,7 +1185,6 @@ scan_network_interfaces() {
         draw_table_end
     fi
 
-    draw_footer
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1290,7 +1276,6 @@ scan_usb_devices() {
     # Check USB subsystem via /sys (no external deps)
     if [[ ! -d /sys/bus/usb/devices ]]; then
         draw_box_line "${C_YELLOW}USB subsystem not available${C_RESET}"
-        draw_footer
         return 0
     fi
 
@@ -3231,7 +3216,6 @@ show_wiki_group() {
     draw_box_line "${C_GREEN}✓ For more: https://wiki.archlinux.org${C_RESET}"
     draw_box_line "${C_CYAN}Tip: Use 'man <command>' for detailed documentation${C_RESET}"
     draw_box_line "${C_YELLOW}Note: Some commands require root privileges${C_RESET}"
-    draw_footer
     printf '\n'
 }
 
@@ -3296,7 +3280,6 @@ show_wiki() {
                 draw_box_line "  ${C_BOLD}--wiki emergency${C_RESET}        - Emergency & recovery"
             fi
             
-            draw_footer
             printf '\n'
             return 0
         fi
@@ -3731,7 +3714,6 @@ show_wiki() {
     draw_box_line "${C_GREEN}✓ For more: https://wiki.archlinux.org${C_RESET}"
     draw_box_line "${C_CYAN}Tip: Use 'man <command>' for detailed documentation${C_RESET}"
     draw_box_line "${C_YELLOW}Note: Some commands require root privileges${C_RESET}"
-    draw_footer
     printf '\n'
 }
 
@@ -3840,7 +3822,6 @@ main() {
         *) boot_desc="boot #$BOOT_OFFSET" ;;
     esac
     draw_info_box "Boot Offset" "${BOOT_OFFSET} ($boot_desc)"
-    draw_footer
 
     # Initialize output directory if --save or --save-all is set
     if [[ "$SAVE_LOGS" -eq 1 || "$SAVE_ALL" -eq 1 ]]; then
@@ -3870,7 +3851,6 @@ main() {
         if [[ "$SAVE_LOGS" -eq 1 ]]; then
             printf '\n'
             draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
             
             local export_failed=0
             
@@ -3892,18 +3872,15 @@ main() {
             else
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
             fi
-            draw_footer
         # Export all logs if --save-all is set (single file)
         elif [[ "$SAVE_ALL" -eq 1 ]]; then
             printf '\n'
             draw_box_line "${C_CYAN}Exporting all logs to single file...${C_RESET}"
-            draw_footer
             if export_all_logs; then
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}/arch-log-inspector-all.txt${C_RESET}"
             else
                 draw_box_line "${C_RED}✗ Export failed (check warnings above)${C_RESET}"
             fi
-            draw_footer
         fi
 
         # Clear individual flags to prevent double execution in independent blocks
@@ -3923,7 +3900,6 @@ main() {
         if [[ "$SAVE_LOGS" -eq 1 ]]; then
             printf '\n'
             draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-            draw_footer
             
             local export_failed=0
             export_mounts || { warn "Export mounts failed"; export_failed=1; }
@@ -3940,17 +3916,14 @@ main() {
             else
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
             fi
-            draw_footer
         elif [[ "$SAVE_ALL" -eq 1 ]]; then
             printf '\n'
             draw_box_line "${C_CYAN}Exporting all logs to single file...${C_RESET}"
-            draw_footer
             if export_all_logs; then
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}/arch-log-inspector-all.txt${C_RESET}"
             else
                 draw_box_line "${C_RED}✗ Export failed (check warnings above)${C_RESET}"
             fi
-            draw_footer
         fi
 
         # Clear individual flags covered by SCAN_SYSTEM to prevent double execution
@@ -3985,7 +3958,6 @@ main() {
     if [[ "$any_individual_scan" -eq 1 && "$SAVE_LOGS" -eq 1 ]]; then
         printf '\n'
         draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
-        draw_footer
 
         local export_failed=0
         [[ "$SCAN_DRIVER" -eq 1 ]] && { export_drivers || { warn "Export drivers failed"; export_failed=1; }; }
@@ -4002,13 +3974,11 @@ main() {
         else
             draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
         fi
-        draw_footer
     fi
 
     # Footer
     printf '\n'
     draw_box_line "${C_GREEN}✓ Scan complete. This tool is read-only.${C_RESET}"
-    draw_footer
     printf '\n'
 }
 
