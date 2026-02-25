@@ -1288,12 +1288,13 @@ scan_usb_devices() {
 
     # Use /sys filesystem directly (lightweight, works without lsusb)
     local count=0
+    shopt -s nullglob
     for dev_path in /sys/bus/usb/devices/*; do
         [[ $count -ge 10 ]] && break
-        
+
         # Skip broken symlinks
         [[ -L "$dev_path" && ! -e "$dev_path" ]] && continue
-        
+
         # Skip if not a directory (after resolving symlinks)
         [[ ! -d "$dev_path" ]] && continue
 
@@ -1311,23 +1312,23 @@ scan_usb_devices() {
         # Read from sysfs (no external commands)
         vendor="$(cat "$dev_path/idVendor" 2>/dev/null || echo "")"
         [[ -z "$vendor" ]] && continue  # Skip if no vendor ID
-        
+
         dev_id="$(cat "$dev_path/devnum" 2>/dev/null || echo "?")"
         bus_id="$(cat "$dev_path/busnum" 2>/dev/null || echo "?")"
-        
+
         # Try product first, then manufacturer as fallback
         product="$(cat "$dev_path/product" 2>/dev/null || echo "")"
         if [[ -z "$product" || "$product" =~ ^[[:cntrl:]]*$ ]]; then
             manufacturer="$(cat "$dev_path/manufacturer" 2>/dev/null || echo "")"
             [[ -n "$manufacturer" && ! "$manufacturer" =~ ^[[:cntrl:]]*$ ]] && product="$manufacturer"
         fi
-        
+
         # Clean product name (remove control characters)
         product="$(echo "$product" | tr -d '[:cntrl:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-        
+
         # Fallback product name
         [[ -z "$product" ]] && product="USB Device"
-        
+
         # Determine device type from product name
         local dev_type="Other"
         case "$product" in
@@ -1342,11 +1343,12 @@ scan_usb_devices() {
 
         # Read product ID from sysfs
         local product_id
-        product_id="$(cat "$dev_path/idProduct" 2>/dev/null || echo "????")" 
+        product_id="$(cat "$dev_path/idProduct" 2>/dev/null || echo "????")"
 
         draw_table_row "${vendor}:${product_id}" "${product:0:29}" "Bus ${bus_id}" "$dev_type"
         count=$((count + 1))
     done
+    shopt -u nullglob
 
     draw_table_end
 
