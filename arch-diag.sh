@@ -514,7 +514,25 @@ detect_drivers() {
     [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
     [[ -z "$watchdog_driver" ]] && watchdog_driver="N/A"
 
-    # Build result string
+    # Sanitize driver names: remove '|' to prevent IFS parsing issues
+    # (unlikely but possible with garbage in /sys or unusual module names)
+    gpu_driver="${gpu_driver//|/_}"
+    network_driver="${network_driver//|/_}"
+    audio_driver="${audio_driver//|/_}"
+    storage_driver="${storage_driver//|/_}"
+    usb_driver="${usb_driver//|/_}"
+    thunderbolt_driver="${thunderbolt_driver//|/_}"
+    input_driver="${input_driver//|/_}"
+    platform_driver="${platform_driver//|/_}"
+    virtual_driver="${virtual_driver//|/_}"
+    nvme_driver="${nvme_driver//|/_}"
+    sata_driver="${sata_driver//|/_}"
+    raid_driver="${raid_driver//|/_}"
+    i2c_driver="${i2c_driver//|/_}"
+    smbus_driver="${smbus_driver//|/_}"
+    watchdog_driver="${watchdog_driver//|/_}"
+
+    # Build result string (pipe-separated for IFS parsing)
     local result
     result="$(printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \
         "$loaded_count" \
