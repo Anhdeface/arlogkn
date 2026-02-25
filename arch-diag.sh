@@ -113,9 +113,11 @@ detect_distro() {
     local id="" variant=""
 
     if [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        id="$(grep -E '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')"
-        variant="$(grep -E '^ID_LIKE=' /etc/os-release | cut -d'=' -f2 | tr -d '"' || echo "")"
+        # Parse ID and ID_LIKE from os-release
+        # -m1: only first match (avoid multi-line edge case)
+        # -f2-: keep rest of line if value contains '='
+        id="$(grep -m1 '^ID=' /etc/os-release | cut -d'=' -f2- | tr -d '"')"
+        variant="$(grep -m1 '^ID_LIKE=' /etc/os-release | cut -d'=' -f2- | tr -d '"' || echo "")"
     elif [[ -f /etc/arch-release ]]; then
         id="arch"
     else
