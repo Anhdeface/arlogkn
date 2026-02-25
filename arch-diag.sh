@@ -12,7 +12,6 @@ readonly VERSION="1.0.1"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 # Color state (set dynamically)
-declare -i COLOR_SUPPORT=1
 declare -g C_RESET="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_BOLD=""
 
 # Scan scope
@@ -33,9 +32,6 @@ declare -g INTERNET_STATUS="unknown"
 
 # Output directory for saved logs
 declare -g OUTPUT_DIR="./arch-diag-logs"
-
-# Table formatting
-declare -g TABLE_WIDTH=66
 
 # Distro info
 declare -g DISTRO_NAME="Unknown"
@@ -95,7 +91,6 @@ init_colors() {
     local colors_avail
     # Check if terminal supports colors (redirect stderr to avoid noise)
     if ! colors_avail=$(tput colors 2>/dev/null) || [[ -z "$colors_avail" ]] || [[ "$colors_avail" -lt 8 ]]; then
-        COLOR_SUPPORT=0
         C_RESET="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_BOLD=""
         return 0
     fi
@@ -2664,43 +2659,6 @@ declare -A WIKI_ALIASES=(
     ["perm"]="file"
     ["recover"]="emergency"
 )
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BACKUP: Levenshtein distance (commented out - replaced with awk version)
-# ─────────────────────────────────────────────────────────────────────────────
-# levenshtein() {
-#     local s1="$1" s2="$2" len1=${#s1} len2=${#s2}
-#     [[ $len1 -eq 0 ]] && echo $len2 && return
-#     [[ $len2 -eq 0 ]] && echo $len1 && return
-#     if [[ $len1 -gt $len2 ]]; then
-#         local tmp="$s1"; s1="$s2"; s2="$tmp"
-#         local tmp=$len1; len1=$len2; len2=$tmp
-#     fi
-#     local -a costs; local i j
-#     for ((i=0; i<=len2; i++)); do costs[$i]=$i; done
-#     for ((i=1; i<=len1; i++)); do
-#         local prev=${costs[0]}; costs[0]=$i; local c1="${s1:i-1:1}"
-#         for ((j=1; j<=len2; j++)); do
-#             local temp=${costs[$j]}; local c2="${s2:j-1:1}"
-#             if [[ "$c1" == "$c2" ]]; then costs[$j]=$prev
-#             else
-#                 local min=${costs[$j]}
-#                 [[ ${costs[$((j-1))]} -lt $min ]] && min=${costs[$((j-1))]}
-#                 [[ $prev -lt $min ]] && min=$prev
-#                 costs[$j]=$((min + 1))
-#             fi
-#             prev=$temp
-#         done
-#     done
-#     echo ${costs[$len2]}
-# }
-# get_threshold() {
-#     local word="$1" len=${#word}
-#     if [[ $len -le 4 ]]; then echo 1
-#     elif [[ $len -le 8 ]]; then echo 2
-#     else echo 3; fi
-# }
-# ─────────────────────────────────────────────────────────────────────────────
 
 # AWK-based fuzzy matching - optimized for speed
 # Uses Levenshtein distance with awk
