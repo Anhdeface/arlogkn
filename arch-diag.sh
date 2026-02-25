@@ -891,13 +891,19 @@ scan_user_services() {
     draw_box_line ""
 
     printf '%s\n' "$output" | head -15 | while read -r line; do
-        # Highlight service names using bash regex (safe, no sed injection risk)
-        local colored_line="$line"
-        # Match service names and wrap with color codes
-        while [[ "$colored_line" =~ ([a-zA-Z0-9_-]+\.service) ]]; do
-            local svc="${BASH_REMATCH[1]}"
-            colored_line="${colored_line//"$svc"/"${C_CYAN}${svc}${C_RESET}"}"
-        done
+        # Highlight service names using awk (single pass, no infinite loop risk)
+        # Bash regex replacement causes infinite loop: color codes like \e[36m
+        # contain alphanumeric chars that create new matches after replacement
+        local colored_line
+        colored_line="$(printf '%s' "$line" | awk -v cyan="$C_CYAN" -v rst="$C_RESET" '{
+            while (match($0, /[a-zA-Z0-9_-]+\.service/)) {
+                svc = substr($0, RSTART, RLENGTH)
+                printf "%s", substr($0, 1, RSTART-1)
+                printf "%s%s%s", cyan, svc, rst
+                $0 = substr($0, RSTART+RLENGTH)
+            }
+            print
+        }')"
         draw_box_line "$colored_line"
     done
 
