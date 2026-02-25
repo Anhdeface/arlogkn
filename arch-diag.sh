@@ -921,13 +921,22 @@ scan_coredumps() {
             draw_box_line "${C_YELLOW}$line${C_RESET}"
             continue
         fi
-        
-        # Extract time from beginning by stripping the last 6 fields
-        # (UID, GID, SIG, COREFILE, EXE, and PID/COMM)
-        time="$(echo "$line" | awk '{for(i=1; i<=NF-6; i++) printf "%s ", $i; print ""}')"
-        pid="$(echo "$line" | awk '{print $(NF-5)}')"
-        sig="$(echo "$line" | awk '{print $(NF-2)}')"
-        exe="$(echo "$line" | awk '{print $NF}')"
+
+        # Single awk call to extract all fields (performance optimization)
+        # Avoids spawning 4 subprocesses per iteration
+        # coredumpctl format: TIME... PID UID GID SIG COREFILE EXE SIZE
+        read -r time pid sig exe < <(
+            awk '{
+                # Extract time (all fields except last 7)
+                for(i=1; i<=NF-7; i++) printf "%s ", $i
+                # Extract pid, sig, exe
+                printf "%s %s %s\n", $(NF-6), $(NF-3), $(NF-1)
+            }' <<< "$line"
+        )
+
+        # Trim trailing space from time
+        time="${time% }"
+
         draw_box_line "${C_CYAN}[$time]${C_RESET} PID ${C_BOLD}$pid${C_RESET} - ${C_YELLOW}$exe${C_RESET} (signal: $sig)"
     done
 
