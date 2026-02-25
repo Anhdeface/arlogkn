@@ -840,7 +840,7 @@ scan_user_services() {
         done
 
         local failed_count
-        failed_count="$(printf '%s\n' "$failed_output" | grep -c . || echo 0)"
+        failed_count="$(printf '%s\n' "$failed_output" | wc -l)"
         if [[ "$failed_count" -gt 10 ]]; then
             draw_box_line "${C_YELLOW}... and $((failed_count - 10)) more failed units${C_RESET}"
         fi
