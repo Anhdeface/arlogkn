@@ -1647,19 +1647,21 @@ check_disk_space() {
 init_output_dir() {
     local timestamp
     timestamp="$(date +%Y%m%d_%H%M%S)"
-    OUTPUT_DIR="./arch-diag-logs/${timestamp}"
+    local new_output_dir="./arch-diag-logs/${timestamp}"
 
-    # Check disk space before creating directory
-    if ! check_disk_space "$OUTPUT_DIR"; then
+    # Check disk space before mutating global state
+    if ! check_disk_space "$new_output_dir"; then
         warn "Insufficient disk space for export"
         return 1
     fi
 
-    if ! mkdir -p "$OUTPUT_DIR" 2>/dev/null; then
-        warn "Could not create output directory: $OUTPUT_DIR"
+    if ! mkdir -p "$new_output_dir" 2>/dev/null; then
+        warn "Could not create output directory: $new_output_dir"
         return 1
     fi
 
+    # All checks passed — assign to global
+    OUTPUT_DIR="$new_output_dir"
     info "Logs will be saved to: $OUTPUT_DIR"
     return 0
 }
