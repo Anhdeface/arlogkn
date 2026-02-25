@@ -930,7 +930,8 @@ scan_coredumps() {
         # Format varies by systemd version.
         local time pid exe sig
         # Check if line has enough fields. If NF < 6, fallback to raw string.
-        if ! echo "$line" | awk '{if(NF<6) exit 1}'; then
+        # Use printf to avoid echo interpreting flags like -n, -e in $line
+        if ! printf '%s\n' "$line" | awk '{if(NF<6) exit 1}'; then
             draw_box_line "${C_YELLOW}$line${C_RESET}"
             continue
         fi
