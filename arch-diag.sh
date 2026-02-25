@@ -2594,6 +2594,11 @@ parse_args() {
                 if ! [[ "$BOOT_OFFSET" =~ ^-?[0-9]+$ ]]; then
                     die "Invalid boot offset: $BOOT_OFFSET (must be integer)"
                 fi
+                # Validate reasonable range (systemd typically keeps 10-20 boots)
+                # Reject extreme values that would cause confusing journalctl errors
+                if [[ "$BOOT_OFFSET" -lt -100 || "$BOOT_OFFSET" -gt 100 ]]; then
+                    die "Boot offset out of range: $BOOT_OFFSET (must be between -100 and 100)"
+                fi
                 shift
                 ;;
             --save)
