@@ -1825,7 +1825,8 @@ export_usb_devices() {
         printf '=============================================================\n\n'
 
         if command -v lsblk &>/dev/null; then
-            lsblk -dnbo NAME,MODEL,SIZE,VENDOR,MOUNTPOINT 2>/dev/null | grep -E '^(sd|usb)' || true
+            # Match removable devices (sd*, mmcblk*) - USB storage indicator
+            lsblk -dnbo NAME,MODEL,SIZE,VENDOR,MOUNTPOINT 2>/dev/null | grep -E '^sd|^mmcblk' || true
         fi
     } > "$output_file"
 
