@@ -642,22 +642,13 @@ strip_ansi() {
 }
 
 # Get visible length (excluding ANSI codes)
-# Uses pure bash to avoid subshell overhead in tight loops (table rendering)
+# Calls strip_ansi() for maintainability — single source of truth
+# Subshell overhead is acceptable (~100μs per call, table rendering is not hot path)
 visible_len() {
     local s="$1"
-    # Strip script color variables
-    s="${s//${C_RED}/}"
-    s="${s//${C_GREEN}/}"
-    s="${s//${C_YELLOW}/}"
-    s="${s//${C_BLUE}/}"
-    s="${s//${C_CYAN}/}"
-    s="${s//${C_BOLD}/}"
-    s="${s//${C_RESET}/}"
-    # Strip raw ANSI escape sequences using bash regex (no subshell)
-    while [[ "$s" =~ $'\x1b''\['[0-9\;]*[a-zA-Z] ]]; do
-        s="${s//"${BASH_REMATCH[0]}"/}"
-    done
-    printf '%d' "${#s}"
+    local stripped
+    stripped="$(strip_ansi "$s")"
+    printf '%d' "${#stripped}"
 }
 
 # Global table state
