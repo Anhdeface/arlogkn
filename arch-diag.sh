@@ -2200,7 +2200,7 @@ export_drivers() {
         printf '=============================================================\n\n'
         if [[ -d /sys/bus/pci/drivers ]]; then
             printf 'PCI Drivers indicating virtualization:\n'
-            ls -1 /sys/bus/pci/drivers/ 2>/dev/null | grep -iE 'virtio|vmware|vbox|xen|qxl|virtio' || printf 'No virtual drivers detected\n'
+            ls -1 /sys/bus/pci/drivers/ 2>/dev/null | grep -iE 'virtio|vmware|vbox|xen|qxl' || printf 'No virtual drivers detected\n'
         else
             printf 'PCI bus not available\n'
         fi
