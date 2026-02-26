@@ -1176,10 +1176,13 @@ scan_network_interfaces() {
         while read -r iface state addr_line; do
             [[ -z "$iface" ]] && continue
             local ip_addr
-            # Match IPv4 first, fallback to IPv6
-            ip_addr="$(echo "$addr_line" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-            if [[ -z "$ip_addr" ]]; then
-                ip_addr="$(echo "$addr_line" | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
+            # Match IPv4 first, fallback to IPv6 using bash regex (zero subprocesses)
+            if [[ "$addr_line" =~ ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
+                ip_addr="${BASH_REMATCH[1]}"
+            elif [[ "$addr_line" =~ ([0-9a-fA-F:]{3,39}(/[0-9]+)?) ]]; then
+                ip_addr="${BASH_REMATCH[1]}"
+            else
+                ip_addr=""
             fi
             [[ -n "$ip_addr" ]] && iface_ips["$iface"]="$ip_addr"
         done < <(ip -br addr 2>/dev/null | grep -v '^lo ')
