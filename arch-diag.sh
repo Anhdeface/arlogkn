@@ -934,7 +934,6 @@ scan_coredumps() {
     printf '%s\n' "$coredumps" | while read -r line; do
         # Parse coredumpctl output robustly
         # Format varies by systemd version.
-        local time pid exe sig
         # Check if line has enough fields. If NF < 6, fallback to raw string.
         # Use printf to avoid echo interpreting flags like -n, -e in $line
         if ! printf '%s\n' "$line" | awk '{if(NF<6) exit 1}'; then
@@ -942,22 +941,24 @@ scan_coredumps() {
             continue
         fi
 
-        # Single awk call to extract all fields (performance optimization)
-        # Avoids spawning 4 subprocesses per iteration
+        # Extract fields using awk (single pass, handles multi-word timestamps)
         # coredumpctl format: TIME... PID UID GID SIG COREFILE EXE SIZE
-        read -r time pid sig exe < <(
-            awk '{
-                # Extract time (all fields except last 7)
-                for(i=1; i<=NF-7; i++) printf "%s ", $i
-                # Extract pid, sig, exe
-                printf "%s %s %s\n", $(NF-6), $(NF-3), $(NF-1)
-            }' <<< "$line"
-        )
-
-        # Trim trailing space from time
-        time="${time% }"
-
-        draw_box_line "${C_CYAN}[$time]${C_RESET} PID ${C_BOLD}$pid${C_RESET} - ${C_YELLOW}$exe${C_RESET} (signal: $sig)"
+        # Time can be multiple words: "Wed 2024-01-10 10:23:45 UTC"
+        # Using awk directly avoids read splitting on whitespace
+        local formatted
+        formatted="$(awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '{
+            # Build time string (all fields except last 7)
+            time = ""
+            for(i=1; i<=NF-7; i++) time = time (i>1 ? " " : "") $i
+            # Extract fixed-position fields from end
+            pid = $(NF-6)
+            sig = $(NF-3)
+            exe = $(NF-1)
+            # Output formatted string
+            printf "%s[%s]%s PID %s%s%s - %s%s%s (signal: %s)\n", \
+                cyan, time, rst, bold, pid, rst, yellow, exe, rst, sig
+        }' <<< "$line")"
+        draw_box_line "$formatted"
     done
 
 }
