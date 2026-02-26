@@ -1627,9 +1627,10 @@ scan_system_basics() {
     if command -v df &>/dev/null; then
         local root_info
         root_info="$(df -h / 2>/dev/null | tail -1)"
-        disk_total="$(echo "$root_info" | awk '{print $2}')"
-        disk_used="$(echo "$root_info" | awk '{print $3}')"
-        disk_avail="$(echo "$root_info" | awk '{print $4}')"
+        # Extract fields with pure bash (zero subprocesses)
+        # df output: Filesystem Size Used Avail Use% Mounted
+        # Fields:    $1        $2   $3   $4    $5   $6
+        read -r _ disk_total disk_used disk_avail _ _ <<< "$root_info"
         draw_box_line "${C_BOLD}Root Disk:${C_RESET} Total: ${disk_total} | Used: ${disk_used} | Available: ${disk_avail}"
     fi
 
