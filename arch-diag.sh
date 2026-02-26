@@ -2055,7 +2055,12 @@ export_drivers() {
         printf '=============================================================\n'
         printf '[2] PCI DEVICES WITH DRIVERS\n'
         printf '=============================================================\n\n'
-        _get_lspci_knn || printf 'lspci not available\n'
+        _get_lspci_knn
+        if [[ -n "$_LSPCI_KNN_CACHE" ]]; then
+            printf '%s\n' "$_LSPCI_KNN_CACHE"
+        else
+            printf 'lspci not available\n'
+        fi
         printf '\n\n'
 
         # Section 3: USB devices
