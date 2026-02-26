@@ -793,7 +793,9 @@ scan_kernel_logs() {
     # We only want to warn if accessibility is restricted (e.g., EACCES).
     local jctl_err
     jctl_err="$(mktemp)" || { warn "Cannot create temp file for journal check"; return 1; }
-    trap 'rm -f "$jctl_err" 2>/dev/null' RETURN
+    # Use trap EXIT instead of RETURN: EXIT fires on set -e termination, RETURN does not
+    # This prevents temp file leak if script is killed mid-function
+    trap 'rm -f "$jctl_err" 2>/dev/null' EXIT
     if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
         if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
             warn "Cannot access system journal (try running as root for full access)"
@@ -801,7 +803,7 @@ scan_kernel_logs() {
     fi
     # Temp file no longer needed — delete immediately, then clear trap
     rm -f "$jctl_err" 2>/dev/null
-    trap - RETURN
+    trap - EXIT
 
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -2256,8 +2258,10 @@ export_all_logs() {
     local temp_file
     temp_file="$(mktemp)"
 
-    # Cleanup trap: ensure temp file is removed on exiting this function
-    trap 'rm -f "$temp_file" 2>/dev/null || true' RETURN
+    # Cleanup trap: use EXIT instead of RETURN
+    # EXIT fires on set -e termination, signal, or normal exit
+    # RETURN only fires on normal function return (not sufficient)
+    trap 'rm -f "$temp_file" 2>/dev/null || true' EXIT
 
     {
         printf '=============================================================\n'
@@ -2534,7 +2538,7 @@ export_all_logs() {
     fi
 
     # Reset trap after successful move (temp file no longer exists)
-    trap - RETURN
+    trap - EXIT
 
     info "All logs exported to: ${output_file}"
 }
