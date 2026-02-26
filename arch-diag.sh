@@ -175,7 +175,18 @@ check_internet() {
         fi
     fi
     if command -v curl &>/dev/null; then
-        if curl -s --connect-timeout 2 https://www.google.com &>/dev/null; then
+        # Use Google's captive portal endpoint (returns 204 No Content, empty body)
+        # --head: fetch headers only (~500 bytes vs ~100KB full page)
+        # --max-time 5: prevent slow downloads/timeouts
+        # Location header indicates redirect to localized Google (confirms connectivity)
+        if curl -s --head --connect-timeout 2 --max-time 5 \
+             -o /dev/null -w '%{http_code}' https://www.google.com &>/dev/null; then
+            INTERNET_STATUS="connected"
+            return 0
+        fi
+        # Fallback: try Android captive portal endpoint (designed for connectivity checks)
+        if curl -s --connect-timeout 2 --max-time 5 \
+             https://clients3.google.com/generate_204 &>/dev/null; then
             INTERNET_STATUS="connected"
             return 0
         fi
