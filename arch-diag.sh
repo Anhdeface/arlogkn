@@ -1112,12 +1112,15 @@ scan_boot_timing() {
 
         printf '%s\n' "$blame_output" | while read -r line; do
             [[ -z "$line" ]] && continue
-            
+
             # Extract service name (last word) and full time string
             local unit="${line##* }"
             local time_str="${line% "$unit"}"
-            # Trim leading/trailing spaces from time string
-            time_str="$(echo "$time_str" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            # Trim leading/trailing spaces with pure bash (zero subprocesses)
+            shopt -s extglob
+            time_str="${time_str##+([[:space:]])}"
+            time_str="${time_str%%+([[:space:]])}"
+            shopt -u extglob
             # Extract just the first part for coloring logic (e.g. "3min" from "3min 31s")
             local time_val="${time_str%% *}"
             
