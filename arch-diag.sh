@@ -240,7 +240,8 @@ detect_gpu() {
     # Build GPU info string (supports multiple GPUs)
     if [[ ${#gpu_names[@]} -gt 0 ]]; then
         # Remove duplicates and join with ", "
-        GPU_INFO="$(printf '%s\n' "${gpu_names[@]}" | sort -u | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')"
+        # Combined sed expressions: remove trailing comma, then add space after commas
+        GPU_INFO="$(printf '%s\n' "${gpu_names[@]}" | sort -u | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
     else
         GPU_INFO=""
     fi
