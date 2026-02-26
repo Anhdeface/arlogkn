@@ -157,7 +157,11 @@ detect_system_info() {
     if [[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]]; then
         CPU_GOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "unknown")"
     elif command -v cpupower &>/dev/null; then
-        CPU_GOVERNOR="$(cpupower frequency-info 2>/dev/null | sed -n 's/.*current policy:[[:space:]]*\([a-zA-Z0-9_]*\).*/\1/p' | head -1)"
+        # Parse governor from cpupower output format:
+        #   The governor "performance" may decide which speed to use
+        # NOT from "current policy: frequency..." line (wrong format)
+        CPU_GOVERNOR="$(cpupower frequency-info 2>/dev/null | \
+            sed -n 's/.*The governor "\([^"]*\)".*/\1/p' | head -1)"
         CPU_GOVERNOR="${CPU_GOVERNOR:-unknown}"
     fi
 }
