@@ -1,11 +1,10 @@
-# Changelog: arch-diag.sh
+# Changelog: arlogkn
 
-## Session Overview
+## Version 1.0.2 (2026-02-26)
 
-**Date:** 2026-02-25  
-**Total Commits:** 20  
-**Lines Changed:** ~900  
-**Script Size:** 4008 lines (from 4055)
+**Total Commits:** 13  
+**Lines Changed:** ~1000  
+**Script Size:** 4064 lines
 
 ---
 
