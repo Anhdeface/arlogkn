@@ -1285,8 +1285,14 @@ scan_mounts() {
     df -h 2>/dev/null | awk 'NR>1 && /^\/dev\// {print $1"|"$2"|"$3"|"$4"|"$5}' | sort -u | head -6 | while IFS='|' read -r fs size used avail usep; do
         local color="$C_RESET"
         local use_num="${usep%\%}"
-        [[ "$use_num" -gt 90 ]] && color="$C_RED"
-        [[ "$use_num" -gt 70 && "$use_num" -le 90 ]] && color="$C_YELLOW"
+        # Validate use_num is numeric before arithmetic comparison
+        # df can return "-" for unavailable filesystems (e.g., NFS timeout)
+        # Without validation, [[ "-" -gt 90 ]] throws bash arithmetic syntax error
+        if [[ "$use_num" =~ ^[0-9]+$ ]]; then
+            [[ "$use_num" -gt 90 ]] && color="$C_RED"
+            [[ "$use_num" -gt 70 ]] && color="$C_YELLOW"
+        fi
+        # Non-numeric values (e.g., "-") remain $C_RESET (no color)
         draw_table_row "${color}${fs}${C_RESET}" "$size" "$used" "$avail" "$usep"
     done
 
