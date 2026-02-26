@@ -465,17 +465,27 @@ detect_drivers() {
     # Input drivers from /sys/class/input
     if [[ -d /sys/class/input ]]; then
         shopt -s nullglob
+        local -a input_drvs=()
         local input_path
         for input_path in /sys/class/input/*; do
             [[ ! -d "$input_path" ]] && continue
             local inp_drv
             inp_drv="$(get_driver_from_sys "$input_path")"
             if [[ -n "$inp_drv" && "$inp_drv" != "N/A" ]]; then
-                input_driver="$inp_drv"
-                break
+                # Check for duplicates (same pattern as network drivers)
+                local dup=0
+                for d in "${input_drvs[@]}"; do
+                    [[ "$d" == "$inp_drv" ]] && dup=1 && break
+                done
+                [[ "$dup" -eq 0 ]] && input_drvs+=("$inp_drv")
             fi
         done
         shopt -u nullglob
+        # Join unique drivers with ", "
+        if [[ ${#input_drvs[@]} -gt 0 ]]; then
+            input_driver="$(printf '%s, ' "${input_drvs[@]}")"
+            input_driver="${input_driver%, }"
+        fi
     fi
 
     # Watchdog
