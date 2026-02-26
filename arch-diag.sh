@@ -812,7 +812,7 @@ scan_kernel_logs() {
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
-    if [[ -z "$journal_output" ]] || ! printf '%s' "$journal_output" | grep -q .; then
+    if [[ -z "$journal_output" ]]; then
         draw_empty_box
         return 0
     fi
@@ -892,7 +892,7 @@ scan_user_services() {
 
     journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
-    if [[ -z "$journal_output" ]] || ! printf '%s' "$journal_output" | grep -q .; then
+    if [[ -z "$journal_output" ]]; then
         draw_empty_box
         return 0
     fi
