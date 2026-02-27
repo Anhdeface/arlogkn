@@ -185,18 +185,22 @@ check_internet() {
         fi
     fi
     if command -v curl &>/dev/null; then
-        # Use Google's captive portal endpoint (returns 204 No Content, empty body)
-        # --head: fetch headers only (~500 bytes vs ~100KB full page)
-        # --max-time 5: prevent slow downloads/timeouts
-        # Location header indicates redirect to localized Google (confirms connectivity)
-        if curl -s --head --connect-timeout 2 --max-time 5 \
-             -o /dev/null -w '%{http_code}' https://www.google.com &>/dev/null; then
+        # Check HTTP status code explicitly (not just TCP connection)
+        # Captive portals often return HTTP 302, which should NOT be "connected"
+        
+        # Try Google.com HEAD request - check for 2xx status
+        local http_code
+        http_code="$(curl -s --head --connect-timeout 2 --max-time 5 \
+             -o /dev/null -w '%{http_code}' https://www.google.com)"
+        if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
             INTERNET_STATUS="connected"
             return 0
         fi
-        # Fallback: try Android captive portal endpoint (designed for connectivity checks)
-        if curl -s --connect-timeout 2 --max-time 5 \
-             https://clients3.google.com/generate_204 &>/dev/null; then
+        
+        # Fallback: try Android captive portal endpoint (returns 204 No Content)
+        http_code="$(curl -s --connect-timeout 2 --max-time 5 \
+             -o /dev/null -w '%{http_code}' https://clients3.google.com/generate_204)"
+        if [[ "$http_code" == "204" ]]; then
             INTERNET_STATUS="connected"
             return 0
         fi
