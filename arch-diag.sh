@@ -3,6 +3,12 @@
 # arlogkn - Read-only diagnostic tool
 # Dependencies: bash 5.0+, coreutils, util-linux, systemd, awk, sed, grep
 
+# Check bash version (require 5.0+ for declare -g and other features)
+if (( BASH_VERSINFO[0] < 5 )); then
+    printf '[ERROR] This script requires bash 5.0 or later (current: %s)\n' "$BASH_VERSION" >&2
+    exit 1
+fi
+
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -765,13 +771,6 @@ tbl_row() {
 tbl_end() {
     : # No-op for clean look
 }
-
-# Legacy wrappers
-draw_table_begin() { tbl_begin "$@"; }
-draw_table_row() { tbl_row "$@"; }
-draw_table_end() { tbl_end "$@"; }
-draw_table_header() { tbl_begin "$@"; }
-draw_table_footer() { tbl_end "$@"; }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LOG PARSING ENGINE
