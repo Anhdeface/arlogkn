@@ -216,7 +216,7 @@ detect_gpu() {
         
         driver=""
         if [[ -L "${card_path}/device/driver" ]]; then
-            driver="$(readlink "${card_path}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+            driver="$(readlink "${card_path}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
         fi
 
         case "$driver" in
@@ -314,7 +314,7 @@ get_driver_from_sys() {
     local driver=""
     
     if [[ -L "${class_path}/device/driver" ]]; then
-        driver="$(readlink "${class_path}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+        driver="$(readlink "${class_path}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
     fi
     echo "$driver"
 }
@@ -2104,7 +2104,7 @@ export_drivers() {
                 [[ ! -d "$card" ]] && continue
                 printf 'Device: %s\n' "$(basename "$card")"
                 if [[ -L "${card}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${card}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                    printf 'Driver: %s\n' "$(readlink "${card}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
                 fi
                 printf '\n'
             done
@@ -2126,7 +2126,7 @@ export_drivers() {
                 iface_name="$(basename "$iface")"
                 printf 'Interface: %s\n' "$iface_name"
                 if [[ -L "${iface}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${iface}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                    printf 'Driver: %s\n' "$(readlink "${iface}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
                 fi
                 printf '\n'
             done
@@ -2146,7 +2146,7 @@ export_drivers() {
                 [[ ! -d "$sound" ]] && continue
                 printf 'Device: %s\n' "$(basename "$sound")"
                 if [[ -L "${sound}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${sound}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                    printf 'Driver: %s\n' "$(readlink "${sound}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
                 fi
                 printf '\n'
             done
@@ -2168,7 +2168,7 @@ export_drivers() {
                 bname="$(basename "$block")"
                 printf 'Device: %s\n' "$bname"
                 if [[ -L "${block}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${block}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                    printf 'Driver: %s\n' "$(readlink "${block}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
                 fi
                 printf '\n'
             done
@@ -2188,7 +2188,7 @@ export_drivers() {
                 [[ ! -d "$input" ]] && continue
                 printf 'Device: %s\n' "$(basename "$input")"
                 if [[ -L "${input}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${input}/device/driver" 2>/dev/null | xargs basename 2>/dev/null)"
+                    printf 'Driver: %s\n' "$(readlink "${input}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
                 fi
                 printf '\n'
             done
