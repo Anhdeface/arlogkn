@@ -1,5 +1,35 @@
 # Changelog: arlogkn
 
+## Version 1.0.3 (2026-02-27) — Security Audit Fixes
+
+**Total Commits:** 18  
+**Lines Changed:** ~1100  
+**Script Size:** 4071 lines
+
+### Security Audit Fixes (Sub-agent Review)
+
+#### HIGH Priority
+- **fix:** Handle empty arrays with set -u using `${array[@]+"${array[@]}"}` pattern
+  - Fixed net_drvs and input_drvs array iterations
+  - Prevents unbound variable crash on minimal systems
+- **fix:** Add -r flag to all 7 xargs calls
+  - Prevents running basename with empty input from broken symlinks
+- **fix:** Add temperature bounds validation (-100°C to +150°C)
+  - Prevents display of invalid sensor readings
+
+#### MEDIUM Priority
+- **fix:** Remove '-' from wiki query whitelist
+  - More restrictive input sanitization (alphanumeric + underscore only)
+- **fix:** Add bash version check (require 5.0+)
+  - Exits with clear error on older bash versions
+
+#### LOW Priority
+- **refactor:** Remove 5 legacy wrapper functions
+  - Removed unused draw_table_* wrappers
+  - Cleaner codebase
+
+---
+
 ## Version 1.0.2 (2026-02-26)
 
 **Total Commits:** 13  

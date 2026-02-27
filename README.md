@@ -1,6 +1,6 @@
 # arlogkn
 
-**Version:** 1.0.2 | **Platform:** Arch Linux and derivatives | **License:** MIT
+**Version:** 1.0.3 | **Platform:** Arch Linux and derivatives | **License:** MIT
 
 A read-only system diagnostic and log extraction utility for Arch Linux. Performs comprehensive hardware and software state analysis without external dependencies, ensuring safety and reliability on broken or minimal systems.
 
@@ -472,7 +472,7 @@ bash -x ./arch-diag.sh --kernel 2>&1 | head -100
 
 ## Project Status
 
-- **Version:** 1.0.2
+- **Version:** 1.0.3
 - **Tested On:** Arch Linux, CachyOS, Manjaro, EndeavourOS
 - **Changelog:** See `log.md` for complete commit history
 

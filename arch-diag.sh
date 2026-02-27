@@ -14,7 +14,7 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.2"
+readonly VERSION="1.0.3"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 # Color state (set dynamically)
