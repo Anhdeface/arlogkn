@@ -813,6 +813,12 @@ scan_kernel_logs() {
     # We only want to warn if accessibility is restricted (e.g., EACCES).
     local jctl_err
     jctl_err="$(mktemp)" || { warn "Cannot create temp file for journal check"; return 1; }
+    
+    # Save caller's EXIT trap to avoid side-effect
+    # trap is GLOBAL in bash - clearing it affects caller
+    local old_exit_trap
+    old_exit_trap="$(trap -p EXIT)"
+    
     # Use trap EXIT instead of RETURN: EXIT fires on set -e termination, RETURN does not
     # This prevents temp file leak if script is killed mid-function
     trap 'rm -f "$jctl_err" 2>/dev/null' EXIT
@@ -821,9 +827,9 @@ scan_kernel_logs() {
             warn "Cannot access system journal (try running as root for full access)"
         fi
     fi
-    # Temp file no longer needed — delete immediately, then clear trap
+    # Temp file no longer needed — delete immediately, then restore caller's trap
     rm -f "$jctl_err" 2>/dev/null
-    trap - EXIT
+    eval "$old_exit_trap"  # Restore caller's EXIT trap (critical!)
 
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -2300,6 +2306,11 @@ export_all_logs() {
     local temp_file
     temp_file="$(mktemp)"
 
+    # Save caller's EXIT trap to avoid side-effect
+    # trap is GLOBAL in bash - clearing it affects caller
+    local old_exit_trap
+    old_exit_trap="$(trap -p EXIT)"
+
     # Cleanup trap: use EXIT instead of RETURN
     # EXIT fires on set -e termination, signal, or normal exit
     # RETURN only fires on normal function return (not sufficient)
@@ -2579,8 +2590,8 @@ export_all_logs() {
         return 1
     fi
 
-    # Reset trap after successful move (temp file no longer exists)
-    trap - EXIT
+    # Restore caller's EXIT trap (temp file no longer exists)
+    eval "$old_exit_trap"  # Restore caller's EXIT trap (critical!)
 
     info "All logs exported to: ${output_file}"
 }
