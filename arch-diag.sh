@@ -731,7 +731,10 @@ tbl_begin() {
     for ((i=0; i<num_cols; i++)); do
         local name="${_TBL_COLS[$((i*2))]}"
         local width="${_TBL_COLS[$((i*2+1))]}"
-        local vlen=${#name}
+        # Use visible_len() to handle ANSI color codes correctly
+        # ${#name} would count escape sequences, breaking alignment
+        local vlen
+        vlen="$(visible_len "$name")"
         local pad=$((width - vlen))
         printf ' %s%*s' "$name" "$pad" ""
     done
