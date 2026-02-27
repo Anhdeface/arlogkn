@@ -1331,8 +1331,12 @@ scan_mounts() {
         # df can return "-" for unavailable filesystems (e.g., NFS timeout)
         # Without validation, [[ "-" -gt 90 ]] throws bash arithmetic syntax error
         if [[ "$use_num" =~ ^[0-9]+$ ]]; then
-            [[ "$use_num" -gt 90 ]] && color="$C_RED"
-            [[ "$use_num" -gt 70 ]] && color="$C_YELLOW"
+            # Use if/elif to prevent overwriting: 95% should be RED, not YELLOW
+            if [[ "$use_num" -gt 90 ]]; then
+                color="$C_RED"
+            elif [[ "$use_num" -gt 70 ]]; then
+                color="$C_YELLOW"
+            fi
         fi
         # Non-numeric values (e.g., "-") remain $C_RESET (no color)
         draw_table_row "${color}${fs}${C_RESET}" "$size" "$used" "$avail" "$usep"
