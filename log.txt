@@ -3,6 +3,13 @@
 Generated: 2026-02-27
 
 ---
+2bad518 2026-02-27 fix: enable extglob globally at script start (parse-time requirement)
+06c4554 2026-02-27 fix: tbl_begin() use visible_len() for ANSI-safe header padding
+652b097 2026-02-27 fix: support both --boot N and --boot=N argument formats
+930bd1c 2026-02-27 fix: trap EXIT side-effect — save/restore caller's trap to avoid deletion
+0f85122 2026-02-27 fix: check_internet — validate HTTP status code, not just TCP connection
+d6d95cc 2026-02-27 fix: scan_mounts color logic — use if/elif to prevent overwriting
+abf0dfe 2026-02-27 docs: update log.txt with latest commits
 a12f179 2026-02-27 refactor: replace SESSION_SUMMARY.md with log.txt and auto-update script
 adf75d9 2026-02-27 release: version 1.0.3 — security audit fixes
 895bf92 2026-02-27 fix: add bash version check and remove legacy wrapper functions
