@@ -1061,6 +1061,12 @@ scan_temperatures() {
             temp_raw="$(cat "$temp_input" 2>/dev/null)" || continue
             [[ -z "$temp_raw" || ! "$temp_raw" =~ ^-?[0-9]+$ ]] && continue
 
+            # Validate temperature bounds (-100°C to +150°C = -100000 to +150000 millidegrees)
+            # Prevents display of invalid sensor readings
+            if [[ "$temp_raw" -lt -100000 || "$temp_raw" -gt 150000 ]]; then
+                continue
+            fi
+
             # Convert millidegrees to degrees
             temp_c=$((temp_raw / 1000))
 
