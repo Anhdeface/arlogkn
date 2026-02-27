@@ -368,7 +368,8 @@ detect_drivers() {
             if [[ -n "$iface_driver" && "$iface_driver" != "N/A" ]]; then
                 # Avoid duplicates
                 local dup=0
-                for d in "${net_drvs[@]}"; do
+                # Use ${array[@]+"${array[@]}"} to handle empty array with set -u
+                for d in "${net_drvs[@]+"${net_drvs[@]}"}"; do
                     [[ "$d" == "$iface_driver" ]] && dup=1 && break
                 done
                 [[ "$dup" -eq 0 ]] && net_drvs+=("$iface_driver")
@@ -474,7 +475,8 @@ detect_drivers() {
             if [[ -n "$inp_drv" && "$inp_drv" != "N/A" ]]; then
                 # Check for duplicates (same pattern as network drivers)
                 local dup=0
-                for d in "${input_drvs[@]}"; do
+                # Use ${array[@]+"${array[@]}"} to handle empty array with set -u
+                for d in "${input_drvs[@]+"${input_drvs[@]}"}"; do
                     [[ "$d" == "$inp_drv" ]] && dup=1 && break
                 done
                 [[ "$dup" -eq 0 ]] && input_drvs+=("$inp_drv")
