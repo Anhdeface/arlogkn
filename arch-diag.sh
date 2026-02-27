@@ -10,6 +10,7 @@ if (( BASH_VERSINFO[0] < 5 )); then
 fi
 
 set -euo pipefail
+shopt -s extglob  # Enable extglob at parse-time for +([[:space:]]) patterns
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
@@ -1146,11 +1147,9 @@ scan_boot_timing() {
             # Extract service name (last word) and full time string
             local unit="${line##* }"
             local time_str="${line% "$unit"}"
-            # Trim leading/trailing spaces with pure bash (zero subprocesses)
-            shopt -s extglob
+            # Trim leading/trailing spaces (extglob enabled globally at script start)
             time_str="${time_str##+([[:space:]])}"
             time_str="${time_str%%+([[:space:]])}"
-            shopt -u extglob
             # Extract just the first part for coloring logic (e.g. "3min" from "3min 31s")
             local time_val="${time_str%% *}"
             
