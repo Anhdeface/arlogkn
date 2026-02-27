@@ -2670,6 +2670,23 @@ parse_args() {
                 WIKI_GROUP="${arg#--wiki-group=}"
                 shift
                 ;;
+            --boot)
+                # Support space-separated format: --boot -1
+                if [[ $# -lt 2 ]]; then
+                    die "Missing value for --boot (use: --boot N or --boot=N)"
+                fi
+                BOOT_OFFSET="$2"
+                # Validate numeric
+                if ! [[ "$BOOT_OFFSET" =~ ^-?[0-9]+$ ]]; then
+                    die "Invalid boot offset: $BOOT_OFFSET (must be integer)"
+                fi
+                # Validate reasonable range (systemd typically keeps 10-20 boots)
+                # Reject extreme values that would cause confusing journalctl errors
+                if [[ "$BOOT_OFFSET" -lt -100 || "$BOOT_OFFSET" -gt 100 ]]; then
+                    die "Boot offset out of range: $BOOT_OFFSET (must be between -100 and 100)"
+                fi
+                shift 2
+                ;;
             --boot=*)
                 BOOT_OFFSET="${arg#--boot=}"
                 # Validate numeric
