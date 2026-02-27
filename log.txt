@@ -3,6 +3,7 @@
 Generated: 2026-02-27
 
 ---
+a12f179 2026-02-27 refactor: replace SESSION_SUMMARY.md with log.txt and auto-update script
 adf75d9 2026-02-27 release: version 1.0.3 — security audit fixes
 895bf92 2026-02-27 fix: add bash version check and remove legacy wrapper functions
 330fffa 2026-02-27 fix: add temperature bounds validation (-100°C to +150°C)
