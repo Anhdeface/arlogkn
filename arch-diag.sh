@@ -1490,16 +1490,17 @@ scan_usb_devices() {
         # Fallback product name
         [[ -z "$product" ]] && product="USB Device"
 
-        # Determine device type from product name
+        # Determine device type from product name (case-insensitive matching)
         local dev_type="Other"
-        case "$product" in
-            *Keyboard*) dev_type="Keyboard" ;;
-            *Mouse*) dev_type="Mouse" ;;
-            *Hub*) dev_type="Hub" ;;
-            *Storage*|*Flash*|*Disk*|*Mass*|*SD*|*Card*) dev_type="Storage" ;;
-            *Webcam*|*Camera*) dev_type="Camera" ;;
-            *Controller*|*Receiver*|*Wireless*|*Dongle*) dev_type="Controller" ;;
-            *Audio*|*Headset*|*Speaker*|*Headphone*) dev_type="Audio" ;;
+        local product_lower="${product,,}"  # Convert to lowercase for matching
+        case "$product_lower" in
+            *keyboard*) dev_type="Keyboard" ;;
+            *mouse*) dev_type="Mouse" ;;
+            *hub*) dev_type="Hub" ;;
+            *storage*|*flash*|*disk*|*mass*|*sd*|*card*) dev_type="Storage" ;;
+            *webcam*|*camera*) dev_type="Camera" ;;
+            *controller*|*receiver*|*wireless*|*dongle*) dev_type="Controller" ;;
+            *audio*|*headset*|*speaker*|*headphone*) dev_type="Audio" ;;
         esac
 
         # Read product ID from sysfs
