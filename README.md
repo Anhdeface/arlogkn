@@ -1,9 +1,9 @@
 # arlogkn
 
-**Version:** 1.0.3 | **Platform:** Arch Linux and derivatives | **License:** MIT
+**Version:** 1.0.3 | **Platform:** Arch Linux and derivatives | **License:** MIT | **![Report VirusTotal](https://www.virustotal.com/gui/file/33b074d65643a15a9f703c3333006dd271b65fadec8dff198e7796fb6484ae1c/detection)**
+
 
 A read-only system diagnostic and log extraction utility for Arch Linux. Performs comprehensive hardware and software state analysis without external dependencies, ensuring safety and reliability on broken or minimal systems.
-
 ---
 
 ## Quick Start
@@ -67,7 +67,7 @@ No installation required. The script is standalone:
 ```bash
 # Clone or download
 git clone <repository-url>
-cd ChSys
+cd arlogkn
 
 # Make executable
 chmod +x arch-diag.sh
