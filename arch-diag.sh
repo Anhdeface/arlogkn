@@ -2392,22 +2392,20 @@ export_all_logs() {
     local temp_file
     temp_file="$(mktemp)"
 
-    # Use subshell for isolated trap - avoids eval and nested trap corruption
-    # Trap fires on subshell exit (normal, error, or signal), cleaning up temp file
-    # Caller's EXIT trap is unaffected
-    (
-        trap 'rm -f "$temp_file" 2>/dev/null || true' EXIT
+    # Use subshell for output generation
+    # Trap in parent scope handles cleanup on any failure
+    trap 'rm -f "$temp_file" "$output_file" 2>/dev/null' EXIT INT TERM
 
-        {
-            printf '=============================================================\n'
-            printf 'ARLOGKN - FULL LOG EXPORT\n'
-            printf '=============================================================\n'
-            printf 'Generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-            printf 'System: %s (%s)\n' "${DISTRO_NAME}" "${DISTRO_TYPE}"
-            printf 'Kernel: %s\n' "${KERNEL_VER}"
-            printf 'CPU Governor: %s\n' "${CPU_GOVERNOR}"
-            printf 'Boot Offset: %s\n' "${BOOT_OFFSET}"
-            printf '=============================================================\n\n'
+    {
+        printf '=============================================================\n'
+        printf 'ARLOGKN - FULL LOG EXPORT\n'
+        printf '=============================================================\n'
+        printf 'Generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf 'System: %s (%s)\n' "${DISTRO_NAME}" "${DISTRO_TYPE}"
+        printf 'Kernel: %s\n' "${KERNEL_VER}"
+        printf 'CPU Governor: %s\n' "${CPU_GOVERNOR}"
+        printf 'Boot Offset: %s\n' "${BOOT_OFFSET}"
+        printf '=============================================================\n\n'
 
         # ─────────────────────────────────────────────────────────────────────
         # KERNEL LOGS
@@ -2667,11 +2665,6 @@ export_all_logs() {
         printf '=============================================================\n'
 
     } > "$temp_file"
-    
-    # Clear trap before exiting subshell - temp file successfully written
-    # Trap would delete the file, but we need it for the mv operation below
-    trap - EXIT
-    )
 
     # Validate temp file before moving (detect partial writes)
     if [[ ! -f "$temp_file" ]]; then
@@ -2681,15 +2674,17 @@ export_all_logs() {
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
-        rm -f "$temp_file" 2>/dev/null
         return 1
     fi
 
-    # Move temp file to final location (outside subshell)
+    # Move temp file to final location
     if ! mv "$temp_file" "$output_file"; then
         warn "Failed to move temp file to $output_file"
         return 1
     fi
+    
+    # SUCCESS: Clear trap - files are safely in place
+    trap - EXIT INT TERM
 
     info "All logs exported to: ${output_file}"
 }
