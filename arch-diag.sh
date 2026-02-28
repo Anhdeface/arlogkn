@@ -62,7 +62,13 @@ declare -g _LSPCI_KNN_CACHE_INIT=0
 # Get lspci output with caching (single call per session)
 _get_lspci() {
     if [[ "$_LSPCI_CACHE_INIT" -eq 0 ]]; then
-        _LSPCI_CACHE="$(lspci -k 2>/dev/null || true)"
+        local lspci_output
+        if ! lspci_output="$(timeout 5 lspci -k 2>/dev/null)"; then
+            warn "lspci command failed, hardware detection may be incomplete"
+            _LSPCI_CACHE=""
+        else
+            _LSPCI_CACHE="$lspci_output"
+        fi
         _LSPCI_CACHE_INIT=1
     fi
     printf '%s' "$_LSPCI_CACHE"
@@ -71,7 +77,12 @@ _get_lspci() {
 # Get lspci -knn output with caching (for export)
 _get_lspci_knn() {
     if [[ "$_LSPCI_KNN_CACHE_INIT" -eq 0 ]]; then
-        _LSPCI_KNN_CACHE="$(lspci -knn 2>/dev/null || true)"
+        local lspci_output
+        if ! lspci_output="$(timeout 5 lspci -knn 2>/dev/null)"; then
+            _LSPCI_KNN_CACHE=""
+        else
+            _LSPCI_KNN_CACHE="$lspci_output"
+        fi
         _LSPCI_KNN_CACHE_INIT=1
     fi
     printf '%s' "$_LSPCI_KNN_CACHE"
@@ -381,7 +392,7 @@ detect_drivers() {
     [[ -n "$_DRIVERS_CACHE" ]] && echo "$_DRIVERS_CACHE" && return 0
 
     local lsmod_output
-    lsmod_output="$(lsmod 2>/dev/null)" || true
+    lsmod_output="$(timeout 5 lsmod 2>/dev/null)" || true
     # Count loaded modules (skip header line)
     # Use NR>1{count++} to avoid -1 on empty input (awk with 0 bytes → NR=0 → NR-1=-1)
     # count+0 ensures 0 is printed even if count is unset (empty input)
