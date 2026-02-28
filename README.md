@@ -1,6 +1,6 @@
 # arlogkn
 
-**Version:** 1.0.3 | **Platform:** Arch Linux and derivatives | **License:** MIT | **![Report VirusTotal](https://www.virustotal.com/gui/file/33b074d65643a15a9f703c3333006dd271b65fadec8dff198e7796fb6484ae1c/detection)**
+**Version:** 1.0.3 | **Platform:** Arch Linux and derivatives | **License:** MIT | **[Report VirusTotal](https://www.virustotal.com/gui/file/33b074d65643a15a9f703c3333006dd271b65fadec8dff198e7796fb6484ae1c/detection)**
 
 
 A read-only system diagnostic and log extraction utility for Arch Linux. Performs comprehensive hardware and software state analysis without external dependencies, ensuring safety and reliability on broken or minimal systems.
