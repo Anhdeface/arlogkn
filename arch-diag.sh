@@ -911,8 +911,8 @@ scan_kernel_logs() {
     # Trap fires on subshell exit (normal, error, or signal), cleaning up temp file
     # Caller's EXIT trap is unaffected
     (
-        trap 'rm -f "$jctl_err" 2>/dev/null' EXIT
-        
+        trap 'rm -f "$jctl_err" 2>/dev/null' EXIT INT TERM
+
         if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
             if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
                 warn "Cannot access system journal (try running as root for full access)"
@@ -1302,6 +1302,11 @@ scan_network_interfaces() {
     if command -v ip &>/dev/null; then
         while read -r iface state addr_line; do
             [[ -z "$iface" ]] && continue
+            # Security: Validate interface name (prevent array key injection)
+            if [[ ! "$iface" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+                warn "Skipping invalid interface name: $iface"
+                continue
+            fi
             local ip_addr
             # Match IPv4 first, fallback to IPv6 using bash regex (zero subprocesses)
             if [[ "$addr_line" =~ ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
@@ -1835,13 +1840,19 @@ init_output_dir() {
 
     # Security: Prevent symlink attacks and path traversal
     local base_dir="./arch-diag-logs"
-    
+
+    # Set restrictive umask for log export (owner read/write only)
+    local old_umask
+    old_umask="$(umask)"
+    umask 077
+
     # Check if base directory is a symlink (attack vector)
     if [[ -L "$base_dir" ]]; then
         warn "Refusing to use symlink at $base_dir (security risk)"
+        umask "$old_umask"
         return 1
     fi
-    
+
     # Resolve to absolute path for validation
     local resolved_base
     if [[ -d "$base_dir" ]]; then
@@ -1850,11 +1861,12 @@ init_output_dir() {
         # Directory doesn't exist yet, check parent
         resolved_base="$(pwd)/arch-diag-logs"
     fi
-    
+
     # Prevent writing to system directories (path traversal protection)
     case "$resolved_base" in
         /etc/*|/bin/*|/sbin/*|/usr/bin/*|/usr/sbin/*|/usr/local/*|/boot/*|/root/*)
             warn "Refusing to write to system directory: $resolved_base"
+            umask "$old_umask"
             return 1
             ;;
     esac
@@ -1862,13 +1874,18 @@ init_output_dir() {
     # Check disk space before mutating global state
     if ! check_disk_space "$new_output_dir"; then
         warn "Insufficient disk space for export"
+        umask "$old_umask"
         return 1
     fi
 
     if ! mkdir -p "$new_output_dir" 2>/dev/null; then
         warn "Could not create output directory: $new_output_dir"
+        umask "$old_umask"
         return 1
     fi
+
+    # Restore umask after directory creation
+    umask "$old_umask"
 
     # All checks passed — assign to global
     OUTPUT_DIR="$new_output_dir"
