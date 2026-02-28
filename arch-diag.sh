@@ -2139,7 +2139,7 @@ export_vga_info() {
 
         if command -v glxinfo &>/dev/null; then
             printf 'OpenGL Info:\n'
-            glxinfo 2>/dev/null | grep -E 'OpenGL (vendor|renderer|version)' | head -5
+            glxinfo 2>/dev/null | grep -E 'OpenGL (vendor|renderer|version)' | head -5 || true
         fi
     } > "$output_file"
 
@@ -2589,7 +2589,7 @@ export_all_logs() {
         printf 'Display: %s\n\n' "${DISPLAY_INFO}"
         if command -v glxinfo &>/dev/null; then
             printf 'OpenGL Info:\n'
-            glxinfo 2>/dev/null | grep -E 'OpenGL (vendor|renderer|version)' | head -5
+            glxinfo 2>/dev/null | grep -E 'OpenGL (vendor|renderer|version)' | head -5 || true
         fi
         printf '\n\n'
 
@@ -2658,8 +2658,23 @@ export_all_logs() {
         printf '=============================================================\n'
 
     } > "$temp_file"
-    # Subshell exits here - temp file is written to disk, trap cleaned up
+    
+    # Clear trap before exiting subshell - temp file successfully written
+    # Trap would delete the file, but we need it for the mv operation below
+    trap - EXIT
     )
+
+    # Validate temp file before moving (detect partial writes)
+    if [[ ! -f "$temp_file" ]]; then
+        warn "Temp file not created: $temp_file"
+        return 1
+    fi
+
+    if [[ ! -s "$temp_file" ]]; then
+        warn "Temp file is empty (possible write failure): $temp_file"
+        rm -f "$temp_file" 2>/dev/null
+        return 1
+    fi
 
     # Move temp file to final location (outside subshell)
     if ! mv "$temp_file" "$output_file"; then
