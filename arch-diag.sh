@@ -2084,6 +2084,7 @@ export_network_interfaces() {
         if [[ -d /sys/class/net ]]; then
             printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
             printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
+            shopt -s nullglob
             for net_path in /sys/class/net/*; do
                 [[ ! -d "$net_path" ]] && continue
                 local iface_name
@@ -2113,6 +2114,7 @@ export_network_interfaces() {
                 fi
                 printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
             done
+            shopt -u nullglob
         else
             printf '/sys/class/net not available.\n'
         fi
@@ -2548,6 +2550,7 @@ export_all_logs() {
         if [[ -d /sys/class/net ]]; then
             printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
             printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
+            shopt -s nullglob
             for net_path in /sys/class/net/*; do
                 [[ ! -d "$net_path" ]] && continue
                 local iface_name
@@ -2577,6 +2580,7 @@ export_all_logs() {
                 fi
                 printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
             done
+            shopt -u nullglob
         else
             printf '/sys/class/net not available.\n'
         fi
