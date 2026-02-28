@@ -844,10 +844,32 @@ cluster_errors() {
         return 1
     fi
 
-    # Normalize: extract message, count duplicates
+    # Normalize: remove timestamps, then normalize dynamic content for clustering
+    # Kernel errors often contain dynamic values (addresses, PIDs, IRQs) that make
+    # identical errors appear unique. We normalize these to enable proper clustering.
+    #
+    # Normalization patterns:
+    # - Memory addresses: 0x[0-9a-fA-F]+ → 0xADDR
+    # - PIDs in brackets: [12345] → [PID]
+    # - IRQ numbers: IRQ \d+ → IRQ N
+    # - CPU numbers: CPU \d+ → CPU N
+    # - Device names: sd[a-z], mmcblk\d+, nvme\d+n\d+ → DEVICE
+    # - MAC addresses: xx:xx:xx:xx:xx:xx → MAC
+    # - Port numbers: :1234 → :PORT
+    
     printf '%s\n' "$input" | \
         sed -E 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' | \
         sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' | \
+        sed -E 's/0x[0-9a-fA-F]+/0xADDR/g' | \
+        sed -E 's/\[[0-9]+\]/[PID]/g' | \
+        sed -E 's/IRQ [0-9]+/IRQ N/g' | \
+        sed -E 's/CPU [0-9]+/CPU N/g' | \
+        sed -E 's/(sd)[a-z]+/\1DEVICE/g' | \
+        sed -E 's/mmcblk[0-9]+/mmcblkDEVICE/g' | \
+        sed -E 's/nvme[0-9]+n[0-9]+/nvmeDEVICE/g' | \
+        sed -E 's/sector [0-9]+/sector N/g' | \
+        sed -E 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/MAC/g' | \
+        sed -E 's/:[0-9]+/:PORT/g' | \
         sort | uniq -c | sort -rn | \
         while read -r count msg; do
             if [[ "$count" -gt 1 ]]; then
