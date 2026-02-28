@@ -1093,6 +1093,12 @@ scan_pacman_logs() {
 
     local pacman_log="/var/log/pacman.log"
 
+    # Security: Check for symlink attack (TOCTOU protection)
+    if [[ -L "$pacman_log" ]]; then
+        warn "Refusing to read symlink: $pacman_log (security risk)"
+        return 0
+    fi
+
     if [[ ! -f "$pacman_log" ]]; then
         draw_box_line "${C_YELLOW}Pacman log not found (may require root)${C_RESET}"
         return 0
