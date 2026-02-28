@@ -416,40 +416,40 @@ detect_drivers() {
         lspci_output="$(_get_lspci)"
 
         # GPU (enhanced patterns)
-        [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(echo "$lspci_output" | grep -A2 -iE 'vga|3d|display' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        
+        [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'vga|3d|display' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+
         # Network (enhanced patterns)
-        [[ "$network_driver" == "N/A" ]] && network_driver="$(echo "$lspci_output" | grep -A2 -iE 'ethernet|network|wireless|wifi' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        
+        [[ "$network_driver" == "N/A" ]] && network_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'ethernet|network|wireless|wifi' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+
         # Audio
-        [[ "$audio_driver" == "N/A" ]] && audio_driver="$(echo "$lspci_output" | grep -A2 -iE 'audio|hdmi|hd-audio' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        
+        [[ "$audio_driver" == "N/A" ]] && audio_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'audio|hdmi|hd-audio' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+
         # Storage controllers
-        storage_driver="$(echo "$lspci_output" | grep -A2 -iE 'sata|ahci|ide|storage' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        storage_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'sata|ahci|ide|storage' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         [[ -z "$storage_driver" ]] && storage_driver="N/A"
-        
+
         # NVMe
-        nvme_driver="$(echo "$lspci_output" | grep -A2 -iE 'nvme' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        nvme_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'nvme' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         [[ -z "$nvme_driver" ]] && nvme_driver="N/A"
-        
+
         # USB Controller
-        usb_driver="$(echo "$lspci_output" | grep -A2 -iE 'usb|xhci|ehci|ohci|uhci' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        usb_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'usb|xhci|ehci|ohci|uhci' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         [[ -z "$usb_driver" ]] && usb_driver="N/A"
-        
+
         # Thunderbolt
-        thunderbolt_driver="$(echo "$lspci_output" | grep -A2 -iE 'thunderbolt' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        thunderbolt_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'thunderbolt' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         [[ -z "$thunderbolt_driver" ]] && thunderbolt_driver="N/A"
-        
+
         # I2C/SMBus
-        smbus_driver="$(echo "$lspci_output" | grep -A2 -iE 'smbus|i2c' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        smbus_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'smbus|i2c' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
 
         # ISA/LPC Bridge (platform)
         # Prioritize ISA/LPC matches (specific platform bridges), then fallback to PCH/platform
         # Avoid generic 'bridge' pattern which matches PCIe/SATA bridges incorrectly
-        platform_driver="$(echo "$lspci_output" | grep -A2 -iE 'isa bridge|lpc bridge|isa|lpc' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'isa bridge|lpc bridge|isa|lpc' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         if [[ -z "$platform_driver" ]]; then
-            platform_driver="$(echo "$lspci_output" | grep -A2 -iE 'platform|pch' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+            platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'platform|pch' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         fi
         [[ -z "$platform_driver" ]] && platform_driver="N/A"
     fi
@@ -518,23 +518,23 @@ detect_drivers() {
     # ─────────────────────────────────────────────────────────────────────────
     # SOURCE 4: lsmod category detection
     # ─────────────────────────────────────────────────────────────────────────
-    
+
     # RAID detection
-    if echo "$lsmod_output" | grep -qE '^raid|^dm_raid'; then
+    if printf '%s\n' "$lsmod_output" | grep -qE '^raid|^dm_raid'; then
         raid_driver="mdraid/dm-raid"
     else
         raid_driver="N/A"
     fi
-    
+
     # SATA enhancement
-    if [[ "$sata_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^ahci|^sata_'; then
-        sata_driver="$(echo "$lsmod_output" | grep -E '^ahci|^sata_' | head -1 | awk '{print $1}')"
+    if [[ "$sata_driver" == "N/A" ]] && printf '%s\n' "$lsmod_output" | grep -qE '^ahci|^sata_'; then
+        sata_driver="$(printf '%s\n' "$lsmod_output" | grep -E '^ahci|^sata_' | head -1 | awk '{print $1}')"
         [[ -z "$sata_driver" ]] && sata_driver="N/A"
     fi
-    
+
     # I2C enhancement
-    if [[ "$i2c_driver" == "N/A" ]] && echo "$lsmod_output" | grep -qE '^i2c_'; then
-        i2c_driver="$(echo "$lsmod_output" | grep -E '^i2c_' | head -1 | awk '{print $1}')"
+    if [[ "$i2c_driver" == "N/A" ]] && printf '%s\n' "$lsmod_output" | grep -qE '^i2c_'; then
+        i2c_driver="$(printf '%s\n' "$lsmod_output" | grep -E '^i2c_' | head -1 | awk '{print $1}')"
         [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
     fi
     
