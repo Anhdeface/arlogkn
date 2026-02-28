@@ -249,6 +249,13 @@ check_internet() {
         # Fallback to HTTP check with configurable endpoint
         # Default: Android captive portal (lightweight, returns 204)
         local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
+        
+        # Security: Validate URL format to prevent SSRF attacks
+        if [[ ! "$test_url" =~ ^https?://[a-zA-Z0-9.-]+ ]]; then
+            warn "Invalid test URL format, using default"
+            test_url="https://clients3.google.com/generate_204"
+        fi
+        
         if command -v curl &>/dev/null; then
             local http_code
             http_code="$(curl -s --head --connect-timeout 2 --max-time 3 \
@@ -914,9 +921,8 @@ scan_kernel_logs() {
         trap 'rm -f "$jctl_err" 2>/dev/null' EXIT INT TERM
 
         if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
-            if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
-                warn "Cannot access system journal (try running as root for full access)"
-            fi
+            # Generic error message to avoid revealing system configuration
+            warn "Cannot access system journal (try running as root for full access)"
         fi
         # Temp file cleanup happens automatically on subshell exit
     )
