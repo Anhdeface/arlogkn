@@ -824,23 +824,20 @@ scan_kernel_logs() {
     # We only want to warn if accessibility is restricted (e.g., EACCES).
     local jctl_err
     jctl_err="$(mktemp)" || { warn "Cannot create temp file for journal check"; return 1; }
-    
-    # Save caller's EXIT trap to avoid side-effect
-    # trap is GLOBAL in bash - clearing it affects caller
-    local old_exit_trap
-    old_exit_trap="$(trap -p EXIT)"
-    
-    # Use trap EXIT instead of RETURN: EXIT fires on set -e termination, RETURN does not
-    # This prevents temp file leak if script is killed mid-function
-    trap 'rm -f "$jctl_err" 2>/dev/null' EXIT
-    if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
-        if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
-            warn "Cannot access system journal (try running as root for full access)"
+
+    # Use subshell for isolated trap - avoids eval and nested trap corruption
+    # Trap fires on subshell exit (normal, error, or signal), cleaning up temp file
+    # Caller's EXIT trap is unaffected
+    (
+        trap 'rm -f "$jctl_err" 2>/dev/null' EXIT
+        
+        if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
+            if grep -q 'Permission denied\|Failed to open' "$jctl_err" 2>/dev/null; then
+                warn "Cannot access system journal (try running as root for full access)"
+            fi
         fi
-    fi
-    # Temp file no longer needed — delete immediately, then restore caller's trap
-    rm -f "$jctl_err" 2>/dev/null
-    eval "$old_exit_trap"  # Restore caller's EXIT trap (critical!)
+        # Temp file cleanup happens automatically on subshell exit
+    )
 
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -2304,37 +2301,33 @@ EOF
 
 export_all_logs() {
     local -a boot_args=(-b "$BOOT_OFFSET")
-    
+
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
         warn "export_all_logs: OUTPUT_DIR not set or invalid"
         return 1
     fi
-    
+
     local output_file="${OUTPUT_DIR}/arch-log-inspector-all.txt"
     local temp_file
     temp_file="$(mktemp)"
 
-    # Save caller's EXIT trap to avoid side-effect
-    # trap is GLOBAL in bash - clearing it affects caller
-    local old_exit_trap
-    old_exit_trap="$(trap -p EXIT)"
+    # Use subshell for isolated trap - avoids eval and nested trap corruption
+    # Trap fires on subshell exit (normal, error, or signal), cleaning up temp file
+    # Caller's EXIT trap is unaffected
+    (
+        trap 'rm -f "$temp_file" 2>/dev/null || true' EXIT
 
-    # Cleanup trap: use EXIT instead of RETURN
-    # EXIT fires on set -e termination, signal, or normal exit
-    # RETURN only fires on normal function return (not sufficient)
-    trap 'rm -f "$temp_file" 2>/dev/null || true' EXIT
-
-    {
-        printf '=============================================================\n'
-        printf 'ARLOGKN - FULL LOG EXPORT\n'
-        printf '=============================================================\n'
-        printf 'Generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-        printf 'System: %s (%s)\n' "${DISTRO_NAME}" "${DISTRO_TYPE}"
-        printf 'Kernel: %s\n' "${KERNEL_VER}"
-        printf 'CPU Governor: %s\n' "${CPU_GOVERNOR}"
-        printf 'Boot Offset: %s\n' "${BOOT_OFFSET}"
-        printf '=============================================================\n\n'
+        {
+            printf '=============================================================\n'
+            printf 'ARLOGKN - FULL LOG EXPORT\n'
+            printf '=============================================================\n'
+            printf 'Generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+            printf 'System: %s (%s)\n' "${DISTRO_NAME}" "${DISTRO_TYPE}"
+            printf 'Kernel: %s\n' "${KERNEL_VER}"
+            printf 'CPU Governor: %s\n' "${CPU_GOVERNOR}"
+            printf 'Boot Offset: %s\n' "${BOOT_OFFSET}"
+            printf '=============================================================\n\n'
 
         # ─────────────────────────────────────────────────────────────────────
         # KERNEL LOGS
@@ -2592,15 +2585,14 @@ export_all_logs() {
         printf '=============================================================\n'
 
     } > "$temp_file"
+    # Subshell exits here - temp file is written to disk, trap cleaned up
+    )
 
-    # Move temp file to final location
+    # Move temp file to final location (outside subshell)
     if ! mv "$temp_file" "$output_file"; then
         warn "Failed to move temp file to $output_file"
         return 1
     fi
-
-    # Restore caller's EXIT trap (temp file no longer exists)
-    eval "$old_exit_trap"  # Restore caller's EXIT trap (critical!)
 
     info "All logs exported to: ${output_file}"
 }
