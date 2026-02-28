@@ -872,10 +872,14 @@ cluster_errors() {
         sed -E 's/:[0-9]+/:PORT/g' | \
         sort | uniq -c | sort -rn | \
         while read -r count msg; do
+            # Security: Escape % to prevent printf format string injection
+            # An attacker with kernel log write access could inject %s, %n, etc.
+            # This sanitizes the message before passing to printf
+            local safe_msg="${msg//%/%%}"
             if [[ "$count" -gt 1 ]]; then
-                printf '%s (x%d)\n' "$msg" "$count"
+                printf '%s (x%d)\n' "$safe_msg" "$count"
             else
-                printf '%s\n' "$msg"
+                printf '%s\n' "$safe_msg"
             fi
         done
 }
