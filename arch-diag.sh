@@ -1816,6 +1816,32 @@ init_output_dir() {
     timestamp="$(date +%Y%m%d_%H%M%S)"
     local new_output_dir="./arch-diag-logs/${timestamp}"
 
+    # Security: Prevent symlink attacks and path traversal
+    local base_dir="./arch-diag-logs"
+    
+    # Check if base directory is a symlink (attack vector)
+    if [[ -L "$base_dir" ]]; then
+        warn "Refusing to use symlink at $base_dir (security risk)"
+        return 1
+    fi
+    
+    # Resolve to absolute path for validation
+    local resolved_base
+    if [[ -d "$base_dir" ]]; then
+        resolved_base="$(cd "$base_dir" 2>/dev/null && pwd)" || resolved_base="$(pwd)/arch-diag-logs"
+    else
+        # Directory doesn't exist yet, check parent
+        resolved_base="$(pwd)/arch-diag-logs"
+    fi
+    
+    # Prevent writing to system directories (path traversal protection)
+    case "$resolved_base" in
+        /etc/*|/bin/*|/sbin/*|/usr/bin/*|/usr/sbin/*|/usr/local/*|/boot/*|/root/*)
+            warn "Refusing to write to system directory: $resolved_base"
+            return 1
+            ;;
+    esac
+
     # Check disk space before mutating global state
     if ! check_disk_space "$new_output_dir"; then
         warn "Insufficient disk space for export"
