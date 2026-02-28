@@ -178,34 +178,79 @@ detect_system_info() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 check_internet() {
-    # Check internet connection (try both ping and curl independently)
-    if command -v ping &>/dev/null; then
-        if ping -c1 -W2 8.8.8.8 &>/dev/null; then
+    # Local-first connectivity check (no external traffic by default)
+    # Designed for air-gapped systems and enterprise environments
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # FAST PATH 1: Check default route (no external traffic)
+    # ─────────────────────────────────────────────────────────────────────────
+    if command -v ip &>/dev/null; then
+        if ip route 2>/dev/null | grep -q '^default'; then
             INTERNET_STATUS="connected"
             return 0
         fi
     fi
-    if command -v curl &>/dev/null; then
-        # Check HTTP status code explicitly (not just TCP connection)
-        # Captive portals often return HTTP 302, which should NOT be "connected"
-        
-        # Try Google.com HEAD request - check for 2xx status
-        local http_code
-        http_code="$(curl -s --head --connect-timeout 2 --max-time 5 \
-             -o /dev/null -w '%{http_code}' https://www.google.com)"
-        if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
-            INTERNET_STATUS="connected"
-            return 0
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # FAST PATH 2: Check interface operstate (local /sys filesystem)
+    # Check all interfaces except loopback (lo)
+    # ─────────────────────────────────────────────────────────────────────────
+    if [[ -d /sys/class/net ]]; then
+        local iface operstate
+        shopt -s nullglob
+        for iface in /sys/class/net/*; do
+            # Skip loopback interface
+            [[ "$(basename "$iface")" == "lo" ]] && continue
+            
+            # Check if interface is UP
+            if [[ -f "${iface}/operstate" ]]; then
+                operstate="$(cat "${iface}/operstate" 2>/dev/null)"
+                if [[ "$operstate" == "up" || "$operstate" == "unknown" ]]; then
+                    # "unknown" state often means interface is up but no carrier
+                    # Still counts as network capability (e.g., VMs, containers)
+                    shopt -u nullglob
+                    INTERNET_STATUS="connected"
+                    return 0
+                fi
+            fi
+        done
+        shopt -u nullglob
+    fi
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # OPTIONAL: External connectivity checks (only if explicitly enabled)
+    # Controlled by ARLOGKN_CHECK_EXTERNAL environment variable
+    # ─────────────────────────────────────────────────────────────────────────
+    if [[ "${ARLOGKN_CHECK_EXTERNAL:-0}" == "1" ]]; then
+        # Try gateway ping first (more reliable than hardcoded 8.8.8.8)
+        local gateway=""
+        if command -v ip &>/dev/null; then
+            gateway="$(ip route 2>/dev/null | grep '^default' | awk '{print $3}' | head -1)"
         fi
         
-        # Fallback: try Android captive portal endpoint (returns 204 No Content)
-        http_code="$(curl -s --connect-timeout 2 --max-time 5 \
-             -o /dev/null -w '%{http_code}' https://clients3.google.com/generate_204)"
-        if [[ "$http_code" == "204" ]]; then
-            INTERNET_STATUS="connected"
-            return 0
+        if [[ -n "$gateway" ]] && command -v ping &>/dev/null; then
+            if ping -c1 -W2 "$gateway" &>/dev/null; then
+                INTERNET_STATUS="connected"
+                return 0
+            fi
+        fi
+        
+        # Fallback to HTTP check with configurable endpoint
+        # Default: Android captive portal (lightweight, returns 204)
+        local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
+        if command -v curl &>/dev/null; then
+            local http_code
+            http_code="$(curl -s --head --connect-timeout 2 --max-time 3 \
+                 -o /dev/null -w '%{http_code}' "$test_url" 2>/dev/null)"
+            # Accept 2xx (success) or 204 (captive portal check)
+            if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+                INTERNET_STATUS="connected"
+                return 0
+            fi
         fi
     fi
+    
+    # No connectivity detected
     INTERNET_STATUS="disconnected"
     return 1
 }
