@@ -1001,8 +1001,14 @@ scan_user_services() {
         return 0
     fi
 
-    # Header info
-    draw_box_line "${C_BOLD}Service Journal Errors (current boot)${C_RESET}"
+    # Header info with boot offset
+    local boot_desc
+    case "$BOOT_OFFSET" in
+        0) boot_desc="current boot" ;;
+        -1) boot_desc="previous boot" ;;
+        *) boot_desc="boot #$BOOT_OFFSET" ;;
+    esac
+    draw_box_line "${C_BOLD}Service Journal Errors (${boot_desc})${C_RESET}"
     draw_box_line ""
 
     printf '%s\n' "$output" | head -15 | while read -r line; do
