@@ -2455,12 +2455,18 @@ export_all_logs() {
     fi
 
     local output_file="${OUTPUT_DIR}/arch-log-inspector-all.txt"
-    local temp_file
-    temp_file="$(mktemp)"
+    local temp_file=""
+    local export_success=0
+    
+    # Security: Check mktemp return value to prevent silent failure
+    temp_file="$(mktemp)" || {
+        warn "Failed to create temp file (disk full or /tmp unavailable)"
+        return 1
+    }
 
-    # Use subshell for output generation
-    # Trap in parent scope handles cleanup on any failure
-    trap 'rm -f "$temp_file" "$output_file" 2>/dev/null' EXIT INT TERM
+    # Trap only cleans up temp file on failure (export_success=0)
+    # On success, export_file is preserved for user
+    trap '[[ "$export_success" -eq 0 ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
 
     {
         printf '=============================================================\n'
@@ -2749,7 +2755,9 @@ export_all_logs() {
         return 1
     fi
     
-    # SUCCESS: Clear trap - files are safely in place
+    # SUCCESS: Mark export as successful and clear trap
+    # Export file is now safely in place, no cleanup needed
+    export_success=1
     trap - EXIT INT TERM
 
     info "All logs exported to: ${output_file}"
