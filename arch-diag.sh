@@ -395,12 +395,15 @@ detect_display() {
 get_driver_from_sys() {
     local class_path="$1"
     local driver=""
-    
+
     if [[ -L "${class_path}/device/driver" ]]; then
         driver="$(readlink "${class_path}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
     fi
     echo "$driver"
 }
+
+# Cache for parsed lspci driver data (avoids 60 subprocesses on repeated calls)
+declare -g _LSPCI_DRIVERS_CACHE=""
 
 # Main driver detection - multi-source comprehensive
 detect_drivers() {
@@ -483,9 +486,26 @@ detect_drivers() {
     # ─────────────────────────────────────────────────────────────────────────
 
     if command -v lspci &>/dev/null; then
-        # Use cached lspci output (single subprocess per session)
-        local lspci_output
-        lspci_output="$(_get_lspci)"
+        # Use cached lspci driver data if available (avoids 60 subprocesses)
+        if [[ -n "$_LSPCI_DRIVERS_CACHE" ]]; then
+            IFS='|' read -r cached_gpu cached_net cached_audio cached_storage \
+                cached_nvme cached_usb cached_thunderbolt cached_smbus cached_platform \
+                <<< "$_LSPCI_DRIVERS_CACHE"
+            
+            [[ "$gpu_driver" == "N/A" && -n "$cached_gpu" ]] && gpu_driver="$cached_gpu"
+            [[ "$network_driver" == "N/A" && -n "$cached_net" ]] && network_driver="$cached_net"
+            [[ "$audio_driver" == "N/A" && -n "$cached_audio" ]] && audio_driver="$cached_audio"
+            [[ "$storage_driver" == "N/A" && -n "$cached_storage" ]] && storage_driver="$cached_storage"
+            [[ "$nvme_driver" == "N/A" && -n "$cached_nvme" ]] && nvme_driver="$cached_nvme"
+            [[ "$usb_driver" == "N/A" && -n "$cached_usb" ]] && usb_driver="$cached_usb"
+            [[ "$thunderbolt_driver" == "N/A" && -n "$cached_thunderbolt" ]] && thunderbolt_driver="$cached_thunderbolt"
+            [[ "$smbus_driver" == "N/A" && -n "$cached_smbus" ]] && smbus_driver="$cached_smbus"
+            [[ "$platform_driver" == "N/A" && -n "$cached_platform" ]] && platform_driver="$cached_platform"
+        else
+            # First call - parse lspci output (60 subprocesses)
+            # Use cached lspci output (single subprocess per session)
+            local lspci_output
+            lspci_output="$(_get_lspci)"
 
         # GPU (enhanced patterns)
         [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'vga|3d|display' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
@@ -524,8 +544,13 @@ detect_drivers() {
             platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'platform|pch' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
         fi
         [[ -z "$platform_driver" ]] && platform_driver="N/A"
+        fi  # Close if-else for cache check
+        
+        # Cache parsed lspci driver data to avoid 60 subprocesses on repeated calls
+        # Format: gpu|net|audio|storage|nvme|usb|thunderbolt|smbus|platform
+        _LSPCI_DRIVERS_CACHE="${gpu_driver}|${network_driver}|${audio_driver}|${storage_driver}|${nvme_driver}|${usb_driver}|${thunderbolt_driver}|${smbus_driver}|${platform_driver}"
     fi
-    
+
     # ─────────────────────────────────────────────────────────────────────────
     # SOURCE 3: /sys/bus detection
     # ─────────────────────────────────────────────────────────────────────────
