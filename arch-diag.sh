@@ -757,11 +757,10 @@ strip_ansi() {
     s="${s//${C_CYAN}/}"
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
-    # Strip raw ANSI escape sequences using bash regex (no subshell)
-    # Pattern: ESC [ params... letter
-    while [[ "$s" =~ $'\x1b''\['[0-9\;]*[a-zA-Z] ]]; do
-        s="${s//"${BASH_REMATCH[0]}"/}"
-    done
+    # Strip raw ANSI escape sequences using sed (single pass, O(n), reliable)
+    # While loop with regex could hang on malformed ANSI sequences
+    # sed is battle-tested for this purpose and handles edge cases correctly
+    s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
     printf '%s' "$s"
 }
 
