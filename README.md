@@ -470,11 +470,6 @@ bash -x ./arch-diag.sh --kernel 2>&1 | head -100
 
 ---
 
-## Project Status
-
-- **Version:** 1.0.3
-- **Tested On:** Arch Linux, CachyOS, Manjaro, EndeavourOS
-- **Changelog:** See `log.md` for complete commit history
 
 ---
 
