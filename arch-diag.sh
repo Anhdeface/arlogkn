@@ -1074,27 +1074,44 @@ scan_coredumps() {
 
     printf '%s\n' "$coredumps" | while read -r line; do
         # Parse coredumpctl output robustly
-        # Format varies by systemd version.
-        # Check if line has enough fields. If NF < 6, fallback to raw string.
-        # Use printf to avoid echo interpreting flags like -n, -e in $line
-        if ! printf '%s\n' "$line" | awk '{if(NF<6) exit 1}'; then
-            draw_box_line "${C_YELLOW}$line${C_RESET}"
-            continue
-        fi
-
-        # Extract fields using awk (single pass, handles multi-word timestamps)
+        # Format varies by systemd version, so we parse by pattern not position
         # coredumpctl format: TIME... PID UID GID SIG COREFILE EXE SIZE
-        # Time can be multiple words: "Wed 2024-01-10 10:23:45 UTC"
-        # Using awk directly avoids read splitting on whitespace
+        # But older versions may have different fields
+        # Use pattern matching to find numeric PID and extract relative to it
+        
         local formatted
         formatted="$(awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '{
-            # Build time string (all fields except last 7)
+            # Find first numeric field (PID) and work from there
+            pid_field = 0
+            for(i=1; i<=NF; i++) {
+                if ($i ~ /^[0-9]+$/) {
+                    pid_field = i
+                    break
+                }
+            }
+            
+            # If no numeric field found, print raw line
+            if (pid_field == 0) {
+                print $0
+                next
+            }
+            
+            # Extract fields relative to PID
+            # Format: TIME... PID UID GID SIG [COREFILE] EXE [SIZE]
+            pid = $pid_field
+            sig = $(pid_field + 3)
+            # EXE is typically 2 fields after SIG (or 1 if no COREFILE)
+            exe_field = pid_field + 4
+            if ($(exe_field) ~ /^\/|^\.\/|^[a-zA-Z]/) {
+                exe = $(exe_field)
+            } else {
+                exe = $(exe_field + 1)
+            }
+            
+            # Build time from all fields before PID
             time = ""
-            for(i=1; i<=NF-7; i++) time = time (i>1 ? " " : "") $i
-            # Extract fixed-position fields from end
-            pid = $(NF-6)
-            sig = $(NF-3)
-            exe = $(NF-1)
+            for(j=1; j<pid_field; j++) time = time (j>1 ? " " : "") $j
+            
             # Output formatted string
             printf "%s[%s]%s PID %s%s%s - %s%s%s (signal: %s)\n", \
                 cyan, time, rst, bold, pid, rst, yellow, exe, rst, sig
