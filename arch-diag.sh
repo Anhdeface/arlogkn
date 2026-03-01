@@ -313,9 +313,18 @@ detect_gpu() {
 
     # Build GPU info string (supports multiple GPUs)
     if [[ ${#gpu_names[@]} -gt 0 ]]; then
-        # Remove duplicates and join with ", "
-        # Combined sed expressions: remove trailing comma, then add space after commas
-        GPU_INFO="$(printf '%s\n' "${gpu_names[@]}" | sort -u | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
+        # Remove duplicates using pure bash (no subprocesses)
+        local -A seen
+        local -a unique=()
+        for name in "${gpu_names[@]}"; do
+            if [[ -z "${seen[$name]:-}" ]]; then
+                unique+=("$name")
+                seen[$name]=1
+            fi
+        done
+        # Join with ", " using pure bash
+        local IFS=', '
+        GPU_INFO="${unique[*]}"
     else
         GPU_INFO=""
     fi
@@ -921,7 +930,7 @@ scan_kernel_logs() {
 
         if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
             # Generic error message to avoid revealing system configuration
-            warn "Cannot access system journal (try running as root for full access)"
+            warn "Cannot access system journal"
         fi
         # Temp file cleanup happens automatically on subshell exit
     )
@@ -1191,7 +1200,7 @@ scan_temperatures() {
             [[ ! -f "$temp_input" ]] && continue
 
             local temp_raw label temp_c color
-            temp_raw="$(cat "$temp_input" 2>/dev/null)" || continue
+            temp_raw="$(<"$temp_input")" || continue
             [[ -z "$temp_raw" || ! "$temp_raw" =~ ^-?[0-9]+$ ]] && continue
 
             # Validate temperature bounds (-100°C to +150°C = -100000 to +150000 millidegrees)
@@ -1203,10 +1212,10 @@ scan_temperatures() {
             # Convert millidegrees to degrees
             temp_c=$((temp_raw / 1000))
 
-            # Get label (e.g. "Core 0", "Tctl")
+            # Get label (e.g. "Core 0", "Tctl") - use bash redirection (no subprocess)
             local label_file="${temp_input%_input}_label"
             if [[ -f "$label_file" ]]; then
-                label="$(cat "$label_file" 2>/dev/null)"
+                label="$(<"$label_file")"
             else
                 label="${chip_name:-hwmon}"
             fi
