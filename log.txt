@@ -1,8 +1,35 @@
 # arlogkn Commit Log
 
-Generated: 2026-02-28
+Generated: 2026-03-01
 
 ---
+498d220 2026-03-01 fix: add caching for parsed lspci driver data (HIGH #5)
+d78b5e8 2026-03-01 fix: performance and security improvements (MEDIUM #8,9 + LOW #10,11)
+9547630 2026-03-01 fix: add input validation to awk_fuzzy_match to prevent injection
+18839be 2026-03-01 fix: parse coredumpctl output by pattern matching instead of fixed positions
+c4b4d82 2026-03-01 fix: replace while loop with sed in strip_ansi for reliability
+e7d8bb5 2026-03-01 fix: prevent data loss in export_all_logs - trap preserves exported file on interrupt
+7ffc7b4 2026-02-28 Update VirusTotal link format in README
+8cbdf1c 2026-02-28 Update README with VirusTotal report link
+06b6121 2026-02-28 chore: LOW #18-21 — code quality improvements (no functional changes)
+e6074fb 2026-02-28 fix: MEDIUM #12,14 — generic error messages and URL validation
+bf50ef1 2026-02-28 fix: HIGH #8,9,10 — signal handlers, interface validation, file permissions
+06b845f 2026-02-28 fix: HIGH #6,7,11 — add timeouts and error handling for external commands
+7f42c9d 2026-02-28 fix: HIGH #5 — prevent TOCTOU symlink attack in pacman log read
+b3f8354 2026-02-28 fix: HIGH #4 — tighten BOOT_OFFSET validation bounds
+93064be 2026-02-28 fix: CRITICAL #3 — prevent path traversal via symlink attack
+fe69bd1 2026-02-28 fix: CRITICAL #2 — prevent temp file race condition in export_all_logs()
+df731a2 2026-02-28 fix: CRITICAL #1 — prevent printf format string injection in cluster_errors()
+f8014b9 2026-02-28 fix: USB device type detection use case-insensitive matching
+04520a3 2026-02-28 fix: add missing shopt -s nullglob in network interface loops
+37768f5 2026-02-28 fix: export_all_logs prevent partial write data loss and add validation
+b93b7c0 2026-02-28 chore: remove test scripts used during security audit
+7d84172 2026-02-28 fix: show correct boot offset in service journal errors heading
+ffe2d77 2026-02-28 fix: cluster_errors() normalize dynamic content for proper error grouping
+4a8a357 2026-02-28 fix: local-first internet connectivity check (no external traffic by default)
+39675a9 2026-02-28 fix: replace unsafe echo with printf to prevent flag injection
+f8f7c1f 2026-02-28 fix: CRITICAL — replace dangerous eval "$old_exit_trap" with subshell isolation
+886cd02 2026-02-28 docs: update log.txt with latest commits
 8d9b71a 2026-02-28 fix: CRITICAL — restore draw_table_* wrapper functions (102 call sites)
 b13c0fc 2026-02-27 docs: update log.txt with latest commits
 2bad518 2026-02-27 fix: enable extglob globally at script start (parse-time requirement)
