@@ -322,50 +322,6 @@ visible_len()    # Computes visible string length (excluding ANSI)
 
 ---
 
-## Performance & Optimization
-
-### Optimization Summary (28 Phases, 67 Improvements)
-
-| Category | Count | Examples |
-|----------|-------|----------|
-| **Bug Fixes** | 52 | Off-by-one errors, trap handling, dispatch regression, symlink resolution |
-| **Features** | 5 | Temperature scanning, boot timing, network interfaces, swap/zram status |
-| **Polish** | 10 | Table width optimization, IPv6 support, log export indices |
-
-### Key Optimizations
-
-**1. Subprocess Caching**
-```bash
-# Before: Multiple `lspci -k` calls per scan
-# After: Single call, cached in $_LSPCI_CACHE
-```
-
-**2. Algorithm Improvement**
-```bash
-# strip_ansi(): O(n²) bash regex loop → O(n) sed single pass
-# Significant speedup for large table outputs
-```
-
-**3. Fork Reduction**
-```bash
-# readlink -f only if path is actually a symlink
-[[ -L "$fs" ]] && resolved="$(readlink -f "$fs")" || resolved="$fs"
-```
-
-**4. Memory Efficiency**
-```bash
-# Single `lsmod` call, derive loaded_count from cached output
-# Avoided 3 separate `free` calls by using single process substitution
-```
-
-**5. Timeout Guards**
-```bash
-# Prevent hangs on slow devices
-timeout 15 lsusb -v 2>/dev/null | head -100
-timeout 10 journalctl -k -p 3 ...
-```
-
----
 
 ## Security & Safety
 
