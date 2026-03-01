@@ -2959,9 +2959,18 @@ declare -A WIKI_ALIASES=(
 awk_fuzzy_match() {
     local query="$1"
     local groups="$2"
+
+    # Security: Validate inputs to prevent awk script injection
+    # Remove characters that could break awk string literals
+    query="${query//[\'\"\\\`\$\(\)\[\]\{\}]/}"
     
+    # Limit query length to prevent DoS
+    if [[ ${#query} -gt 50 ]]; then
+        query="${query:0:50}"
+    fi
+
     # Use awk for fast string processing
-    echo "$groups" | awk -v q="$query" '
+    printf '%s\n' "$groups" | awk -v q="$query" '
     BEGIN {
         best_idx = -1
         best_dist = 999
