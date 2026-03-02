@@ -15,7 +15,7 @@ shopt -s extglob  # Enable extglob at parse-time for +([[:space:]]) patterns
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.3"
+readonly VERSION="1.0.4"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 # Color state (set dynamically)
