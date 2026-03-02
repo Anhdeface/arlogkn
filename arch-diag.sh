@@ -770,10 +770,27 @@ draw_info_box() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Strip ANSI codes (script variables + raw escape sequences)
-# Uses pure bash to avoid subshell overhead in tight loops (table rendering)
+# Optimized with fast-path for strings without ANSI
 strip_ansi() {
     local s="$1"
-    # Strip script color variables
+    
+    # FAST PATH: Check if string contains any ANSI (avoid fork if clean)
+    # Most table cells don't have raw ANSI, only script color variables
+    if [[ "$s" != *$'\x1b'* ]]; then
+        # Pure bash: strip script color variables only (no fork)
+        s="${s//${C_RED}/}"
+        s="${s//${C_GREEN}/}"
+        s="${s//${C_YELLOW}/}"
+        s="${s//${C_BLUE}/}"
+        s="${s//${C_CYAN}/}"
+        s="${s//${C_BOLD}/}"
+        s="${s//${C_RESET}/}"
+        printf '%s' "$s"
+        return 0
+    fi
+    
+    # SLOW PATH: String has raw ANSI escape sequences
+    # Strip script color variables first (pure bash)
     s="${s//${C_RED}/}"
     s="${s//${C_GREEN}/}"
     s="${s//${C_YELLOW}/}"
@@ -781,16 +798,18 @@ strip_ansi() {
     s="${s//${C_CYAN}/}"
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
-    # Strip raw ANSI escape sequences using sed (single pass, O(n), reliable)
-    # While loop with regex could hang on malformed ANSI sequences
-    # sed is battle-tested for this purpose and handles edge cases correctly
+    
+    # Strip raw ANSI escape sequences (requires sed for regex matching)
+    # Note: This spawns 1 subshell, but only for strings with raw ANSI
+    # sed is battle-tested for handling malformed ANSI sequences
     s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
     printf '%s' "$s"
 }
 
 # Get visible length (excluding ANSI codes)
-# Calls strip_ansi() for maintainability — single source of truth
-# Subshell overhead is acceptable (~100μs per call, table rendering is not hot path)
+# Calls strip_ansi() which has fast-path for strings without raw ANSI
+# Fast-path: pure bash, no subprocess (common case for table cells)
+# Slow-path: 1 subprocess for sed (only when raw ANSI present)
 visible_len() {
     local s="$1"
     local stripped
