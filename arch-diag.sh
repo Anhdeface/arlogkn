@@ -953,7 +953,9 @@ scan_kernel_logs() {
     draw_section_header "KERNEL CRITICAL"
 
     # Fetch kernel errors (priority 3 = ERR)
-    journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+    # (kernel panic loop or log storm could generate MBs of data)
+    journal_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
         draw_empty_box
@@ -1033,7 +1035,8 @@ scan_user_services() {
     draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
     printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
 
-    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
         draw_empty_box
@@ -1973,7 +1976,8 @@ export_kernel_logs() {
     local output_file="${OUTPUT_DIR}/kernel_errors.txt"
     local journal_output
 
-    journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+    journal_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
         printf 'No kernel errors found for boot: %s\n' "${boot_args[*]}" > "$output_file"
@@ -1995,17 +1999,18 @@ export_kernel_logs() {
 
 export_user_services() {
     local -a boot_args=(-b "$BOOT_OFFSET")
-    
+
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
         warn "export_user_services: OUTPUT_DIR not set or invalid"
         return 1
     fi
-    
+
     local output_file="${OUTPUT_DIR}/service_errors.txt"
     local journal_output
 
-    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
         printf 'No service errors found for boot: %s\n' "${boot_args[*]}" > "$output_file"
@@ -2563,7 +2568,8 @@ export_all_logs() {
         printf '[1] KERNEL LOGS (Priority ≤3 - Errors)\n'
         printf '=============================================================\n'
         local kernel_output
-        kernel_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+        # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+        kernel_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
         if [[ -n "$kernel_output" ]]; then
             printf '%s\n' "$kernel_output"
         else
@@ -2592,7 +2598,8 @@ export_all_logs() {
         printf '[3] USER SERVICES\n'
         printf '=============================================================\n'
         local service_output
-        service_output="$(timeout 10 journalctl -u "*.service" -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+        # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+        service_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
         if [[ -n "$service_output" ]]; then
             printf '%s\n' "$service_output"
         else
