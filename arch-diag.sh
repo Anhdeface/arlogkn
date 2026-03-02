@@ -253,12 +253,22 @@ check_internet() {
         
         # Fallback to HTTP check with configurable endpoint
         # Default: Android captive portal (lightweight, returns 204)
+        # SECURITY: ARLOGKN_TEST_URL can be overridden by user. In enterprise
+        # environments, this could be abused for SSRF attacks against internal
+        # services (169.254.169.254 for cloud metadata, internal APIs, etc.).
+        # Consider blocking this variable via environment restrictions if needed.
         local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
-        
-        # Security: Validate URL format to prevent SSRF attacks
+
+        # Validate URL format (basic check, not SSRF protection)
+        # This only prevents malformed URLs, not internal network access
         if [[ ! "$test_url" =~ ^https?://[a-zA-Z0-9.-]+ ]]; then
             warn "Invalid test URL format, using default"
             test_url="https://clients3.google.com/generate_204"
+        fi
+
+        # Warn if using custom URL (enterprise audit trail)
+        if [[ -n "${ARLOGKN_TEST_URL:-}" ]]; then
+            warn "Using custom connectivity test URL (SSRF risk in enterprise)"
         fi
         
         if command -v curl &>/dev/null; then
