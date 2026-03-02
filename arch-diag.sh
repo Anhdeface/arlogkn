@@ -2456,7 +2456,16 @@ export_drivers() {
         printf '[9] PLATFORM DRIVERS\n'
         printf '=============================================================\n\n'
         if [[ -d /sys/bus/platform/drivers ]]; then
-            ls -1 /sys/bus/platform/drivers/ 2>/dev/null | head -50 || printf 'Unable to list platform drivers\n'
+            # Use glob instead of ls parsing (safe with special chars)
+            local count=0
+            shopt -s nullglob
+            for d in /sys/bus/platform/drivers/*/; do
+                [[ -d "$d" ]] || continue
+                printf '%s\n' "${d##*/}"
+                count=$((count + 1))
+                [[ "$count" -ge 50 ]] && break
+            done
+            shopt -u nullglob
         else
             printf 'Platform bus not available\n'
         fi
@@ -2468,7 +2477,19 @@ export_drivers() {
         printf '=============================================================\n\n'
         if [[ -d /sys/bus/pci/drivers ]]; then
             printf 'PCI Drivers indicating virtualization:\n'
-            ls -1 /sys/bus/pci/drivers/ 2>/dev/null | grep -iE 'virtio|vmware|vbox|xen|qxl' || printf 'No virtual drivers detected\n'
+            # Use glob instead of ls parsing (safe with special chars)
+            local found=0
+            shopt -s nullglob
+            for d in /sys/bus/pci/drivers/*/; do
+                [[ -d "$d" ]] || continue
+                local driver_name="${d##*/}"
+                if [[ "$driver_name" =~ virtio|vmware|vbox|xen|qxl ]]; then
+                    printf '%s\n' "$driver_name"
+                    found=1
+                fi
+            done
+            shopt -u nullglob
+            [[ "$found" -eq 0 ]] && printf 'No virtual drivers detected\n'
         else
             printf 'PCI bus not available\n'
         fi
