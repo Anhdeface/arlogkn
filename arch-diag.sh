@@ -1866,7 +1866,8 @@ init_output_dir() {
     old_umask="$(umask)"
     umask 077
 
-    # Check if base directory is a symlink (attack vector)
+    # Check if base directory is a symlink BEFORE mkdir (pre-check)
+    # Note: This is a defense-in-depth check, not the primary protection
     if [[ -L "$base_dir" ]]; then
         warn "Refusing to use symlink at $base_dir (security risk)"
         umask "$old_umask"
@@ -1898,8 +1899,27 @@ init_output_dir() {
         return 1
     fi
 
-    if ! mkdir -p "$new_output_dir" 2>/dev/null; then
+    # SECURITY: Create directory with --no-dereference to prevent symlink following
+    # This is the PRIMARY protection against TOCTOU race condition
+    # Attack scenario: attacker creates symlink between pre-check and mkdir
+    if ! mkdir --no-dereference -p "$new_output_dir" 2>/dev/null; then
+        # POST-CONDITION CHECK: Verify created path is not a symlink
+        # If mkdir failed and path is symlink, attack was detected
+        if [[ -L "$new_output_dir" ]]; then
+            warn "Symlink attack detected at $new_output_dir (TOCTOU race prevented)"
+            umask "$old_umask"
+            return 1
+        fi
         warn "Could not create output directory: $new_output_dir"
+        umask "$old_umask"
+        return 1
+    fi
+
+    # DEFENSE IN DEPTH: Verify created directory is not a symlink
+    # Even with --no-dereference, double-check for safety
+    if [[ -L "$new_output_dir" ]]; then
+        warn "Created path is a symlink at $new_output_dir (attack detected)"
+        rm -f "$new_output_dir" 2>/dev/null
         umask "$old_umask"
         return 1
     fi
