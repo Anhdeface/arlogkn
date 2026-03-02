@@ -3776,6 +3776,13 @@ main() {
         return 0
     fi
 
+    # Validate conflicting export flags
+    if [[ "$SAVE_LOGS" -eq 1 && "$SAVE_ALL" -eq 1 ]]; then
+        warn "Conflicting export modes detected (--save and --save-all)"
+        warn "Using --save-all (single file export), ignoring --save"
+        SAVE_LOGS=0  # Clear conflicting flag
+    fi
+
     detect_distro
     detect_system_info
     check_internet || true
