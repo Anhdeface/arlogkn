@@ -1954,10 +1954,12 @@ init_output_dir() {
         resolved_base="$(pwd)/arch-diag-logs"
     fi
 
-    # Prevent writing to system directories (path traversal protection)
+    # Prevent writing to protected directories (path traversal protection)
+    # Blocks: system dirs, user dirs, world-writable dirs, virtual filesystems
     case "$resolved_base" in
-        /etc/*|/bin/*|/sbin/*|/usr/bin/*|/usr/sbin/*|/usr/local/*|/boot/*|/root/*)
-            warn "Refusing to write to system directory: $resolved_base"
+        /etc/*|/bin/*|/sbin/*|/usr/*|/boot/*|/root/*| \
+        /home/*|/tmp/*|/var/*|/proc/*|/sys/*|/dev/*|/run/*|/opt/*)
+            warn "Refusing to write to protected directory: $resolved_base"
             umask "$old_umask"
             return 1
             ;;
