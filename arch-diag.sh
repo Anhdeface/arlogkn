@@ -415,8 +415,6 @@ get_driver_from_sys() {
     echo "$driver"
 }
 
-# Cache for parsed lspci driver data (removed - redundant with _DRIVERS_CACHE)
-
 # Main driver detection - multi-source comprehensive
 detect_drivers() {
     # Return cached result if available (drivers don't change during session)
