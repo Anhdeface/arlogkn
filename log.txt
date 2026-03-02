@@ -1,8 +1,31 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-01
+Generated: 2026-03-02
 
 ---
+99dee88 2026-03-02 docs: restructure README for clarity and newcomer onboarding
+a8102ae 2026-03-02 release: version 1.0.4 - comprehensive security audit and performance improvements
+478ff43 2026-03-02 docs: document SSRF risk with ARLOGKN_TEST_URL (enterprise security)
+44a2620 2026-03-02 fix: expand path traversal protection to cover all sensitive directories
+cc58b50 2026-03-02 fix: warn about truncated mounts in scan_mounts()
+fe0c8d8 2026-03-02 docs: document ANSI truncation trade-off in draw_box_line()
+902d87d 2026-03-02 fix: warn user about conflicting --save and --save-all flags
+b0f854c 2026-03-02 chore: remove obsolete comment about _LSPCI_DRIVERS_CACHE
+9fc4f20 2026-03-02 refactor: eliminate wiki duplication - show_wiki calls show_wiki_group
+d52472e 2026-03-02 refactor: extract _gather_temperatures() helper (DRY principle)
+ffd4234 2026-03-02 fix: unsafe ls parsing in export_drivers() (special char handling)
+2d76ccc 2026-03-02 fix: unbounded memory buffering in journalctl calls (DoS prevention)
+93eafe4 2026-03-02 perf: cluster_errors() combine 10 sed processes into 1
+d1296c7 2026-03-02 perf: strip_ansi() fast-path optimization - avoid fork for common case
+f166c6d 2026-03-02 perf: replace xargs|basename with pure bash parameter expansion
+a3b30b8 2026-03-02 fix: TOCTOU race condition in init_output_dir() - symlink attack prevention
+2aaf658 2026-03-02 fix: false-positive 'connected' with operstate == 'unknown'
+f346b3a 2026-03-02 fix: remove _LSPCI_DRIVERS_CACHE dead code (redundant caching layer)
+84d6b07 2026-03-02 fix: trap leak in export_all_logs() - temp file not cleaned on early return
+395f188 2026-03-02 fix: remove dead code in scan_kernel_logs() - jctl_err check is useless
+5093d47 2026-03-01 Remove Performance & Optimization section from README
+98746d9 2026-03-01 Delete project status information from README
+62219bc 2026-03-01 docs: update log.txt with latest commits
 498d220 2026-03-01 fix: add caching for parsed lspci driver data (HIGH #5)
 d78b5e8 2026-03-01 fix: performance and security improvements (MEDIUM #8,9 + LOW #10,11)
 9547630 2026-03-01 fix: add input validation to awk_fuzzy_match to prevent injection
