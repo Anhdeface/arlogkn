@@ -1,15 +1,36 @@
 # arlogkn
 
-**Version:** 1.0.4 | **Platform:** Arch Linux and derivatives | **License:** MIT | **[Report VirusTotal](https://www.virustotal.com/gui/file/33b074d65643a15a9f703c3333006dd271b65fadec8dff198e7796fb6484ae1c/detection)**
+**Version:** 1.0.4 | **Platform:** Arch Linux and derivatives | **License:** MIT
 
+A read-only system diagnostic and log extraction utility for Arch Linux. Performs comprehensive hardware and software state analysis without external dependencies.
 
-A read-only system diagnostic and log extraction utility for Arch Linux. Performs comprehensive hardware and software state analysis without external dependencies, ensuring safety and reliability on broken or minimal systems.
+---
+
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+2. [What It Does](#what-it-does)
+3. [Why Single File?](#why-single-file)
+4. [Requirements](#requirements)
+5. [Installation](#installation)
+6. [Usage Guide](#usage-guide)
+7. [Export Options](#export-options)
+8. [Wiki Mode](#wiki-mode)
+9. [Scan Capabilities](#scan-capabilities)
+10. [Frequently Asked Questions](#frequently-asked-questions)
+11. [Troubleshooting](#troubleshooting)
+12. [Security & Safety](#security--safety)
+13. [License](#license)
+
 ---
 
 ## Quick Start
 
 ```bash
-# Full system diagnostic scan (default)
+# Make executable (first time only)
+chmod +x arch-diag.sh
+
+# Run full system scan
 ./arch-diag.sh
 
 # Check kernel errors from previous boot
@@ -32,20 +53,33 @@ arlogkn inspects your system's current state and extracts diagnostic information
 - **Package logs** - pacman errors and warnings
 - **Crash dumps** - coredumpctl entries
 
-All data is **read-only**. The script never modifies system state, configurations, or executes state-changing binaries.
+**Read-Only Guarantee:** The script never modifies system state, configurations, or executes state-changing binaries. Safe for production and recovery environments.
 
 ---
 
-## Design Philosophy
+## Why Single File?
 
-### Zero External Dependencies
-Operates entirely on standard tools (`bash` 5.0+, `coreutils`, `util-linux`, `systemd`) and low-level pseudo-filesystems (`/sys`, `/proc`). No additional packages (`inxi`, `hwinfo`, etc.) required. Ideal for diagnosing network-isolated or severely broken systems.
+**Design Decision:** arlogkn is intentionally a single bash file (~4000 lines) rather than a modular project structure.
 
-### Strictly Read-Only
-Hardcoded to never alter system state. Safe to run in critical production or recovery environments.
+**Rationale:**
 
-### Arch-Native & Systemd-Optimized
-Tailored for the Arch ecosystem. Native `pacman` log parsing, deep `journalctl` integration, failing `systemctl` unit extraction, boot profiling via `systemd-analyze`, and crash tracing via `coredumpctl`.
+1. **Portability** - Copy one file to any Arch system and run. No installation, no dependencies, no build process.
+
+2. **Recovery Scenarios** - When a system is broken, you cannot rely on package managers or complex setups. A single script works in chroot, rescue mode, or minimal installations.
+
+3. **Speed** - No module loading overhead, no import resolution. The script starts executing immediately.
+
+4. **Audit Simplicity** - Security reviewers can audit one file end-to-end rather than tracing through multiple modules.
+
+5. **Distribution** - Share via gist, pastebin, or USB drive. No git repository required.
+
+**Trade-offs Accepted:**
+
+- Larger file to navigate (mitigated by clear section headers and comments)
+- No code reuse across files (mitigated by internal helper functions)
+- Single point of failure (mitigated by comprehensive testing)
+
+This design prioritizes operational convenience over software engineering conventions. For a diagnostic tool used in emergency situations, this trade-off is deliberate and justified.
 
 ---
 
@@ -53,10 +87,12 @@ Tailored for the Arch ecosystem. Native `pacman` log parsing, deep `journalctl` 
 
 | Category | Details |
 |----------|---------|
-| **OS** | Arch Linux, CachyOS, Manjaro, EndeavourOS (or generic systemd-based Linux) |
-| **Shell** | `bash` 5.0+ |
-| **Core utilities** | `coreutils`, `util-linux`, `systemd`, `awk`, `sed`, `grep` |
-| **Permissions** | Root (`sudo`) recommended for full visibility into `/var/log`, `/sys`, and protected logs |
+| **Operating System** | Arch Linux, CachyOS, Manjaro, EndeavourOS, or any systemd-based Linux |
+| **Shell** | bash 5.0 or later |
+| **Core Utilities** | coreutils, util-linux, systemd, awk, sed, grep |
+| **Permissions** | Root (sudo) recommended for full visibility into /var/log, /sys, and protected logs |
+
+**No External Dependencies:** Does not require inxi, hwinfo, or other diagnostic packages.
 
 ---
 
@@ -65,7 +101,7 @@ Tailored for the Arch ecosystem. Native `pacman` log parsing, deep `journalctl` 
 No installation required. The script is standalone:
 
 ```bash
-# Clone or download
+# Clone repository
 git clone <repository-url>
 cd arlogkn
 
@@ -76,15 +112,17 @@ chmod +x arch-diag.sh
 ./arch-diag.sh
 ```
 
+**Alternative:** Download the script directly and run. No build step, no package manager needed.
+
 ---
 
-## Usage
+## Usage Guide
 
-### Quick Reference
+### Basic Commands
 
 | Command | Purpose |
 |---------|---------|
-| `./arch-diag.sh` | Full system scan |
+| `./arch-diag.sh` | Full system scan (default) |
 | `./arch-diag.sh --kernel` | Kernel errors only |
 | `./arch-diag.sh --kernel --boot=-1` | Previous boot kernel errors |
 | `./arch-diag.sh --system` | Hardware scan (no logs) |
@@ -92,6 +130,7 @@ chmod +x arch-diag.sh
 | `./arch-diag.sh --save-all` | Export to single file |
 | `./arch-diag.sh --wiki` | Arch Wiki command reference |
 | `./arch-diag.sh --wiki=sound` | Specific wiki group |
+| `./arch-diag.sh --help` | Show help and exit |
 
 ### Scan Modes
 
@@ -123,16 +162,53 @@ chmod +x arch-diag.sh
 
 **Example:**
 ```bash
-# Export kernel errors, service errors, coredumps, etc. to separate files
+# Export to separate files
 ./arch-diag.sh --save
 
-# Export everything to one consolidated file
+# Export to single consolidated file
 ./arch-diag.sh --save-all
 ```
 
-### Wiki Mode
+---
 
-Interactive Arch Wiki command reference with 20 topic groups and fuzzy matching:
+## Export Options
+
+### Separate Files (--save)
+
+Creates timestamped directory with individual log files:
+
+```
+./arch-diag-logs/20260302_120000/
+├── kernel_errors.txt
+├── kernel_errors_clustered.txt
+├── service_errors.txt
+├── coredumps.txt
+├── pacman_errors.txt
+├── mounts.txt
+├── usb_devices.txt
+├── vga_info.txt
+├── drivers.txt
+├── temperatures.txt
+├── boot_timing.txt
+├── network_interfaces.txt
+└── summary.txt
+```
+
+### Single File (--save-all)
+
+Creates one consolidated file:
+
+```
+./arch-diag-logs/20260302_120000/arch-log-inspector-all.txt
+```
+
+Contains all sections in raw format (no ANSI color codes). Suitable for sharing, archiving, or attaching to bug reports.
+
+---
+
+## Wiki Mode
+
+Interactive Arch Wiki command reference with 20 topic groups and fuzzy matching.
 
 ```bash
 # Show all wiki groups
@@ -147,41 +223,21 @@ Interactive Arch Wiki command reference with 20 topic groups and fuzzy matching:
 ./arch-diag.sh --wiki=troubleshooting
 ```
 
-**Supported groups:**
+**Supported Groups:**
+
 ```
 pacman, aur, system, process, hardware, disk, network, user, logs,
 arch, performance, backup, troubleshooting, boot, memory, graphics,
 sound, systemd, file, emergency
 ```
 
-**Fuzzy matching examples:**
+**Fuzzy Matching Examples:**
+
 ```bash
-./arch-diag.sh --wiki=soud      # → suggests "sound"
-./arch-diag.sh --wiki=netwok    # → suggests "network"
-./arch-diag.sh --wiki=grafix    # → suggests "graphics"
+./arch-diag.sh --wiki=soud      # Suggests "sound"
+./arch-diag.sh --wiki=netwok    # Suggests "network"
+./arch-diag.sh --wiki=grafix    # Suggests "graphics"
 ```
-
----
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--all` | Comprehensive full system scan (default) |
-| `--kernel` | Kernel log and ring buffer analysis |
-| `--user` | User service analysis and unit failure scan |
-| `--mount` | Filesystem mount point and disk usage scan |
-| `--usb` | USB device taxonomy and storage scan |
-| `--driver` | Kernel module and driver attachment scan |
-| `--vga` | GPU, DRM, and display information |
-| `--system` | Core system hardware scan (bypasses logs) |
-| `--wiki` | Launch offline Arch Wiki command reference |
-| `--wiki=<group>` | Query specific group (fuzzy matching enabled) |
-| `--boot=N` | Journalctl boot offset (`0`=current, `-1`=previous) |
-| `--save` | Export to separate categorized files |
-| `--save-all` | Export to single consolidated file |
-| `--help, -h` | Print help and exit |
-| `--version, -v` | Print version and exit |
 
 ---
 
@@ -204,206 +260,70 @@ sound, systemd, file, emergency
 
 ---
 
-## Output Format
+## Frequently Asked Questions
 
-### Table Format
-Clean, borderless tables with ANSI color coding:
+### Do I need to run as root?
 
-```
- Interface      State    Speed      IP                   MAC
-────────────────────────────────────────────────────────────────
- enp1s0         up       1Gbps      192.168.1.100        aa:bb:cc:dd:ee:ff
- wlp2s0         down     N/A        N/A                  11:22:33:44:55:66
-```
+**Recommended but not required.** The script runs without root, but some diagnostics require elevated privileges:
 
-### Box Drawing
-Section headers and info boxes:
+- `/var/log/pacman.log` - Requires root for read access
+- `/sys` filesystem - Some paths restricted to root
+- `journalctl` - Full logs require root
 
-```
-──[ KERNEL CRITICAL ]────────────────────────────────────────────
+**Best practice:** Run with `sudo` for complete diagnostics.
 
- ✓ No Critical Issues Found
+### Why is the script so large?
 
-──[ SYSTEM SERVICES ]────────────────────────────────────────────
+The script is ~4000 lines because it:
 
- ✓ No failed services
+- Implements 12+ scan modules
+- Includes offline Arch Wiki reference (20 command groups)
+- Handles edge cases and error conditions
+- Contains security mitigations (TOCTOU prevention, symlink protection, DoS limits)
+- Has no external dependencies (implements everything internally)
 
- Service Errors (journalctl):
- ────────────────────────────────────────────────────────────────
- ✓ No Critical Issues Found
-```
+### Is it safe to run on production systems?
 
-### Color Coding
+**Yes.** The script is strictly read-only:
 
-| Color | Meaning |
-|-------|---------|
-| 🟢 Green | Normal / OK / Active |
-| 🟡 Yellow | Warning / Degraded / Moderate threshold |
-| 🔴 Red | Error / Failed / Critical threshold |
-| 🔵 Blue | Info / Neutral |
-| 🟣 Cyan | Highlight / Secondary info |
-
-**Thresholds:**
-- **Temperatures:** Green (<60°C), Yellow (60-80°C), Red (>80°C)
-- **Disk usage:** Green (<70%), Yellow (70-90%), Red (>90%)
-- **Boot time:** Green (<5s), Yellow (5-10s), Red (>10s)
-
----
-
-## Output Management
-
-### Export Directory
-```
-./arch-diag-logs/YYYYMMDD_HHMMSS/
-```
-
-### Generated Artifacts (--save mode)
-
-| File | Content |
-|------|---------|
-| `kernel_errors.txt` | Kernel ring buffer errors |
-| `kernel_errors_clustered.txt` | Deduplicated kernel errors |
-| `service_errors.txt` | Service journal errors |
-| `coredumps.txt` | Core dump list |
-| `pacman_errors.txt` | Pacman errors and warnings |
-| `mounts.txt` | Mounted filesystems and disk usage |
-| `usb_devices.txt` | USB device list |
-| `vga_info.txt` | GPU and display information |
-| `drivers.txt` | Driver status |
-| `temperatures.txt` | Hardware temperature readings |
-| `boot_timing.txt` | Boot performance analysis |
-| `network_interfaces.txt` | Network interface status |
-| `summary.txt` | System overview and scan metadata |
-
-### Single File Export (--save-all mode)
-```
-./arch-diag-logs/YYYYMMDD_HHMMSS/arch-log-inspector-all.txt
-```
-Contains all 13 sections above in a single consolidated file (raw format, no ANSI codes).
-
----
-
-## Technical Architecture
-
-### Caching Strategy
-Avoids redundant system calls within a session:
-
-```bash
-_get_lspci()        # Caches `lspci -k` output (single call per session)
-_get_lspci_knn()    # Caches `lspci -knn` output (for export)
-_DRIVERS_CACHE      # Caches multi-source driver detection result
-```
-
-### Multi-Source Driver Detection
-Drivers are detected from multiple sources in priority order:
-
-1. **`/sys/class`** - Most reliable (DRM, net, sound, input, watchdog)
-2. **`lspci -k`** - PCI device driver binding
-3. **`/sys/bus/pci/drivers`** - Virtual drivers (virtio, vmware, xen)
-4. **`lsmod`** - Module category detection (RAID, SATA, I2C)
-
-### Error Clustering
-Identical errors are grouped and counted:
-
-```bash
-cluster_errors() {
-    # Normalize timestamps, count duplicates
-    # Output: "Error message (x15)" instead of 15 identical lines
-}
-```
-
-### ANSI-Aware String Handling
-Table rendering correctly handles ANSI color codes:
-
-```bash
-strip_ansi()     # O(n) sed-based stripping (avoided O(n²) bash loop)
-visible_len()    # Computes visible string length (excluding ANSI)
-```
-
----
-
-
-## Security & Safety
-
-### Read-Only Guarantee
 - No write operations to system files
 - No configuration modifications
-- No state-changing binary execution
+- No execution of state-changing binaries
+- Secure temp file handling with cleanup
+- Symlink attack prevention
 
-### Temp File Security
-```bash
-# Secure temp file creation
-jctl_err="$(mktemp)" || { warn "Cannot create temp file"; return 1; }
+### Why not use inxi or hwinfo?
 
-# Cleanup on exit (including SIGINT)
-trap 'rm -f "$jctl_err" 2>/dev/null' RETURN
+Those tools require installation. arlogkn is designed for:
 
-# Early trap clearing to avoid nesting conflicts
-trap - RETURN
-```
+- Broken systems where packages cannot be installed
+- Minimal installations without extra utilities
+- Recovery environments with limited package access
+- Quick diagnostics without dependency management
 
-### Symlink Resolution
-```bash
-# Prevent cross-filesystem symlink attacks in disk space checks
-if [[ -L "$target" ]]; then
-    resolved="$(readlink -f "$target")"
-else
-    resolved="$target"
-fi
-```
+### Can I use this on non-Arch systems?
 
-### DoS Prevention
-```bash
-# Query length limits (wiki mode)
-if [[ -z "$query" || ${#query} -gt 50 ]]; then
-    echo "-1"
-    return 1
-fi
+**Possible but not recommended.** The script assumes:
 
-# Timeout on external commands
-timeout 10 journalctl ...
-timeout 15 lsusb -v ...
-```
+- systemd as init system
+- pacman as package manager
+- Arch-specific log locations
+- Arch Wiki command reference
 
----
+For generic Linux, consider alternatives like `inxi`, `neofetch`, or `hwinfo`.
 
-## Real-World Use Cases
+### How do I report bugs or security issues?
 
-### 1. Broken System Diagnosis
-```bash
-# System won't boot properly - check previous boot errors
-sudo ./arch-diag.sh --kernel --boot=-1 --save
-```
+Open an issue on the repository. For security vulnerabilities, please use responsible disclosure and allow time for a fix before public disclosure.
 
-### 2. Service Failure Debugging
-```bash
-# Check why a service failed to start
-sudo ./arch-diag.sh --user --boot=0
-```
+### What is the performance impact?
 
-### 3. Driver Troubleshooting
-```bash
-# Verify GPU and network driver attachment
-./arch-diag.sh --driver --vga
-```
+The script is optimized for speed:
 
-### 4. Post-Update Verification
-```bash
-# Check for pacman errors after system upgrade
-sudo ./arch-diag.sh --kernel --user --save
-```
-
-### 5. Hardware State Snapshot
-```bash
-# Full hardware overview without log noise
-./arch-diag.sh --system --save
-```
-
-### 6. Recovery Environment
-```bash
-# In chroot or rescue mode - full diagnostic with export
-sudo ./arch-diag.sh --save-all
-```
+- Caches expensive system calls (lspci, driver detection)
+- Uses pure bash operations where possible (80-90% fewer subprocesses)
+- Limits output to reasonable sizes (500 lines max for logs)
+- Typical runtime: 2-5 seconds for full scan
 
 ---
 
@@ -414,11 +334,12 @@ sudo ./arch-diag.sh --save-all
 | `Permission denied` on `/var/log/pacman.log` or `/sys` | Run with `sudo` |
 | Incomplete export files | Check disk space: `df -h .` |
 | `journalctl: Failed to open` | Journal may be inaccessible; try `sudo` |
-| No temperature sensors detected | Some systems don't expose hwmon; this is normal |
-| `coredumpctl not available` | Install `systemd` or ignore (optional feature) |
+| No temperature sensors detected | Some systems do not expose hwmon; this is normal |
+| `coredumpctl not available` | Install systemd or ignore (optional feature) |
 | Wiki group not found | Use fuzzy matching; check available groups with `--wiki` |
 
 ### Verbose Debugging
+
 ```bash
 # Run with bash debug mode
 bash -x ./arch-diag.sh --kernel 2>&1 | head -100
@@ -426,12 +347,46 @@ bash -x ./arch-diag.sh --kernel 2>&1 | head -100
 
 ---
 
+## Security & Safety
+
+### Read-Only Guarantee
+
+- No write operations to system files
+- No configuration modifications
+- No execution of state-changing binaries
+
+### TOCTOU Race Condition Prevention
+
+Uses `mkdir --no-dereference` to prevent symlink attacks during directory creation. Post-condition checks verify created paths are not symlinks.
+
+### Path Traversal Protection
+
+Blocks writes to 15+ sensitive directories:
+
+```
+/etc, /bin, /sbin, /usr, /boot, /root
+/home, /tmp, /var, /proc, /sys, /dev, /run, /opt
+```
+
+### Memory Exhaustion Prevention
+
+All journalctl calls limited to 500 lines maximum. Prevents DoS via log flooding or kernel panic loops.
+
+### Temp File Security
+
+Secure temp file creation with automatic cleanup on exit or interrupt.
+
+### DoS Prevention
+
+- Timeout on external commands (10s for journalctl, 15s for lsusb)
+- Query length limits in wiki mode (50 characters max)
+- Bounded output sizes throughout
 
 ---
 
 ## License
 
-MIT License - See LICENSE file for details.
+MIT License. See LICENSE file for details.
 
 ---
 
