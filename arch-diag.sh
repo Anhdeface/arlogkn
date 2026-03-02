@@ -292,10 +292,13 @@ detect_gpu() {
         # Skip render nodes and connector entries (e.g., card0-HDMI-A-1)
         [[ "$card_path" == *"render"* ]] && continue
         [[ "$(basename "$card_path")" == *-* ]] && continue
-        
+
         driver=""
         if [[ -L "${card_path}/device/driver" ]]; then
-            driver="$(readlink "${card_path}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
+            # Pure bash: extract basename without forking subprocesses
+            local driver_link
+            driver_link="$(readlink "${card_path}/device/driver" 2>/dev/null)"
+            [[ -n "$driver_link" ]] && driver="${driver_link##*/}"
         fi
 
         case "$driver" in
@@ -396,13 +399,18 @@ detect_display() {
 # COMPREHENSIVE DRIVER DETECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Helper: Get driver from /sys/class device link
+# Helper: Get driver from /sys/class device link (pure bash, no subprocesses)
 get_driver_from_sys() {
     local class_path="$1"
     local driver=""
 
     if [[ -L "${class_path}/device/driver" ]]; then
-        driver="$(readlink "${class_path}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
+        # Pure bash: extract basename without forking subprocesses
+        local driver_link
+        driver_link="$(readlink "${class_path}/device/driver" 2>/dev/null)"
+        if [[ -n "$driver_link" ]]; then
+            driver="${driver_link##*/}"  # Extract basename (equivalent to basename)
+        fi
     fi
     echo "$driver"
 }
@@ -2309,7 +2317,10 @@ export_drivers() {
                 [[ ! -d "$card" ]] && continue
                 printf 'Device: %s\n' "$(basename "$card")"
                 if [[ -L "${card}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${card}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
+                    # Pure bash: extract basename without forking subprocesses
+                    local driver_link
+                    driver_link="$(readlink "${card}/device/driver" 2>/dev/null)"
+                    printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
                 printf '\n'
             done
@@ -2331,7 +2342,10 @@ export_drivers() {
                 iface_name="$(basename "$iface")"
                 printf 'Interface: %s\n' "$iface_name"
                 if [[ -L "${iface}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${iface}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
+                    # Pure bash: extract basename without forking subprocesses
+                    local driver_link
+                    driver_link="$(readlink "${iface}/device/driver" 2>/dev/null)"
+                    printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
                 printf '\n'
             done
@@ -2351,7 +2365,10 @@ export_drivers() {
                 [[ ! -d "$sound" ]] && continue
                 printf 'Device: %s\n' "$(basename "$sound")"
                 if [[ -L "${sound}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${sound}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
+                    # Pure bash: extract basename without forking subprocesses
+                    local driver_link
+                    driver_link="$(readlink "${sound}/device/driver" 2>/dev/null)"
+                    printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
                 printf '\n'
             done
@@ -2373,7 +2390,10 @@ export_drivers() {
                 bname="$(basename "$block")"
                 printf 'Device: %s\n' "$bname"
                 if [[ -L "${block}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${block}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
+                    # Pure bash: extract basename without forking subprocesses
+                    local driver_link
+                    driver_link="$(readlink "${block}/device/driver" 2>/dev/null)"
+                    printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
                 printf '\n'
             done
@@ -2393,7 +2413,10 @@ export_drivers() {
                 [[ ! -d "$input" ]] && continue
                 printf 'Device: %s\n' "$(basename "$input")"
                 if [[ -L "${input}/device/driver" ]]; then
-                    printf 'Driver: %s\n' "$(readlink "${input}/device/driver" 2>/dev/null | xargs -r basename 2>/dev/null)"
+                    # Pure bash: extract basename without forking subprocesses
+                    local driver_link
+                    driver_link="$(readlink "${input}/device/driver" 2>/dev/null)"
+                    printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
                 printf '\n'
             done
