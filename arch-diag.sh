@@ -2496,9 +2496,9 @@ export_all_logs() {
         return 1
     }
 
-    # Trap only cleans up temp file on failure (export_success=0)
-    # On success, export_file is preserved for user
-    trap '[[ "$export_success" -eq 0 ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
+    # Trap cleans up temp file on failure or interrupt
+    # Guard: check $temp_file is non-empty and exists before rm
+    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
 
     {
         printf '=============================================================\n'
@@ -2773,17 +2773,20 @@ export_all_logs() {
     # Validate temp file before moving (detect partial writes)
     if [[ ! -f "$temp_file" ]]; then
         warn "Temp file not created: $temp_file"
+        trap - EXIT INT TERM  # Clear trap before early return
         return 1
     fi
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
+        trap - EXIT INT TERM  # Clear trap before early return
         return 1
     fi
 
     # Move temp file to final location
     if ! mv "$temp_file" "$output_file"; then
         warn "Failed to move temp file to $output_file"
+        trap - EXIT INT TERM  # Clear trap before early return (file still exists, will be cleaned)
         return 1
     fi
     
