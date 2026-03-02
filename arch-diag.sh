@@ -1194,17 +1194,12 @@ scan_pacman_logs() {
 # HARDWARE TEMPERATURE SCANNING (zero-dependency, /sys/class/hwmon)
 # ─────────────────────────────────────────────────────────────────────────────
 
-scan_temperatures() {
-    draw_section_header "HARDWARE TEMPERATURES"
-    printf '\n'
-
+# Helper: Gather temperature data from /sys/class/hwmon
+# Output format: chip_name|label|temp_c (pipe-separated, one per line)
+_gather_temperatures() {
     if [[ ! -d /sys/class/hwmon ]]; then
-        draw_box_line "${C_YELLOW}hwmon subsystem not available${C_RESET}"
-        return 0
+        return 1
     fi
-
-    local found=0
-    draw_table_begin "Sensor" 30 "Temperature" 18
 
     shopt -s nullglob
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
@@ -1219,45 +1214,79 @@ scan_temperatures() {
         for temp_input in "${hwmon_dir}"/temp*_input; do
             [[ ! -f "$temp_input" ]] && continue
 
-            local temp_raw label temp_c color
+            local temp_raw
             temp_raw="$(<"$temp_input")" || continue
             [[ -z "$temp_raw" || ! "$temp_raw" =~ ^-?[0-9]+$ ]] && continue
 
-            # Validate temperature bounds (-100°C to +150°C = -100000 to +150000 millidegrees)
-            # Prevents display of invalid sensor readings
+            # Validate temperature bounds (-100°C to +150°C)
             if [[ "$temp_raw" -lt -100000 || "$temp_raw" -gt 150000 ]]; then
                 continue
             fi
 
             # Convert millidegrees to degrees
-            temp_c=$((temp_raw / 1000))
+            local temp_c=$((temp_raw / 1000))
 
-            # Get label (e.g. "Core 0", "Tctl") - use bash redirection (no subprocess)
+            # Get label
             local label_file="${temp_input%_input}_label"
+            local label
             if [[ -f "$label_file" ]]; then
                 label="$(<"$label_file")"
             else
                 label="${chip_name:-hwmon}"
             fi
 
-            # Color-code by severity
-            color="$C_GREEN"
-            [[ "$temp_c" -gt 60 ]] && color="$C_YELLOW"
-            [[ "$temp_c" -gt 80 ]] && color="$C_RED"
-
-            tbl_row "${chip_name:+${chip_name}/}${label}" "${color}${temp_c}°C${C_RESET}"
-            found=1
+            # Output: chip_name|label|temp_c
+            printf '%s|%s|%d\n' "${chip_name:-hwmon}" "$label" "$temp_c"
         done
     done
     shopt -u nullglob
+}
+
+# Helper: Format temperature data for terminal display (with colors)
+_format_temperatures_display() {
+    local found=0
+    draw_table_begin "Sensor" 30 "Temperature" 18
+
+    while IFS='|' read -r chip_name label temp_c; do
+        [[ -z "$chip_name" ]] && continue
+
+        # Color-code by severity
+        local color="$C_GREEN"
+        [[ "$temp_c" -gt 60 ]] && color="$C_YELLOW"
+        [[ "$temp_c" -gt 80 ]] && color="$C_RED"
+
+        tbl_row "${chip_name}/${label}" "${color}${temp_c}°C${C_RESET}"
+        found=1
+    done
+
+    draw_table_end
 
     if [[ "$found" -eq 0 ]]; then
-        draw_table_end
         draw_box_line "${C_YELLOW}No temperature sensors detected${C_RESET}"
-    else
-        draw_table_end
+    fi
+}
+
+# Helper: Format temperature data for file export (plain text)
+_format_temperatures_file() {
+    printf '%-30s %s\n' 'Sensor' 'Temperature'
+    printf '%-30s %s\n' '──────────────' '───────────'
+
+    while IFS='|' read -r chip_name label temp_c; do
+        [[ -z "$chip_name" ]] && continue
+        printf '%-30s %d°C\n' "${chip_name}/${label}" "$temp_c"
+    done
+}
+
+scan_temperatures() {
+    draw_section_header "HARDWARE TEMPERATURES"
+    printf '\n'
+
+    if [[ ! -d /sys/class/hwmon ]]; then
+        draw_box_line "${C_YELLOW}hwmon subsystem not available${C_RESET}"
+        return 0
     fi
 
+    _gather_temperatures | _format_temperatures_display
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2152,25 +2181,7 @@ export_temperatures() {
         printf '=============================================================\n\n'
 
         if [[ -d /sys/class/hwmon ]]; then
-            printf '%-30s %s\n' 'Sensor' 'Temperature'
-            printf '%-30s %s\n' '──────────────' '───────────'
-            shopt -s nullglob
-            for hw_dir in /sys/class/hwmon/hwmon*; do
-                [[ ! -d "$hw_dir" ]] && continue
-                local hw_name=""
-                [[ -f "${hw_dir}/name" ]] && hw_name="$(cat "${hw_dir}/name" 2>/dev/null)"
-                for ti in "${hw_dir}"/temp*_input; do
-                    [[ ! -f "$ti" ]] && continue
-                    local tr_val
-                    tr_val="$(cat "$ti" 2>/dev/null)" || continue
-                    [[ -z "$tr_val" || ! "$tr_val" =~ ^-?[0-9]+$ ]] && continue
-                    local lbl_file="${ti%_input}_label"
-                    local lbl="${hw_name:-hwmon}"
-                    [[ -f "$lbl_file" ]] && lbl="$(cat "$lbl_file" 2>/dev/null)"
-                    printf '%-30s %d°C\n' "${hw_name:-hwmon}/${lbl}" $((tr_val / 1000))
-                done
-            done
-            shopt -u nullglob
+            _gather_temperatures | _format_temperatures_file
         else
             printf 'hwmon not available.\n'
         fi
