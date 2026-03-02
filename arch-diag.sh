@@ -942,24 +942,6 @@ scan_kernel_logs() {
 
     draw_section_header "KERNEL CRITICAL"
 
-    # Check journal accessibility
-    # We only want to warn if accessibility is restricted (e.g., EACCES).
-    local jctl_err
-    jctl_err="$(mktemp)" || { warn "Cannot create temp file for journal check"; return 1; }
-
-    # Use subshell for isolated trap - avoids eval and nested trap corruption
-    # Trap fires on subshell exit (normal, error, or signal), cleaning up temp file
-    # Caller's EXIT trap is unaffected
-    (
-        trap 'rm -f "$jctl_err" 2>/dev/null' EXIT INT TERM
-
-        if ! timeout 10 journalctl -n 1 --quiet 2>"$jctl_err"; then
-            # Generic error message to avoid revealing system configuration
-            warn "Cannot access system journal"
-        fi
-        # Temp file cleanup happens automatically on subshell exit
-    )
-
     # Fetch kernel errors (priority 3 = ERR)
     journal_output="$(timeout 10 journalctl -k -p 3 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
