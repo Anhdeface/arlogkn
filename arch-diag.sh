@@ -716,6 +716,10 @@ draw_box_line() {
     content_visible_len="$(visible_len "$content")"
 
     # Truncate if too long
+    # Note: Truncated lines lose color formatting (ANSI codes stripped)
+    # This is a bash limitation: ${var:0:N} counts bytes, not visible chars
+    # Trade-off: Correct truncation > Color preservation
+    # Non-truncated lines retain their colors
     if [[ $content_visible_len -gt $inner_width ]]; then
         local truncate_at=$((inner_width - 3))
         local stripped
