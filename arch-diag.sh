@@ -1487,12 +1487,16 @@ scan_mounts() {
     draw_table_begin "Device" 22 "Mountpoint" 24 "Type" 12 "Size" 10
 
     # Use /proc/mounts directly (lightweight, no external deps)
+    # Count total mounts first to warn about truncation
+    local total_mounts
+    total_mounts="$(wc -l < /proc/mounts)"
+
     local count=0
     while IFS=' ' read -r source target fstype opts freq pass; do
         [[ $count -ge 12 ]] && break
         [[ "$source" =~ ^# ]] && continue
         [[ "$fstype" == "autofs" ]] && continue
-        
+
         # Get size from df cache (resolve symlink to match df keys)
         # Only call readlink -f if path is actually a symlink (avoid fork overhead)
         local resolved_source
@@ -1503,17 +1507,22 @@ scan_mounts() {
         fi
         local size="${df_sizes[$resolved_source]:-${df_sizes[$source]:-N/A}}"
         local color="$C_RESET"
-        
+
         case "$fstype" in
             ext4|btrfs|xfs) color="$C_GREEN" ;;
             nfs|cifs) color="$C_YELLOW" ;;
             tmpfs|devtmpfs) color="$C_BLUE" ;;
             overlay|squashfs) color="$C_CYAN" ;;
         esac
-        
+
         draw_table_row "${color}${source}${C_RESET}" "${target}" "${fstype}" "${size}"
         count=$((count + 1))
     done < /proc/mounts
+
+    # Warn if truncated (servers with many mounts: NFS, btrfs subvolumes, containers)
+    if [[ "$total_mounts" -gt "$count" ]]; then
+        draw_box_line "${C_YELLOW}... and $((total_mounts - count)) more mounts${C_RESET}"
+    fi
 
     draw_table_end
 
