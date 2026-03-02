@@ -212,13 +212,18 @@ check_internet() {
         for iface in /sys/class/net/*; do
             # Skip loopback interface
             [[ "$(basename "$iface")" == "lo" ]] && continue
-            
+
             # Check if interface is UP
+            # Note: Only check for "up" state, not "unknown"
+            # "unknown" state is unreliable - appears on:
+            #   - Wireless interfaces without carrier (not connected to AP)
+            #   - Docker bridges (docker0, br-*)
+            #   - VPN tunnels (tun0, tap0)
+            #   - Virtual interfaces (veth*, virbr*)
+            # These do NOT indicate actual network connectivity
             if [[ -f "${iface}/operstate" ]]; then
                 operstate="$(cat "${iface}/operstate" 2>/dev/null)"
-                if [[ "$operstate" == "up" || "$operstate" == "unknown" ]]; then
-                    # "unknown" state often means interface is up but no carrier
-                    # Still counts as network capability (e.g., VMs, containers)
+                if [[ "$operstate" == "up" ]]; then
                     shopt -u nullglob
                     INTERNET_STATUS="connected"
                     return 0
