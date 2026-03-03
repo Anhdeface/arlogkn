@@ -1249,10 +1249,24 @@ _gather_temperatures() {
 
             local temp_raw
             temp_raw="$(<"$temp_input")" || continue
-            [[ -z "$temp_raw" || ! "$temp_raw" =~ ^-?[0-9]+$ ]] && continue
-
-            # Validate temperature bounds (-100°C to +150°C)
-            if [[ "$temp_raw" -lt -100000 || "$temp_raw" -gt 150000 ]]; then
+            
+            # Security: Validate numeric format FIRST (prevent injection)
+            # Must be optional minus followed by digits only
+            if [[ -z "$temp_raw" || ! "$temp_raw" =~ ^-?[0-9]+$ ]]; then
+                continue
+            fi
+            
+            # Security: Prevent integer overflow by checking string length
+            # Bash uses 64-bit signed integers. Values with >15 digits could overflow.
+            # Temperature in millidegrees should never exceed 7 digits normally.
+            if [[ ${#temp_raw} -gt 10 ]]; then
+                continue
+            fi
+            
+            # Validate temperature bounds (-100°C to +150°C) in millidegrees
+            # Use absolute value comparison to avoid overflow issues
+            local abs_temp="${temp_raw#-}"  # Remove minus sign for comparison
+            if [[ "$abs_temp" -gt 150000 ]]; then
                 continue
             fi
 
