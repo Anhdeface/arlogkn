@@ -2608,16 +2608,17 @@ export_all_logs() {
     local output_file="${OUTPUT_DIR}/arch-log-inspector-all.txt"
     local temp_file=""
     local export_success=0
-    
+
+    # Security: Set trap BEFORE mktemp to handle any failure (TOCTOU prevention)
+    # This ensures temp file is cleaned up even if interrupted between mktemp and trap
+    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
+
     # Security: Check mktemp return value to prevent silent failure
     temp_file="$(mktemp)" || {
         warn "Failed to create temp file (disk full or /tmp unavailable)"
+        trap - EXIT INT TERM  # Clear trap before early return
         return 1
     }
-
-    # Trap cleans up temp file on failure or interrupt
-    # Guard: check $temp_file is non-empty and exists before rm
-    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
 
     {
         printf '=============================================================\n'
@@ -2907,12 +2908,14 @@ export_all_logs() {
     # Move temp file to final location
     if ! mv "$temp_file" "$output_file"; then
         warn "Failed to move temp file to $output_file"
-        trap - EXIT INT TERM  # Clear trap before early return (file still exists, will be cleaned)
+        # Trap will clean up temp_file, don't clear it
         return 1
     fi
-    
+
     # SUCCESS: Mark export as successful and clear trap
     # Export file is now safely in place, no cleanup needed
+    # Clear temp_file variable FIRST so trap doesn't try to clean it
+    temp_file=""
     export_success=1
     trap - EXIT INT TERM
 
