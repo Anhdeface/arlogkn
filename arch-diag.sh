@@ -256,21 +256,26 @@ check_internet() {
         # SECURITY: ARLOGKN_TEST_URL can be overridden by user. In enterprise
         # environments, this could be abused for SSRF attacks against internal
         # services (169.254.169.254 for cloud metadata, internal APIs, etc.).
-        # Consider blocking this variable via environment restrictions if needed.
-        local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
+        # We block private/internal IP ranges to prevent SSRF attacks.
+        local test_url="${ARLOGKN_TEST_URL:-}"
 
-        # Validate URL format (basic check, not SSRF protection)
-        # This only prevents malformed URLs, not internal network access
-        if [[ ! "$test_url" =~ ^https?://[a-zA-Z0-9.-]+ ]]; then
-            warn "Invalid test URL format, using default"
+        # If custom URL is set, validate it strictly to prevent SSRF
+        if [[ -n "$test_url" ]]; then
+            # Block private/internal IP ranges to prevent SSRF attacks
+            # This includes: localhost, private networks, link-local, cloud metadata
+            if [[ "$test_url" =~ (127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::1\]|localhost) ]]; then
+                warn "Blocked SSRF attempt: internal/private URL not allowed"
+                test_url="https://clients3.google.com/generate_204"
+            # Validate URL format: must have valid domain with TLD (not bare IP)
+            elif [[ ! "$test_url" =~ ^https?://[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(/.*)?$ ]]; then
+                warn "Invalid test URL format, using default"
+                test_url="https://clients3.google.com/generate_204"
+            fi
+            warn "Using custom connectivity test URL (audit logged)"
+        else
             test_url="https://clients3.google.com/generate_204"
         fi
 
-        # Warn if using custom URL (enterprise audit trail)
-        if [[ -n "${ARLOGKN_TEST_URL:-}" ]]; then
-            warn "Using custom connectivity test URL (SSRF risk in enterprise)"
-        fi
-        
         if command -v curl &>/dev/null; then
             local http_code
             http_code="$(curl -s --head --connect-timeout 2 --max-time 3 \
