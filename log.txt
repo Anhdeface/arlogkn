@@ -1,8 +1,16 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-02
+Generated: 2026-03-03
 
 ---
+95c8471 2026-03-03 fix: HIGH #7 — prevent temperature integer overflow
+713bd56 2026-03-03 fix: HIGH #6 — add readlink error handling in get_driver_from_sys()
+084bc6c 2026-03-03 fix: HIGH #5 — use whitelist approach for awk input sanitization
+5a721f9 2026-03-03 fix: HIGH #4 — add final path validation in init_output_dir()
+142d910 2026-03-03 fix: CRITICAL #3 — prevent TOCTOU race in export_all_logs()
+3d739e9 2026-03-03 fix: CRITICAL #2 — prevent SSRF via ARLOGKN_TEST_URL
+5345ff4 2026-03-03 fix: CRITICAL #1 — prevent command injection in cluster_errors()
+13b1fb4 2026-03-02 docs: update log.txt with latest commits
 99dee88 2026-03-02 docs: restructure README for clarity and newcomer onboarding
 a8102ae 2026-03-02 release: version 1.0.4 - comprehensive security audit and performance improvements
 478ff43 2026-03-02 docs: document SSRF risk with ARLOGKN_TEST_URL (enterprise security)
