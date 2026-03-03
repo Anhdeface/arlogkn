@@ -1959,13 +1959,17 @@ init_output_dir() {
     # Set restrictive umask for log export (owner read/write only)
     local old_umask
     old_umask="$(umask)"
+    
+    # Security: Ensure umask is restored on ANY exit from this function
+    # This prevents umask leaks if future modifications add early returns
+    trap 'umask "$old_umask"' RETURN
+    
     umask 077
 
     # Check if base directory is a symlink BEFORE mkdir (pre-check)
     # Note: This is a defense-in-depth check, not the primary protection
     if [[ -L "$base_dir" ]]; then
         warn "Refusing to use symlink at $base_dir (security risk)"
-        umask "$old_umask"
         return 1
     fi
 
@@ -1979,12 +1983,12 @@ init_output_dir() {
     fi
 
     # Prevent writing to protected directories (path traversal protection)
-    # Blocks: system dirs, user dirs, world-writable dirs, virtual filesystems
+    # Blocks: system dirs, world-writable dirs, virtual filesystems
+    # Note: Removed /home, /tmp, /var, /opt - too restrictive for normal users
     case "$resolved_base" in
         /etc/*|/bin/*|/sbin/*|/usr/*|/boot/*|/root/*| \
-        /home/*|/tmp/*|/var/*|/proc/*|/sys/*|/dev/*|/run/*|/opt/*)
+        /proc/*|/sys/*|/dev/*|/run/*)
             warn "Refusing to write to protected directory: $resolved_base"
-            umask "$old_umask"
             return 1
             ;;
     esac
@@ -1992,7 +1996,6 @@ init_output_dir() {
     # Check disk space before mutating global state
     if ! check_disk_space "$new_output_dir"; then
         warn "Insufficient disk space for export"
-        umask "$old_umask"
         return 1
     fi
 
@@ -2004,11 +2007,9 @@ init_output_dir() {
         # If mkdir failed and path is symlink, attack was detected
         if [[ -L "$new_output_dir" ]]; then
             warn "Symlink attack detected at $new_output_dir (TOCTOU race prevented)"
-            umask "$old_umask"
             return 1
         fi
         warn "Could not create output directory: $new_output_dir"
-        umask "$old_umask"
         return 1
     fi
 
@@ -2017,12 +2018,21 @@ init_output_dir() {
     if [[ -L "$new_output_dir" ]]; then
         warn "Created path is a symlink at $new_output_dir (attack detected)"
         rm -f "$new_output_dir" 2>/dev/null
-        umask "$old_umask"
         return 1
     fi
 
-    # Restore umask after directory creation
-    umask "$old_umask"
+    # DEFENSE IN DEPTH: Validate final resolved path (not just base)
+    # This catches any edge cases where timestamp manipulation could bypass base check
+    local resolved_final
+    resolved_final="$(cd "$new_output_dir" 2>/dev/null && pwd)" || resolved_final="$new_output_dir"
+    case "$resolved_final" in
+        /etc/*|/bin/*|/sbin/*|/usr/*|/boot/*|/root/*| \
+        /proc/*|/sys/*|/dev/*|/run/*)
+            warn "Refusing to write to protected directory (final path): $resolved_final"
+            rm -rf "$new_output_dir" 2>/dev/null
+            return 1
+            ;;
+    esac
 
     # All checks passed — assign to global
     OUTPUT_DIR="$new_output_dir"
