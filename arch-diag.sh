@@ -3113,13 +3113,20 @@ awk_fuzzy_match() {
     local query="$1"
     local groups="$2"
 
-    # Security: Validate inputs to prevent awk script injection
-    # Remove characters that could break awk string literals
-    query="${query//[\'\"\\\`\$\(\)\[\]\{\}]/}"
-    
-    # Limit query length to prevent DoS
+    # Security: Whitelist approach to prevent awk script injection
+    # Only allow alphanumeric, underscore, hyphen, and space
+    # This is more secure than blacklisting specific characters
+    query="$(printf '%s' "$query" | tr -cd '[:alnum:]_ -')"
+
+    # Limit query length to prevent DoS (must be done AFTER sanitization)
     if [[ ${#query} -gt 50 ]]; then
         query="${query:0:50}"
+    fi
+
+    # Additional safety: ensure query is not empty after sanitization
+    if [[ -z "$query" ]]; then
+        printf '%s\n' "-1:999"
+        return 1
     fi
 
     # Use awk for fast string processing
@@ -3234,10 +3241,12 @@ find_wiki_group_awk() {
 suggest_wiki_groups_awk() {
     local query="$1"
 
-    # Normalize: lowercase, trim, remove special chars (security)
-    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_')"
+    # Security: Whitelist approach - only allow safe characters
+    # Convert to lowercase, trim whitespace, keep only alphanumeric, underscore, space
+    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_ ')"
 
     # Early exit for empty or too long query (DoS prevention)
+    # Check length AFTER sanitization to prevent bypass
     if [[ -z "$query" || ${#query} -gt 50 ]]; then
         return 1
     fi
