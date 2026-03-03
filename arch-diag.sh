@@ -945,14 +945,23 @@ cluster_errors() {
             -e 's/:[0-9]+/:PORT/g' | \
         sort | uniq -c | sort -rn | \
         while read -r count msg; do
-            # Security: Escape % to prevent printf format string injection
-            # An attacker with kernel log write access could inject %s, %n, etc.
-            # This sanitizes the message before passing to printf
+            # Security: Comprehensive sanitization to prevent printf injection attacks
+            # An attacker with kernel log write access could inject format specifiers
+            # (%s, %n, etc.), escape sequences, or other special characters.
+            # 
+            # Sanitization steps:
+            # 1. Escape % to prevent format string injection
+            # 2. Escape backslash to prevent escape sequence injection
+            # 3. Use printf '%s' (not as format string) with proper quoting
             local safe_msg="${msg//%/%%}"
+            safe_msg="${safe_msg//\\/\\\\}"
+            
+            # Security: Use printf '%s' with argument (not as format specifier)
+            # This prevents any remaining special chars from being interpreted
             if [[ "$count" -gt 1 ]]; then
-                printf '%s (x%d)\n' "$safe_msg" "$count"
+                printf '%s (x%d)\n' "${safe_msg}" "${count}"
             else
-                printf '%s\n' "$safe_msg"
+                printf '%s\n' "${safe_msg}"
             fi
         done
 }
