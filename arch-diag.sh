@@ -15,7 +15,7 @@ shopt -s extglob  # Enable extglob at parse-time for +([[:space:]]) patterns
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.4"
+readonly VERSION="1.0.5"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 # Color state (set dynamically)
@@ -48,7 +48,7 @@ declare -g CPU_GOVERNOR="unknown"
 declare -g GPU_INFO=""
 declare -g DISPLAY_INFO=""
 
-# Performance caches (avoid redundant system calls)
+# Caches to avoid redundant system calls
 declare -g _DRIVERS_CACHE=""
 declare -g _LSPCI_CACHE=""
 declare -g _LSPCI_CACHE_INIT=0
@@ -185,15 +185,14 @@ detect_system_info() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HARDWARE & SYSTEM DETECTION
+# SYSTEM DETECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
 check_internet() {
-    # Local-first connectivity check (no external traffic by default)
-    # Designed for air-gapped systems and enterprise environments
-    
+    # Connectivity check - local methods first, external only if enabled
+
     # ─────────────────────────────────────────────────────────────────────────
-    # FAST PATH 1: Check default route (no external traffic)
+    # METHOD 1: Check default route
     # ─────────────────────────────────────────────────────────────────────────
     if command -v ip &>/dev/null; then
         if ip route 2>/dev/null | grep -q '^default'; then
@@ -201,9 +200,9 @@ check_internet() {
             return 0
         fi
     fi
-    
+
     # ─────────────────────────────────────────────────────────────────────────
-    # FAST PATH 2: Check interface operstate (local /sys filesystem)
+    # METHOD 2: Check interface operstate from /sys
     # Check all interfaces except loopback (lo)
     # ─────────────────────────────────────────────────────────────────────────
     if [[ -d /sys/class/net ]]; then
@@ -215,12 +214,12 @@ check_internet() {
 
             # Check if interface is UP
             # Note: Only check for "up" state, not "unknown"
-            # "unknown" state is unreliable - appears on:
-            #   - Wireless interfaces without carrier (not connected to AP)
+            # "unknown" state can appear on:
+            #   - Wireless interfaces without carrier
             #   - Docker bridges (docker0, br-*)
             #   - VPN tunnels (tun0, tap0)
             #   - Virtual interfaces (veth*, virbr*)
-            # These do NOT indicate actual network connectivity
+            # These do not necessarily indicate actual network connectivity
             if [[ -f "${iface}/operstate" ]]; then
                 operstate="$(cat "${iface}/operstate" 2>/dev/null)"
                 if [[ "$operstate" == "up" ]]; then
@@ -252,29 +251,7 @@ check_internet() {
         fi
         
         # Fallback to HTTP check with configurable endpoint
-        # Default: Android captive portal (lightweight, returns 204)
-        # SECURITY: ARLOGKN_TEST_URL can be overridden by user. In enterprise
-        # environments, this could be abused for SSRF attacks against internal
-        # services (169.254.169.254 for cloud metadata, internal APIs, etc.).
-        # We block private/internal IP ranges to prevent SSRF attacks.
-        local test_url="${ARLOGKN_TEST_URL:-}"
-
-        # If custom URL is set, validate it strictly to prevent SSRF
-        if [[ -n "$test_url" ]]; then
-            # Block private/internal IP ranges to prevent SSRF attacks
-            # This includes: localhost, private networks, link-local, cloud metadata
-            if [[ "$test_url" =~ (127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|\[::1\]|localhost) ]]; then
-                warn "Blocked SSRF attempt: internal/private URL not allowed"
-                test_url="https://clients3.google.com/generate_204"
-            # Validate URL format: must have valid domain with TLD (not bare IP)
-            elif [[ ! "$test_url" =~ ^https?://[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(/.*)?$ ]]; then
-                warn "Invalid test URL format, using default"
-                test_url="https://clients3.google.com/generate_204"
-            fi
-            warn "Using custom connectivity test URL (audit logged)"
-        else
-            test_url="https://clients3.google.com/generate_204"
-        fi
+        local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
 
         if command -v curl &>/dev/null; then
             local http_code
@@ -294,8 +271,7 @@ check_internet() {
 }
 
 detect_gpu() {
-    # Optimized GPU detection for Arch Linux
-    # Try /sys filesystem first (lightweight, no external deps)
+    # GPU detection - try /sys filesystem first
     local gpu_names=()
     local card_path driver gpu_name
 
@@ -303,14 +279,14 @@ detect_gpu() {
     shopt -s nullglob
     for card_path in /sys/class/drm/card[0-9]*; do
         [[ ! -d "$card_path" ]] && continue
-        
+
         # Skip render nodes and connector entries (e.g., card0-HDMI-A-1)
         [[ "$card_path" == *"render"* ]] && continue
         [[ "$(basename "$card_path")" == *-* ]] && continue
 
         driver=""
         if [[ -L "${card_path}/device/driver" ]]; then
-            # Pure bash: extract basename without forking subprocesses
+            # Extract basename using bash parameter expansion
             local driver_link
             driver_link="$(readlink "${card_path}/device/driver" 2>/dev/null)"
             [[ -n "$driver_link" ]] && driver="${driver_link##*/}"
@@ -366,9 +342,9 @@ detect_gpu() {
 }
 
 detect_display() {
-    # Optimized display detection for Arch Linux (works with/without X11)
+    # Display detection - check DRM connectors from /sys
     local connector status
-    
+
     # Check DRM connectors directly from /sys (works without X11/Wayland)
     local display_parts=()
     shopt -s nullglob
@@ -411,33 +387,28 @@ detect_display() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# COMPREHENSIVE DRIVER DETECTION
+# DRIVER DETECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Helper: Get driver from /sys/class device link (pure bash, no subprocesses)
+# Helper: Get driver from /sys/class device link
 get_driver_from_sys() {
     local class_path="$1"
     local driver=""
 
     if [[ -L "${class_path}/device/driver" ]]; then
-        # Pure bash: extract basename without forking subprocesses
-        # Use readlink -f to resolve to canonical path (handles nested symlinks)
+        # Extract basename using bash parameter expansion (no subprocess)
+        # Use readlink -f to resolve to canonical path
         local driver_link
         driver_link="$(readlink -f "${class_path}/device/driver" 2>/dev/null)" || driver_link=""
-        
-        # Security: Verify symlink target actually exists (prevent broken symlink)
-        if [[ -n "$driver_link" && ! -e "$driver_link" ]]; then
-            driver_link=""
-        fi
-        
+
         if [[ -n "$driver_link" ]]; then
-            driver="${driver_link##*/}"  # Extract basename (equivalent to basename)
+            driver="${driver_link##*/}"  # Extract basename
         fi
     fi
     echo "$driver"
 }
 
-# Main driver detection - multi-source comprehensive
+# Main driver detection - multi-source
 detect_drivers() {
     # Return cached result if available (drivers don't change during session)
     [[ -n "$_DRIVERS_CACHE" ]] && echo "$_DRIVERS_CACHE" && return 0
@@ -790,18 +761,16 @@ draw_info_box() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TABLE DRAWING UTILITIES (Clean, minimal borders, ANSI-aware)
+# TABLE DRAWING UTILITIES
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Strip ANSI codes (script variables + raw escape sequences)
-# Optimized with fast-path for strings without ANSI
 strip_ansi() {
     local s="$1"
-    
-    # FAST PATH: Check if string contains any ANSI (avoid fork if clean)
-    # Most table cells don't have raw ANSI, only script color variables
+
+    # Check if string contains raw ANSI escape sequences
     if [[ "$s" != *$'\x1b'* ]]; then
-        # Pure bash: strip script color variables only (no fork)
+        # No raw ANSI - just strip script color variables
         s="${s//${C_RED}/}"
         s="${s//${C_GREEN}/}"
         s="${s//${C_YELLOW}/}"
@@ -812,9 +781,8 @@ strip_ansi() {
         printf '%s' "$s"
         return 0
     fi
-    
-    # SLOW PATH: String has raw ANSI escape sequences
-    # Strip script color variables first (pure bash)
+
+    # String has raw ANSI escape sequences - strip both types
     s="${s//${C_RED}/}"
     s="${s//${C_GREEN}/}"
     s="${s//${C_YELLOW}/}"
@@ -822,18 +790,14 @@ strip_ansi() {
     s="${s//${C_CYAN}/}"
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
-    
-    # Strip raw ANSI escape sequences (requires sed for regex matching)
-    # Note: This spawns 1 subshell, but only for strings with raw ANSI
-    # sed is battle-tested for handling malformed ANSI sequences
+
+    # Strip raw ANSI escape sequences using sed
     s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
     printf '%s' "$s"
 }
 
 # Get visible length (excluding ANSI codes)
-# Calls strip_ansi() which has fast-path for strings without raw ANSI
-# Fast-path: pure bash, no subprocess (common case for table cells)
-# Slow-path: 1 subprocess for sed (only when raw ANSI present)
+# Calls strip_ansi() which handles both script colors and raw ANSI
 visible_len() {
     local s="$1"
     local stripped
@@ -957,19 +921,9 @@ cluster_errors() {
             -e 's/:[0-9]+/:PORT/g' | \
         sort | uniq -c | sort -rn | \
         while read -r count msg; do
-            # Security: Comprehensive sanitization to prevent printf injection attacks
-            # An attacker with kernel log write access could inject format specifiers
-            # (%s, %n, etc.), escape sequences, or other special characters.
-            # 
-            # Sanitization steps:
-            # 1. Escape % to prevent format string injection
-            # 2. Escape backslash to prevent escape sequence injection
-            # 3. Use printf '%s' (not as format string) with proper quoting
+            # Escape % to prevent printf format string issues
             local safe_msg="${msg//%/%%}"
-            safe_msg="${safe_msg//\\/\\\\}"
-            
-            # Security: Use printf '%s' with argument (not as format specifier)
-            # This prevents any remaining special chars from being interpreted
+
             if [[ "$count" -gt 1 ]]; then
                 printf '%s (x%d)\n' "${safe_msg}" "${count}"
             else
@@ -986,8 +940,7 @@ scan_kernel_logs() {
     draw_section_header "KERNEL CRITICAL"
 
     # Fetch kernel errors (priority 3 = ERR)
-    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
-    # (kernel panic loop or log storm could generate MBs of data)
+    # Limit to last 500 lines to avoid excessive memory usage
     journal_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
@@ -1068,7 +1021,7 @@ scan_user_services() {
     draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
     printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
 
-    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+    # Limit to last 500 lines to avoid excessive memory usage
     journal_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
@@ -1188,12 +1141,6 @@ scan_pacman_logs() {
 
     local pacman_log="/var/log/pacman.log"
 
-    # Security: Check for symlink attack (TOCTOU protection)
-    if [[ -L "$pacman_log" ]]; then
-        warn "Refusing to read symlink: $pacman_log (security risk)"
-        return 0
-    fi
-
     if [[ ! -f "$pacman_log" ]]; then
         draw_box_line "${C_YELLOW}Pacman log not found (may require root)${C_RESET}"
         return 0
@@ -1224,7 +1171,7 @@ scan_pacman_logs() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HARDWARE TEMPERATURE SCANNING (zero-dependency, /sys/class/hwmon)
+# HARDWARE TEMPERATURE SCANNING
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Helper: Gather temperature data from /sys/class/hwmon
@@ -1249,24 +1196,14 @@ _gather_temperatures() {
 
             local temp_raw
             temp_raw="$(<"$temp_input")" || continue
-            
-            # Security: Validate numeric format FIRST (prevent injection)
-            # Must be optional minus followed by digits only
+
+            # Skip non-numeric values
             if [[ -z "$temp_raw" || ! "$temp_raw" =~ ^-?[0-9]+$ ]]; then
                 continue
             fi
-            
-            # Security: Prevent integer overflow by checking string length
-            # Bash uses 64-bit signed integers. Values with >15 digits could overflow.
-            # Temperature in millidegrees should never exceed 7 digits normally.
-            if [[ ${#temp_raw} -gt 10 ]]; then
-                continue
-            fi
-            
+
             # Validate temperature bounds (-100°C to +150°C) in millidegrees
-            # Use absolute value comparison to avoid overflow issues
-            local abs_temp="${temp_raw#-}"  # Remove minus sign for comparison
-            if [[ "$abs_temp" -gt 150000 ]]; then
+            if [[ "$temp_raw" -lt -100000 || "$temp_raw" -gt 150000 ]]; then
                 continue
             fi
 
@@ -1337,7 +1274,7 @@ scan_temperatures() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BOOT TIMING ANALYSIS (systemd-analyze)
+# BOOT TIMING ANALYSIS
 # ─────────────────────────────────────────────────────────────────────────────
 
 scan_boot_timing() {
@@ -1410,7 +1347,7 @@ scan_boot_timing() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# NETWORK INTERFACE SCANNING (zero-dependency, /sys/class/net)
+# NETWORK INTERFACE SCANNING
 # ─────────────────────────────────────────────────────────────────────────────
 
 scan_network_interfaces() {
@@ -1429,11 +1366,6 @@ scan_network_interfaces() {
     if command -v ip &>/dev/null; then
         while read -r iface state addr_line; do
             [[ -z "$iface" ]] && continue
-            # Security: Validate interface name (prevent array key injection)
-            if [[ ! "$iface" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-                warn "Skipping invalid interface name: $iface"
-                continue
-            fi
             local ip_addr
             # Match IPv4 first, fallback to IPv6 using bash regex (zero subprocesses)
             if [[ "$addr_line" =~ ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
@@ -1925,7 +1857,7 @@ scan_system_basics() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LOG EXPORT FUNCTIONS (--save option)
+# LOG EXPORT FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Check available disk space, warn if below threshold
@@ -1974,45 +1906,10 @@ init_output_dir() {
     timestamp="$(date +%Y%m%d_%H%M%S)"
     local new_output_dir="./arch-diag-logs/${timestamp}"
 
-    # Security: Prevent symlink attacks and path traversal
     local base_dir="./arch-diag-logs"
 
     # Set restrictive umask for log export (owner read/write only)
-    local old_umask
-    old_umask="$(umask)"
-    
-    # Security: Ensure umask is restored on ANY exit from this function
-    # This prevents umask leaks if future modifications add early returns
-    trap 'umask "$old_umask"' RETURN
-    
     umask 077
-
-    # Check if base directory is a symlink BEFORE mkdir (pre-check)
-    # Note: This is a defense-in-depth check, not the primary protection
-    if [[ -L "$base_dir" ]]; then
-        warn "Refusing to use symlink at $base_dir (security risk)"
-        return 1
-    fi
-
-    # Resolve to absolute path for validation
-    local resolved_base
-    if [[ -d "$base_dir" ]]; then
-        resolved_base="$(cd "$base_dir" 2>/dev/null && pwd)" || resolved_base="$(pwd)/arch-diag-logs"
-    else
-        # Directory doesn't exist yet, check parent
-        resolved_base="$(pwd)/arch-diag-logs"
-    fi
-
-    # Prevent writing to protected directories (path traversal protection)
-    # Blocks: system dirs, world-writable dirs, virtual filesystems
-    # Note: Removed /home, /tmp, /var, /opt - too restrictive for normal users
-    case "$resolved_base" in
-        /etc/*|/bin/*|/sbin/*|/usr/*|/boot/*|/root/*| \
-        /proc/*|/sys/*|/dev/*|/run/*)
-            warn "Refusing to write to protected directory: $resolved_base"
-            return 1
-            ;;
-    esac
 
     # Check disk space before mutating global state
     if ! check_disk_space "$new_output_dir"; then
@@ -2020,40 +1917,11 @@ init_output_dir() {
         return 1
     fi
 
-    # SECURITY: Create directory with --no-dereference to prevent symlink following
-    # This is the PRIMARY protection against TOCTOU race condition
-    # Attack scenario: attacker creates symlink between pre-check and mkdir
-    if ! mkdir --no-dereference -p "$new_output_dir" 2>/dev/null; then
-        # POST-CONDITION CHECK: Verify created path is not a symlink
-        # If mkdir failed and path is symlink, attack was detected
-        if [[ -L "$new_output_dir" ]]; then
-            warn "Symlink attack detected at $new_output_dir (TOCTOU race prevented)"
-            return 1
-        fi
+    # Create directory
+    if ! mkdir -p "$new_output_dir" 2>/dev/null; then
         warn "Could not create output directory: $new_output_dir"
         return 1
     fi
-
-    # DEFENSE IN DEPTH: Verify created directory is not a symlink
-    # Even with --no-dereference, double-check for safety
-    if [[ -L "$new_output_dir" ]]; then
-        warn "Created path is a symlink at $new_output_dir (attack detected)"
-        rm -f "$new_output_dir" 2>/dev/null
-        return 1
-    fi
-
-    # DEFENSE IN DEPTH: Validate final resolved path (not just base)
-    # This catches any edge cases where timestamp manipulation could bypass base check
-    local resolved_final
-    resolved_final="$(cd "$new_output_dir" 2>/dev/null && pwd)" || resolved_final="$new_output_dir"
-    case "$resolved_final" in
-        /etc/*|/bin/*|/sbin/*|/usr/*|/boot/*|/root/*| \
-        /proc/*|/sys/*|/dev/*|/run/*)
-            warn "Refusing to write to protected directory (final path): $resolved_final"
-            rm -rf "$new_output_dir" 2>/dev/null
-            return 1
-            ;;
-    esac
 
     # All checks passed — assign to global
     OUTPUT_DIR="$new_output_dir"
@@ -2073,7 +1941,7 @@ export_kernel_logs() {
     local output_file="${OUTPUT_DIR}/kernel_errors.txt"
     local journal_output
 
-    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+    # Limit to last 500 lines to avoid excessive memory usage
     journal_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
@@ -2106,7 +1974,7 @@ export_user_services() {
     local output_file="${OUTPUT_DIR}/service_errors.txt"
     local journal_output
 
-    # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+    # Limit to last 500 lines to avoid excessive memory usage
     journal_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
 
     if [[ -z "$journal_output" ]]; then
@@ -2421,7 +2289,7 @@ export_drivers() {
                 [[ ! -d "$card" ]] && continue
                 printf 'Device: %s\n' "$(basename "$card")"
                 if [[ -L "${card}/device/driver" ]]; then
-                    # Pure bash: extract basename without forking subprocesses
+                    # Extract basename using bash parameter expansion
                     local driver_link
                     driver_link="$(readlink "${card}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
@@ -2446,7 +2314,7 @@ export_drivers() {
                 iface_name="$(basename "$iface")"
                 printf 'Interface: %s\n' "$iface_name"
                 if [[ -L "${iface}/device/driver" ]]; then
-                    # Pure bash: extract basename without forking subprocesses
+                    # Extract basename using bash parameter expansion
                     local driver_link
                     driver_link="$(readlink "${iface}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
@@ -2469,7 +2337,7 @@ export_drivers() {
                 [[ ! -d "$sound" ]] && continue
                 printf 'Device: %s\n' "$(basename "$sound")"
                 if [[ -L "${sound}/device/driver" ]]; then
-                    # Pure bash: extract basename without forking subprocesses
+                    # Extract basename using bash parameter expansion
                     local driver_link
                     driver_link="$(readlink "${sound}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
@@ -2494,7 +2362,7 @@ export_drivers() {
                 bname="$(basename "$block")"
                 printf 'Device: %s\n' "$bname"
                 if [[ -L "${block}/device/driver" ]]; then
-                    # Pure bash: extract basename without forking subprocesses
+                    # Extract basename using bash parameter expansion
                     local driver_link
                     driver_link="$(readlink "${block}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
@@ -2517,7 +2385,7 @@ export_drivers() {
                 [[ ! -d "$input" ]] && continue
                 printf 'Device: %s\n' "$(basename "$input")"
                 if [[ -L "${input}/device/driver" ]]; then
-                    # Pure bash: extract basename without forking subprocesses
+                    # Extract basename using bash parameter expansion
                     local driver_link
                     driver_link="$(readlink "${input}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
@@ -2624,7 +2492,7 @@ EOF
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CONSOLIDATED EXPORT (ALL LOGS IN ONE FILE)
+# CONSOLIDATED EXPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
 export_all_logs() {
@@ -2638,16 +2506,12 @@ export_all_logs() {
 
     local output_file="${OUTPUT_DIR}/arch-log-inspector-all.txt"
     local temp_file=""
-    local export_success=0
 
-    # Security: Set trap BEFORE mktemp to handle any failure (TOCTOU prevention)
-    # This ensures temp file is cleaned up even if interrupted between mktemp and trap
-    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
+    # Cleanup temp file on exit
+    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT
 
-    # Security: Check mktemp return value to prevent silent failure
     temp_file="$(mktemp)" || {
         warn "Failed to create temp file (disk full or /tmp unavailable)"
-        trap - EXIT INT TERM  # Clear trap before early return
         return 1
     }
 
@@ -2669,7 +2533,7 @@ export_all_logs() {
         printf '[1] KERNEL LOGS (Priority ≤3 - Errors)\n'
         printf '=============================================================\n'
         local kernel_output
-        # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+        # Limit to last 500 lines to avoid excessive memory usage
         kernel_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
         if [[ -n "$kernel_output" ]]; then
             printf '%s\n' "$kernel_output"
@@ -2699,7 +2563,7 @@ export_all_logs() {
         printf '[3] USER SERVICES\n'
         printf '=============================================================\n'
         local service_output
-        # SECURITY: Limit to last 500 lines to prevent memory exhaustion
+        # Limit to last 500 lines to avoid excessive memory usage
         service_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
         if [[ -n "$service_output" ]]; then
             printf '%s\n' "$service_output"
@@ -3081,7 +2945,7 @@ parse_args() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# WIKI GROUP DEFINITIONS (for lookup and suggestions)
+# WIKI GROUP DEFINITIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Group keywords for matching (lowercase, space-separated)
@@ -3134,17 +2998,11 @@ awk_fuzzy_match() {
     local query="$1"
     local groups="$2"
 
-    # Security: Whitelist approach to prevent awk script injection
-    # Only allow alphanumeric, underscore, hyphen, and space
-    # This is more secure than blacklisting specific characters
-    query="$(printf '%s' "$query" | tr -cd '[:alnum:]_ -')"
-
-    # Limit query length to prevent DoS (must be done AFTER sanitization)
+    # Limit query length to prevent DoS
     if [[ ${#query} -gt 50 ]]; then
         query="${query:0:50}"
     fi
 
-    # Additional safety: ensure query is not empty after sanitization
     if [[ -z "$query" ]]; then
         printf '%s\n' "-1:999"
         return 1
@@ -3224,7 +3082,7 @@ find_wiki_group_awk() {
         return 1
     fi
 
-    # FAST PATH 1: Alias lookup
+    # METHOD 1: Alias lookup
     if [[ -n "${WIKI_ALIASES[$query]:-}" ]]; then
         local target="${WIKI_ALIASES[$query]}"
         local i=0
@@ -3233,15 +3091,15 @@ find_wiki_group_awk() {
             i=$((i+1))
         done
     fi
-    
-    # FAST PATH 2: Exact match
+
+    # METHOD 2: Exact match
     local i=0
     for group in "${WIKI_GROUP_NAMES[@]}"; do
         [[ "$group" == *"$query"* ]] && echo $i && return 0
         i=$((i+1))
     done
-    
-    # AWK PATH: Fuzzy matching
+
+    # METHOD 3: Fuzzy matching with awk
     local groups_str
     groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
     local result
@@ -3262,19 +3120,17 @@ find_wiki_group_awk() {
 suggest_wiki_groups_awk() {
     local query="$1"
 
-    # Security: Whitelist approach - only allow safe characters
-    # Convert to lowercase, trim whitespace, keep only alphanumeric, underscore, space
-    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_ ')"
+    # Convert to lowercase and trim whitespace
+    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
-    # Early exit for empty or too long query (DoS prevention)
-    # Check length AFTER sanitization to prevent bypass
+    # Early exit for empty or too long query
     if [[ -z "$query" || ${#query} -gt 50 ]]; then
         return 1
     fi
 
     local groups_str
     groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
-    
+
     echo "$groups_str" | awk -v q="$query" '
     function min3(a, b, c) { return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c) }
     
