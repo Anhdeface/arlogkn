@@ -421,8 +421,15 @@ get_driver_from_sys() {
 
     if [[ -L "${class_path}/device/driver" ]]; then
         # Pure bash: extract basename without forking subprocesses
+        # Use readlink -f to resolve to canonical path (handles nested symlinks)
         local driver_link
-        driver_link="$(readlink "${class_path}/device/driver" 2>/dev/null)"
+        driver_link="$(readlink -f "${class_path}/device/driver" 2>/dev/null)" || driver_link=""
+        
+        # Security: Verify symlink target actually exists (prevent broken symlink)
+        if [[ -n "$driver_link" && ! -e "$driver_link" ]]; then
+            driver_link=""
+        fi
+        
         if [[ -n "$driver_link" ]]; then
             driver="${driver_link##*/}"  # Extract basename (equivalent to basename)
         fi
