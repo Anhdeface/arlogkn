@@ -3003,6 +3003,10 @@ awk_fuzzy_match() {
         query="${query:0:50}"
     fi
 
+    # Sanitize: strip chars that can escape awk -v string context (", \, newline)
+    # Defense-in-depth: caller may sanitize too, but awk injection happens HERE
+    query="$(printf '%s' "$query" | tr -cd '[:alnum:]_ ')"
+
     if [[ -z "$query" ]]; then
         printf '%s\n' "-1:999"
         return 1
@@ -3120,8 +3124,9 @@ find_wiki_group_awk() {
 suggest_wiki_groups_awk() {
     local query="$1"
 
-    # Convert to lowercase and trim whitespace
-    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    # Convert to lowercase, trim whitespace, strip awk-dangerous chars (", \, newline)
+    # tr -cd whitelist prevents awk injection via -v q="$query"
+    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_ ')"
 
     # Early exit for empty or too long query
     if [[ -z "$query" || ${#query} -gt 50 ]]; then
