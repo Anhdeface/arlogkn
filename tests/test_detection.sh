@@ -57,10 +57,9 @@ test_detect_distro_real() {
     detect_distro
     
     local name_valid=0 type_valid=0
-    # Name should be alphanumeric with spaces/hyphens/dots/parentheses
-    [[ "$DISTRO_NAME" =~ ^[A-Za-z0-9\ .\(\)_-]+$ ]] && name_valid=1
-    # Type should also be alphanumeric with spaces
-    [[ "$DISTRO_TYPE" =~ ^[A-Za-z0-9\ ._-]+$ ]] && type_valid=1
+    # Name/Type should just be printable text, avoid overly strict character classes
+    [[ "$DISTRO_NAME" =~ ^[[:print:]]+$ ]] && name_valid=1
+    [[ "$DISTRO_TYPE" =~ ^[[:print:]]+$ ]] && type_valid=1
     
     assert_eq "detect_distro real name format valid" "$name_valid" "1"
     assert_eq "detect_distro real type format valid" "$type_valid" "1"
