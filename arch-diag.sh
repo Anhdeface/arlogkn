@@ -729,6 +729,7 @@ draw_box_line() {
     printf ' %s %*s\n' "$content" "$padding" ""
 }
 
+# shellcheck disable=SC2120
 draw_empty_box() {
     local width="${1:-70}"
     local message="✓ No Critical Issues Found"
@@ -876,6 +877,7 @@ tbl_end() {
 # Legacy wrappers for backward compatibility (102 call sites use these names)
 draw_table_begin() { tbl_begin "$@"; }
 draw_table_row() { tbl_row "$@"; }
+# shellcheck disable=SC2120
 draw_table_end() { tbl_end "$@"; }
 draw_table_header() { tbl_begin "$@"; }
 draw_table_footer() { tbl_end "$@"; }
@@ -1019,7 +1021,7 @@ scan_user_services() {
 
     # ── JOURNAL SERVICE ERRORS ──
     draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
-    printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+    printf '%s%*s%s\n' "$C_CYAN" 64 "" "$C_RESET"
 
     # Limit to last 500 lines to avoid excessive memory usage
     journal_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -1301,7 +1303,7 @@ scan_boot_timing() {
 
     if [[ -n "$blame_output" ]]; then
         draw_box_line "${C_BOLD}Top 10 Slowest Services:${C_RESET}"
-        printf '%s%*s\n' "$C_CYAN" 64 "" "$C_RESET"
+        printf '%s%*s%s\n' "$C_CYAN" 64 "" "$C_RESET"
 
         printf '%s\n' "$blame_output" | while read -r line; do
             [[ -z "$line" ]] && continue
