@@ -11,9 +11,7 @@ suite_begin "Log Parsing"
 
 # ─── cluster_errors() ─────────────────────────────────────────────────────────
 test_cluster_empty() {
-    local rc=0
-    cluster_errors "" >/dev/null 2>&1 || rc=$?
-    assert_eq "cluster_errors empty → exit 1" "$rc" "1"
+    assert_exit_code "cluster_errors empty → exit 1" 1 cluster_errors ""
 }
 
 test_cluster_dedup() {

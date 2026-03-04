@@ -8,6 +8,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCRIPT_UNDER_TEST="$PROJECT_DIR/arch-diag.sh"
 
+export ARLOG_RESULTS_FILE="$(mktemp /tmp/arlogkn_results_XXXXXX.txt)"
+trap 'rm -f "$ARLOG_RESULTS_FILE"' EXIT INT TERM
+
 # Colors
 C_BOLD=$'\033[1m' C_RESET=$'\033[0m'
 C_GREEN=$'\033[32m' C_RED=$'\033[31m' C_CYAN=$'\033[1;36m' C_YELLOW=$'\033[33m'
@@ -65,6 +68,8 @@ SUITES=(
     test_wiki.sh
     test_cli.sh
     test_export.sh
+    test_smoke_scan.sh
+    test_smoke_export.sh
 )
 
 for suite in "${SUITES[@]}"; do
@@ -93,11 +98,20 @@ printf '\n%s══════════════════════�
 printf '%s SUMMARY%s\n' "$C_BOLD" "$C_RESET"
 printf '%s══════════════════════════════════════════════════%s\n\n' "$C_CYAN" "$C_RESET"
 
+if [[ -f "$ARLOG_RESULTS_FILE" ]]; then
+    while read -r tot p f suite; do
+        TOTAL_TESTS=$((TOTAL_TESTS + tot))
+        TOTAL_PASS=$((TOTAL_PASS + p))
+        TOTAL_FAIL=$((TOTAL_FAIL + f))
+    done < "$ARLOG_RESULTS_FILE"
+fi
+
 for sr in "${SUITE_RESULTS[@]}"; do
     printf '  %s\n' "$sr"
 done
 
-printf '\n'
+printf '\n  %sOverall: %d Tests | %s%d PASS%s | %s%d FAIL%s\n\n' \
+    "$C_BOLD" "$TOTAL_TESTS" "$C_GREEN" "$TOTAL_PASS" "$C_RESET" "$C_RED" "$TOTAL_FAIL" "$C_RESET"
 
 if [[ "$OVERALL_RC" -eq 0 ]]; then
     printf '  %s══ ALL CHECKS PASSED ══%s\n\n' "$C_GREEN" "$C_RESET"

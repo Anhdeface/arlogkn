@@ -12,6 +12,9 @@ show_help() { printf 'USAGE: arch-diag.sh [OPTIONS]\n'; }
 
 suite_begin "CLI Argument Parser"
 
+# Helper since parse_args calls die() which calls exit
+bash_c() { bash -c "source \"$SCRIPT_UNDER_TEST\" && $1"; }
+
 # Helper: reset all scan flags before each test
 reset_flags() {
     SCAN_ALL=1 SCAN_KERNEL=0 SCAN_USER=0 SCAN_MOUNT=0 SCAN_USB=0
@@ -109,16 +112,12 @@ test_parse_boot_eq() {
 
 test_parse_boot_invalid() {
     reset_flags
-    local rc=0
-    (parse_args --boot=abc) 2>/dev/null || rc=$?
-    assert_ne "--boot=abc dies" "$rc" "0"
+    assert_exit_code "--boot=abc dies" 1 bash_c "parse_args --boot=abc 2>/dev/null"
 }
 
 test_parse_boot_range_over() {
     reset_flags
-    local rc=0
-    (parse_args --boot=-100) 2>/dev/null || rc=$?
-    assert_ne "--boot=-100 out of range dies" "$rc" "0"
+    assert_exit_code "--boot=-100 out of range dies" 1 bash_c "parse_args --boot=-100 2>/dev/null"
 }
 
 test_parse_save() {
@@ -135,9 +134,7 @@ test_parse_save_all() {
 
 test_parse_unknown() {
     reset_flags
-    local rc=0
-    (parse_args --nonexistent) 2>/dev/null || rc=$?
-    assert_ne "--nonexistent dies" "$rc" "0"
+    assert_exit_code "--nonexistent dies" 1 bash_c "parse_args --nonexistent 2>/dev/null"
 }
 
 test_parse_combined() {
@@ -150,15 +147,15 @@ test_parse_combined() {
 
 # ─── --version output ─────────────────────────────────────────────────────────
 test_version_output() {
-    local output rc=0
-    output="$(bash "$SCRIPT_UNDER_TEST" --version 2>&1)" || rc=$?
+    local output
+    output="$(bash "$SCRIPT_UNDER_TEST" --version 2>&1)" || true
     assert_contains "version contains version string" "$output" "$VERSION"
 }
 
 # ─── --help output ────────────────────────────────────────────────────────────
 test_help_output() {
-    local output rc=0
-    output="$(bash "$SCRIPT_UNDER_TEST" --help 2>&1)" || rc=$?
+    local output
+    output="$(bash "$SCRIPT_UNDER_TEST" --help 2>&1)" || true
     assert_contains "help contains USAGE" "$output" "USAGE"
 }
 

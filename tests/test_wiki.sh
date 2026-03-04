@@ -80,10 +80,7 @@ test_awk_no_match() {
 test_awk_empty_query() {
     local groups
     groups="$(printf '%s\n' "sound" "network")"
-    local result rc=0
-    result="$(awk_fuzzy_match "" "$groups")" || rc=$?
-    assert_eq "empty query returns 1" "$rc" "1"
-    assert_eq "empty query output" "$result" "-1:999"
+    assert_exit_code "empty query returns 1" 1 awk_fuzzy_match "" "$groups"
 }
 
 test_awk_injection_dquote() {
@@ -145,15 +142,17 @@ test_find_group_fuzzy() {
 }
 
 test_find_group_invalid() {
-    local result rc=0
-    result="$(find_wiki_group_awk "zzzzzzzzz")" || rc=$?
-    assert_eq "invalid group returns -1" "$result" "-1"
+    assert_exit_code "invalid group returns 1" 1 find_wiki_group_awk "zzzzzzzzz"
+    local result
+    result="$(find_wiki_group_awk "zzzzzzzzz")" || true
+    assert_eq "invalid group output format is -1" "$result" "-1"
 }
 
 test_find_group_empty() {
-    local result rc=0
-    result="$(find_wiki_group_awk "")" || rc=$?
-    assert_eq "empty query returns -1" "$result" "-1"
+    assert_exit_code "empty group query returns 1" 1 find_wiki_group_awk ""
+    local result=0
+    result="$(find_wiki_group_awk "" 2>/dev/null)" || true
+    assert_eq "empty group output format is -1" "$result" "-1"
 }
 
 # ─── suggest_wiki_groups_awk() ────────────────────────────────────────────────

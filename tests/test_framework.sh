@@ -9,6 +9,7 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 readonly SCRIPT_UNDER_TEST="${SCRIPT_UNDER_TEST:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/arch-diag.sh}"
 readonly TEST_TMPDIR="$(mktemp -d /tmp/arlogkn_test_XXXXXX)"
+export ARLOG_RESULTS_FILE="${ARLOG_RESULTS_FILE:-/tmp/arlogkn_test_results_$$.txt}"
 
 # Counters
 declare -g _PASS=0 _FAIL=0 _TOTAL=0 _SUITE_NAME=""
@@ -38,7 +39,7 @@ suite_end() {
         "$_TOTAL" "$_PASS" "$_FAIL"
 
     # Write machine-readable result for run_all.sh
-    printf '%d %d %d %s\n' "$_TOTAL" "$_PASS" "$_FAIL" "$_SUITE_NAME" >> "${TEST_TMPDIR}/_results.txt"
+    printf '%d %d %d %s\n' "$_TOTAL" "$_PASS" "$_FAIL" "$_SUITE_NAME" >> "$ARLOG_RESULTS_FILE"
 
     [[ "$_FAIL" -eq 0 ]]
 }
@@ -196,9 +197,9 @@ stub_globals() {
     _TBL_WIDTH=0
     _TBL_COLS=()
 
-    # Script identity
-    VERSION="1.0.5"
-    SCRIPT_NAME="arch-diag.sh"
+    # Script identity (bypass if already readonly, like in smoke tests)
+    [[ "$(declare -p VERSION 2>/dev/null)" == *" -r "* ]] || VERSION="1.0.5"
+    [[ "$(declare -p SCRIPT_NAME 2>/dev/null)" == *" -r "* ]] || SCRIPT_NAME="arch-diag.sh"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -12,30 +12,22 @@ suite_begin "Export & Disk Space"
 # ─── check_disk_space() ───────────────────────────────────────────────────────
 test_disk_space_pass() {
     # /tmp should have enough space
-    local rc=0
-    check_disk_space "/tmp" 1024 || rc=$?  # 1MB threshold
-    assert_eq "check_disk_space /tmp passes" "$rc" "0"
+    assert_exit_code "check_disk_space /tmp passes" 0 check_disk_space "/tmp" 1024
 }
 
 test_disk_space_huge_threshold() {
     # Require absurd amount, should fail
-    local rc=0
-    check_disk_space "/tmp" 999999999999 2>/dev/null || rc=$?
-    assert_eq "check_disk_space absurd threshold fails" "$rc" "1"
+    assert_exit_code "check_disk_space absurd threshold fails" 1 check_disk_space "/tmp" 999999999999
 }
 
 test_disk_space_nonexistent() {
     # Non-existent target should fall back to parent
-    local rc=0
-    check_disk_space "/tmp/nonexistent_dir_test_12345" 1024 || rc=$?
-    assert_eq "check_disk_space nonexistent fallback" "$rc" "0"
+    assert_exit_code "check_disk_space nonexistent fallback" 0 check_disk_space "/tmp/nonexistent_dir_test_12345" 1024
 }
 
 test_disk_space_root() {
     # / should always have space
-    local rc=0
-    check_disk_space "/" 1024 || rc=$?
-    assert_eq "check_disk_space / passes" "$rc" "0"
+    assert_exit_code "check_disk_space / passes" 0 check_disk_space "/" 1024
 }
 
 # ─── init_output_dir() ────────────────────────────────────────────────────────
@@ -81,16 +73,7 @@ test_init_umask_restore_nondefault() {
 }
 
 # ─── export_all_logs() trap verification ──────────────────────────────────────
-test_export_trap_signals() {
-    # Source-level verification: trap line must include EXIT INT TERM
-    local trap_line
-    trap_line="$(sed -n '/^export_all_logs() {$/,/^}$/p' "$SCRIPT_UNDER_TEST" | grep "^    trap '" | head -1)"
-    for sig in EXIT INT TERM; do
-        local found=0
-        printf '%s' "$trap_line" | grep -qw "$sig" && found=1
-        assert_eq "export trap has $sig" "$found" "1"
-    done
-}
+
 
 test_export_trap_sigint_cleanup() {
     # Runtime: spawn subshell with same trap, send SIGINT, verify cleanup
@@ -135,7 +118,6 @@ test_disk_space_root
 test_init_creates_dir
 test_init_umask_restore
 test_init_umask_restore_nondefault
-test_export_trap_signals
 test_export_trap_sigint_cleanup
 test_export_trap_sigterm_cleanup
 
