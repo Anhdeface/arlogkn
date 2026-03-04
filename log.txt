@@ -1,8 +1,18 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-03
+Generated: 2026-03-04
 
 ---
+db97349 2026-03-04 test: broaden regex for distro detection in CI environments
+3968976 2026-03-04 test: refine testing infrastructure based on review feedback
+e7385cd 2026-03-04 fix: resolve shellcheck SC2120 and SC2183 warnings
+9c238cd 2026-03-04 ci: add extreme unit tests, shellcheck, and github actions pipeline
+a46b043 2026-03-04 fix: MEDIUM #10 — add INT TERM to trap in export_all_logs()
+c6dc8f0 2026-03-04 fix: MEDIUM #9 — restore umask after init_output_dir()
+d8833c6 2026-03-04 fix: HIGH #8 — sanitize awk injection in wiki fuzzy matching
+3c41142 2026-03-03 Update version number to 1.0.5 in README
+da34967 2026-03-03 release: version 1.0.5 - remove security overengineering and simplify comments
+66d2402 2026-03-03 docs: update log.txt with latest commits
 95c8471 2026-03-03 fix: HIGH #7 — prevent temperature integer overflow
 713bd56 2026-03-03 fix: HIGH #6 — add readlink error handling in get_driver_from_sys()
 084bc6c 2026-03-03 fix: HIGH #5 — use whitelist approach for awk input sanitization
