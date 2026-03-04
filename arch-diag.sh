@@ -1908,20 +1908,29 @@ init_output_dir() {
 
     local base_dir="./arch-diag-logs"
 
+    # Save original umask before setting restrictive mode
+    local old_umask
+    old_umask="$(umask)"
+
     # Set restrictive umask for log export (owner read/write only)
     umask 077
 
     # Check disk space before mutating global state
     if ! check_disk_space "$new_output_dir"; then
         warn "Insufficient disk space for export"
+        umask "$old_umask"
         return 1
     fi
 
     # Create directory
     if ! mkdir -p "$new_output_dir" 2>/dev/null; then
         warn "Could not create output directory: $new_output_dir"
+        umask "$old_umask"
         return 1
     fi
+
+    # Restore original umask — restrictive mode only needed for mkdir above
+    umask "$old_umask"
 
     # All checks passed — assign to global
     OUTPUT_DIR="$new_output_dir"
