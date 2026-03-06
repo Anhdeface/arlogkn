@@ -1580,8 +1580,18 @@ scan_usb_devices() {
             [[ -n "$manufacturer" && ! "$manufacturer" =~ ^[[:cntrl:]]*$ ]] && product="$manufacturer"
         fi
 
-        # Clean product name (remove control characters)
-        product="$(echo "$product" | tr -d '[:cntrl:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        # Clean product name (defense-in-depth: strip ANSI escapes + control chars)
+        # 1. Strip ANSI CSI sequences: \x1b[...letter (e.g., \x1b[2J = clear screen)
+        # 2. Strip ANSI OSC sequences: \x1b]...BEL   (e.g., \x1b]0;title\x07 = set title)
+        # 3. Strip bare ESC not caught above: \x1b followed by anything
+        # 4. Strip remaining control characters (belt-and-suspenders for locale edge cases)
+        # 5. Trim whitespace
+        # Why explicit ANSI strip before tr: [:cntrl:] is locale-dependent;
+        # in non-C locales, \x1b may not be classified as control character
+        product="$(printf '%s' "$product" | \
+            sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g; s/\x1b[^[]*//g' | \
+            tr -d '[:cntrl:]' | \
+            sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
         # Fallback product name
         [[ -z "$product" ]] && product="USB Device"
