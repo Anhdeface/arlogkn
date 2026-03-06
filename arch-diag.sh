@@ -1485,10 +1485,10 @@ scan_mounts() {
     # Table header
     draw_table_begin "Device" 22 "Mountpoint" 24 "Type" 12 "Size" 10
 
-    # Use /proc/mounts directly (lightweight, no external deps)
-    # Count total mounts first to warn about truncation
-    local total_mounts
-    total_mounts="$(wc -l < /proc/mounts)"
+    # Count filtered mounts (excluding autofs, comment lines)
+    # Used to accurately report truncation — raw wc -l includes filtered-out entries
+    local filtered_total
+    filtered_total="$(grep -cvE '^#|autofs' /proc/mounts 2>/dev/null || echo "0")"
 
     local count=0
     while IFS=' ' read -r source target fstype opts freq pass; do
@@ -1519,8 +1519,8 @@ scan_mounts() {
     done < /proc/mounts
 
     # Warn if truncated (servers with many mounts: NFS, btrfs subvolumes, containers)
-    if [[ "$total_mounts" -gt "$count" ]]; then
-        draw_box_line "${C_YELLOW}... and $((total_mounts - count)) more mounts${C_RESET}"
+    if [[ "$filtered_total" -gt "$count" ]]; then
+        draw_box_line "${C_YELLOW}... and $((filtered_total - count)) more mounts${C_RESET}"
     fi
 
     draw_table_end
