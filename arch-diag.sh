@@ -206,11 +206,13 @@ check_internet() {
     # Check all interfaces except loopback (lo)
     # ─────────────────────────────────────────────────────────────────────────
     if [[ -d /sys/class/net ]]; then
-        local iface operstate
+        local iface operstate iface_name
+        local has_link_up=0
         shopt -s nullglob
         for iface in /sys/class/net/*; do
+            iface_name="$(basename "$iface")"
             # Skip loopback interface
-            [[ "$(basename "$iface")" == "lo" ]] && continue
+            [[ "$iface_name" == "lo" ]] && continue
 
             # Check if interface is UP
             # Note: Only check for "up" state, not "unknown"
@@ -223,13 +225,31 @@ check_internet() {
             if [[ -f "${iface}/operstate" ]]; then
                 operstate="$(cat "${iface}/operstate" 2>/dev/null)"
                 if [[ "$operstate" == "up" ]]; then
-                    shopt -u nullglob
-                    INTERNET_STATUS="connected"
-                    return 0
+                    # Interface is UP — but does it have a routable IP?
+                    # Check via ip command if available (most reliable)
+                    if command -v ip &>/dev/null; then
+                        local ip_output
+                        ip_output="$(ip -4 addr show "$iface_name" 2>/dev/null)"
+                        # Has non-link-local IPv4? (exclude 169.254.x.x)
+                        if printf '%s\n' "$ip_output" | grep -qE 'inet [0-9]' && \
+                           ! printf '%s\n' "$ip_output" | grep -q 'inet 169\.254\.'; then
+                            shopt -u nullglob
+                            INTERNET_STATUS="connected"
+                            return 0
+                        fi
+                    fi
+                    # No ip command or no valid IP — mark as link up
+                    has_link_up=1
                 fi
             fi
         done
         shopt -u nullglob
+
+        # Interface(s) up but no routable IP confirmed
+        if [[ "$has_link_up" -eq 1 ]]; then
+            INTERNET_STATUS="link_up"
+            return 0
+        fi
     fi
     
     # ─────────────────────────────────────────────────────────────────────────
@@ -1770,6 +1790,8 @@ scan_system_basics() {
     local internet_icon
     if [[ "$INTERNET_STATUS" == "connected" ]]; then
         internet_icon="${C_GREEN}✓ Connected${C_RESET}"
+    elif [[ "$INTERNET_STATUS" == "link_up" ]]; then
+        internet_icon="${C_YELLOW}▲ Link Up (no IP confirmed)${C_RESET}"
     else
         internet_icon="${C_RED}✗ Disconnected${C_RESET}"
     fi
@@ -3773,6 +3795,8 @@ main() {
     # Internet status
     if [[ "$INTERNET_STATUS" == "connected" ]]; then
         draw_info_box "Internet" "${C_GREEN}Connected${C_RESET}"
+    elif [[ "$INTERNET_STATUS" == "link_up" ]]; then
+        draw_info_box "Internet" "${C_YELLOW}Link Up (no IP confirmed)${C_RESET}"
     else
         draw_info_box "Internet" "${C_RED}Disconnected${C_RESET}"
     fi
