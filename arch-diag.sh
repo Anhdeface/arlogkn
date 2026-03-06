@@ -15,7 +15,7 @@ shopt -s extglob  # Enable extglob at parse-time for +([[:space:]]) patterns
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.5"
+readonly VERSION="1.0.6"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 # Color state (set dynamically)
@@ -1159,8 +1159,8 @@ scan_coredumps() {
     printf '%s\n' "$coredumps" | while read -r line; do
         local formatted
         formatted="$(awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '{
-            # Find PID: first numeric field that is NOT a year (1900-2100)
-            # or timestamp fragment. PIDs are typically 1-65535.
+            # Find PID: first numeric field that is NOT a year-like number
+            # (e.g., to avoid confusing the year in the timestamp with the PID).
             pid_field = 0
             for(i=1; i<=NF; i++) {
                 if ($i ~ /^[0-9]+$/ && $i+0 < 1900) {
@@ -2651,8 +2651,8 @@ export_all_logs() {
         printf 'Boot Offset: %s\n' "${BOOT_OFFSET}"
         printf '=============================================================\n\n'
 
-        # Pre-check: is journald running? Avoids 5s×N timeout waste
-        # on containers or systems where systemd-journald is stopped/restarting
+        # Pre-check: is journald running?
+        # Helps prevent delays on systems where systemd-journald is stopped/restarting
         local journald_available=0
         if command -v journalctl &>/dev/null && \
            journalctl --no-pager -n 0 2>/dev/null; then
@@ -2928,8 +2928,7 @@ export_all_logs() {
     } > "$temp_file"
 
     # Validate temp file before moving (detect partial writes)
-    # NOTE: ! -f check removed — mktemp already returns 1 on failure (handled above)
-    #       and after { } > "$temp_file" redirect, file always exists
+    # NOTE: ! -f check removed — mktemp already created the file and returns 1 on failure.
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
