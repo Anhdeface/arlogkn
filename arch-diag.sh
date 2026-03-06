@@ -2147,7 +2147,13 @@ export_usb_devices() {
         printf '=============================================================\n\n'
 
         if command -v lsusb &>/dev/null; then
-            timeout 15 lsusb -v 2>/dev/null | head -100 || true
+            # lsusb -v without root prints "Couldn't open device" to stdout
+            # (not stderr), polluting export files — use -v only as root
+            if [[ $EUID -eq 0 ]]; then
+                timeout 15 lsusb -v 2>/dev/null | head -100 || true
+            else
+                timeout 15 lsusb 2>/dev/null || true
+            fi
         else
             printf 'lsusb not available\n'
         fi
@@ -2336,7 +2342,12 @@ export_drivers() {
         printf '[3] USB DEVICES\n'
         printf '=============================================================\n\n'
         if command -v lsusb &>/dev/null; then
-            timeout 15 lsusb -v 2>/dev/null | head -200 || timeout 5 lsusb 2>/dev/null || true
+            # lsusb -v without root prints "Couldn't open device" to stdout
+            if [[ $EUID -eq 0 ]]; then
+                timeout 15 lsusb -v 2>/dev/null | head -200 || timeout 5 lsusb 2>/dev/null || true
+            else
+                timeout 5 lsusb 2>/dev/null || true
+            fi
         else
             printf 'lsusb not available\n'
         fi
@@ -2729,7 +2740,12 @@ export_all_logs() {
         printf '[9] USB DEVICES\n'
         printf '=============================================================\n'
         if command -v lsusb &>/dev/null; then
-            timeout 15 lsusb -v 2>/dev/null | head -100 || true
+            # lsusb -v without root prints "Couldn't open device" to stdout
+            if [[ $EUID -eq 0 ]]; then
+                timeout 15 lsusb -v 2>/dev/null | head -100 || true
+            else
+                timeout 15 lsusb 2>/dev/null || true
+            fi
         else
             printf 'lsusb not available.\n'
         fi
