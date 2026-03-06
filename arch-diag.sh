@@ -2008,10 +2008,10 @@ export_kernel_logs() {
 
     # Write clustered version
     local clustered_file="${OUTPUT_DIR}/kernel_errors_clustered.txt"
-    printf '%s\n' "$journal_output" | \
-        sed -E 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' | \
-        sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' | \
-        sort | uniq -c | sort -rn > "$clustered_file"
+    # Reuse cluster_errors() for consistent normalization with terminal output
+    # cluster_errors() normalizes: addresses, PIDs, IRQs, CPUs, device names,
+    # MAC addresses, port numbers, sector numbers — then sorts by frequency
+    cluster_errors "$journal_output" > "$clustered_file"
 
     info "Kernel logs exported: kernel_errors.txt, kernel_errors_clustered.txt"
 }
