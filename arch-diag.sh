@@ -1029,7 +1029,9 @@ scan_user_services() {
         done
 
         local failed_count
-        failed_count="$(printf '%s\n' "$failed_output" | wc -l)"
+        # Count only actual unit lines (exclude summary, blank, and trailing lines)
+        # systemctl --no-legend may still emit "0 loaded units listed." or blanks
+        failed_count="$(printf '%s\n' "$failed_output" | grep -c '\.service' || echo "0")"
         if [[ "$failed_count" -gt 10 ]]; then
             draw_box_line "${C_YELLOW}... and $((failed_count - 10)) more failed units${C_RESET}"
         fi
