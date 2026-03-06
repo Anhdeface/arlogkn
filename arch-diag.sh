@@ -1120,47 +1120,75 @@ scan_coredumps() {
         return 0
     fi
 
+    # METHOD 1: Try structured JSON output (systemd ≥ v248)
+    local json_output
+    json_output="$(coredumpctl list --json=short 2>/dev/null | tail -c 50000)" || json_output=""
+
+    if [[ -n "$json_output" ]] && printf '%s' "$json_output" | grep -q '"pid"'; then
+        # Parse JSON: extract pid, sig, exe, timestamp
+        printf '%s' "$json_output" | awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '
+        BEGIN { count = 0 }
+        /"pid"/ { gsub(/[^0-9]/, "", $0); pid = $0 }
+        /"signal"/ { gsub(/[^0-9]/, "", $0); sig = $0 }
+        /"exe"/ {
+            gsub(/.*"exe" *: *"/, "", $0)
+            gsub(/".*/, "", $0)
+            exe = $0
+        }
+        /"timestamp"/ {
+            gsub(/.*"timestamp" *: */, "", $0)
+            gsub(/[^0-9]/, "", $0)
+            ts = $0
+        }
+        /\}/ {
+            if (pid != "" && exe != "") {
+                count++
+                if (count > 5) exit
+                printf "%s[coredump]%s PID %s%s%s - %s%s%s (signal: %s)\n", \
+                    cyan, rst, bold, pid, rst, yellow, exe, rst, sig
+            }
+            pid = ""; sig = ""; exe = ""; ts = ""
+        }
+        ' | tail -5 | while read -r formatted; do
+            draw_box_line "$formatted"
+        done
+        return 0
+    fi
+
+    # METHOD 2: Fallback heuristic for older systemd (< v248)
     printf '%s\n' "$coredumps" | while read -r line; do
-        # Parse coredumpctl output robustly
-        # Format varies by systemd version, so we parse by pattern not position
-        # coredumpctl format: TIME... PID UID GID SIG COREFILE EXE SIZE
-        # But older versions may have different fields
-        # Use pattern matching to find numeric PID and extract relative to it
-        
         local formatted
         formatted="$(awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '{
-            # Find first numeric field (PID) and work from there
+            # Find PID: first numeric field that is NOT a year (1900-2100)
+            # or timestamp fragment. PIDs are typically 1-65535.
             pid_field = 0
             for(i=1; i<=NF; i++) {
-                if ($i ~ /^[0-9]+$/) {
+                if ($i ~ /^[0-9]+$/ && $i+0 < 1900) {
                     pid_field = i
                     break
                 }
             }
-            
+
             # If no numeric field found, print raw line
             if (pid_field == 0) {
                 print $0
                 next
             }
-            
+
             # Extract fields relative to PID
-            # Format: TIME... PID UID GID SIG [COREFILE] EXE [SIZE]
             pid = $pid_field
             sig = $(pid_field + 3)
-            # EXE is typically 2 fields after SIG (or 1 if no COREFILE)
             exe_field = pid_field + 4
             if ($(exe_field) ~ /^\/|^\.\/|^[a-zA-Z]/) {
                 exe = $(exe_field)
             } else {
                 exe = $(exe_field + 1)
             }
-            
+
             # Build time from all fields before PID
             time = ""
             for(j=1; j<pid_field; j++) time = time (j>1 ? " " : "") $j
-            
-            # Output formatted string
+
             printf "%s[%s]%s PID %s%s%s - %s%s%s (signal: %s)\n", \
                 cyan, time, rst, bold, pid, rst, yellow, exe, rst, sig
         }' <<< "$line")"
