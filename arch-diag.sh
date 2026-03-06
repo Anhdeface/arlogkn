@@ -1972,7 +1972,6 @@ init_output_dir() {
     timestamp="$(date +%Y%m%d_%H%M%S)"
     local new_output_dir="./arch-diag-logs/${timestamp}"
 
-    local base_dir="./arch-diag-logs"
 
     # Save original umask before setting restrictive mode
     local old_umask
@@ -2904,7 +2903,6 @@ export_all_logs() {
 
     # SUCCESS: Restore caller's traps (temp file moved, no cleanup needed)
     temp_file=""
-    export_success=1
     eval "$old_exit_trap"
     eval "$old_int_trap"
     eval "$old_term_trap"
