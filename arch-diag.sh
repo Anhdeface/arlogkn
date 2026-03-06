@@ -1329,8 +1329,15 @@ scan_boot_timing() {
     printf '\n'
 
     # Top 10 slowest services
+    # NOTE: systemd-analyze blame does NOT support --boot=N in most versions
+    # Only show blame for current boot; warn if viewing older boot
     local blame_output
-    blame_output="$(systemd-analyze blame --no-pager 2>/dev/null | head -10)" || true
+    if [[ "$BOOT_OFFSET" -ne 0 ]]; then
+        draw_box_line "${C_YELLOW}⚠ blame not available for boot offset ${BOOT_OFFSET} (systemd-analyze blame only supports current boot)${C_RESET}"
+        blame_output=""
+    else
+        blame_output="$(systemd-analyze blame --no-pager 2>/dev/null | head -10)" || true
+    fi
 
     if [[ -n "$blame_output" ]]; then
         draw_box_line "${C_BOLD}Top 10 Slowest Services:${C_RESET}"
@@ -1675,7 +1682,7 @@ scan_usb_devices() {
         bname="$(basename "$block")"
         
         # Check if it's a USB device (sd* or mmc*)
-        [[ ! "$bname" =~ ^(sd[a-z]|mmcblk[0-9])$ ]] && continue
+        [[ ! "$bname" =~ ^(sd[a-z]+|mmcblk[0-9]+)$ ]] && continue
         
         # Check if removable (USB drives are removable)
         local removable="0"
@@ -2879,11 +2886,8 @@ export_all_logs() {
     } > "$temp_file"
 
     # Validate temp file before moving (detect partial writes)
-    if [[ ! -f "$temp_file" ]]; then
-        warn "Temp file not created: $temp_file"
-        eval "$old_exit_trap"; eval "$old_int_trap"; eval "$old_term_trap"
-        return 1
-    fi
+    # NOTE: ! -f check removed — mktemp already returns 1 on failure (handled above)
+    #       and after { } > "$temp_file" redirect, file always exists
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
