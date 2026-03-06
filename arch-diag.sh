@@ -1496,6 +1496,17 @@ scan_mounts() {
         [[ "$source" =~ ^# ]] && continue
         [[ "$fstype" == "autofs" ]] && continue
 
+        # Decode /proc/mounts octal escapes (pure bash, no subprocess)
+        # /proc/mounts encodes: space→\040, tab→\011, backslash→\134
+        # Without decoding, paths like "/mnt/my\040drive" display wrong
+        # and fail comparison with actual filesystem paths
+        source="${source//\\040/ }"
+        source="${source//\\011/$'\t'}"
+        source="${source//\\134/\\}"
+        target="${target//\\040/ }"
+        target="${target//\\011/$'\t'}"
+        target="${target//\\134/\\}"
+
         # Get size from df cache (resolve symlink to match df keys)
         # Only call readlink -f if path is actually a symlink (avoid fork overhead)
         local resolved_source
