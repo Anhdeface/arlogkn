@@ -2518,8 +2518,15 @@ export_all_logs() {
     local output_file="${OUTPUT_DIR}/arch-log-inspector-all.txt"
     local temp_file=""
 
-    # Cleanup temp file on exit
-    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT
+    # Save caller's traps to avoid side-effect
+    # trap is GLOBAL in bash — clearing it affects caller
+    local old_exit_trap old_int_trap old_term_trap
+    old_exit_trap="$(trap -p EXIT)"
+    old_int_trap="$(trap -p INT)"
+    old_term_trap="$(trap -p TERM)"
+
+    # Cleanup temp file on exit, interrupt (Ctrl+C), or termination
+    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
 
     temp_file="$(mktemp)" || {
         warn "Failed to create temp file (disk full or /tmp unavailable)"
@@ -2801,13 +2808,13 @@ export_all_logs() {
     # Validate temp file before moving (detect partial writes)
     if [[ ! -f "$temp_file" ]]; then
         warn "Temp file not created: $temp_file"
-        trap - EXIT INT TERM  # Clear trap before early return
+        eval "$old_exit_trap"; eval "$old_int_trap"; eval "$old_term_trap"
         return 1
     fi
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
-        trap - EXIT INT TERM  # Clear trap before early return
+        eval "$old_exit_trap"; eval "$old_int_trap"; eval "$old_term_trap"
         return 1
     fi
 
@@ -2818,12 +2825,12 @@ export_all_logs() {
         return 1
     fi
 
-    # SUCCESS: Mark export as successful and clear trap
-    # Export file is now safely in place, no cleanup needed
-    # Clear temp_file variable FIRST so trap doesn't try to clean it
+    # SUCCESS: Restore caller's traps (temp file moved, no cleanup needed)
     temp_file=""
     export_success=1
-    trap - EXIT INT TERM
+    eval "$old_exit_trap"
+    eval "$old_int_trap"
+    eval "$old_term_trap"
 
     info "All logs exported to: ${output_file}"
 }
