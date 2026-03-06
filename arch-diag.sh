@@ -812,8 +812,12 @@ strip_ansi() {
     s="${s//${C_BOLD}/}"
     s="${s//${C_RESET}/}"
 
-    # Strip raw ANSI escape sequences using sed
-    s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
+    # Strip raw ANSI escape sequences using pure bash (no sed subprocess)
+    # Pattern: \x1b followed by [ then digits/semicolons then a letter
+    # Uses bash parameter expansion loop to avoid spawning sed in tight loops
+    while [[ "$s" =~ $'\x1b'\[[0-9\;]*[a-zA-Z] ]]; do
+        s="${s//${BASH_REMATCH[0]}/}"
+    done
     printf '%s' "$s"
 }
 
@@ -1716,9 +1720,11 @@ scan_vga_info() {
 
     # OpenGL info (only if glxinfo available - from mesa-utils)
     if command -v glxinfo &>/dev/null; then
-        local glx_vendor glx_renderer
-        glx_vendor="$(glxinfo -s 2>/dev/null | grep 'OpenGL vendor' | cut -d':' -f2 | sed 's/^ *//')"
-        glx_renderer="$(glxinfo -s 2>/dev/null | grep 'OpenGL renderer' | cut -d':' -f2 | sed 's/^ *//')"
+        # Cache glxinfo output (can take 0.5-1s per call if X server is busy)
+        local glx_output glx_vendor glx_renderer
+        glx_output="$(glxinfo -s 2>/dev/null)" || glx_output=""
+        glx_vendor="$(printf '%s\n' "$glx_output" | grep 'OpenGL vendor' | cut -d':' -f2 | sed 's/^ *//')"
+        glx_renderer="$(printf '%s\n' "$glx_output" | grep 'OpenGL renderer' | cut -d':' -f2 | sed 's/^ *//')"
         
         [[ -n "$glx_vendor" ]] && draw_box_line "${C_BOLD}OpenGL Vendor:${C_RESET} ${C_CYAN}${glx_vendor}${C_RESET}"
         [[ -n "$glx_renderer" ]] && draw_box_line "${C_BOLD}OpenGL Renderer:${C_RESET} ${C_CYAN}${glx_renderer}${C_RESET}"
