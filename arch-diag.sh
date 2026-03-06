@@ -2155,11 +2155,16 @@ export_mounts() {
         printf 'MOUNTED FILESYSTEMS\n'
         printf '=============================================================\n\n'
 
-        if command -v findmnt &>/dev/null; then
-            findmnt -rn -o SOURCE,TARGET,FSTYPE,SIZE 2>/dev/null || true
-        else
-            cat /proc/mounts 2>/dev/null || true
-        fi
+        # Use /proc/mounts directly (consistent with scan_mounts terminal output)
+        # Filter: exclude autofs and comment lines, decode octal escapes
+        while IFS=' ' read -r source target fstype opts rest; do
+            [[ "$source" =~ ^# ]] && continue
+            [[ "$fstype" == "autofs" ]] && continue
+            # Decode /proc/mounts octal escapes
+            source="${source//\\040/ }"
+            target="${target//\\040/ }"
+            printf '%-30s %-30s %s\n' "$source" "$target" "$fstype"
+        done < /proc/mounts 2>/dev/null || true
 
         printf '\n=============================================================\n'
         printf 'DISK USAGE\n'
@@ -2646,6 +2651,14 @@ export_all_logs() {
         printf 'Boot Offset: %s\n' "${BOOT_OFFSET}"
         printf '=============================================================\n\n'
 
+        # Pre-check: is journald running? Avoids 5s×N timeout waste
+        # on containers or systems where systemd-journald is stopped/restarting
+        local journald_available=0
+        if command -v journalctl &>/dev/null && \
+           journalctl --no-pager -n 0 2>/dev/null; then
+            journald_available=1
+        fi
+
         # ─────────────────────────────────────────────────────────────────────
         # KERNEL LOGS
         # ─────────────────────────────────────────────────────────────────────
@@ -2653,8 +2666,9 @@ export_all_logs() {
         printf '[1] KERNEL LOGS (Priority ≤3 - Errors)\n'
         printf '=============================================================\n'
         local kernel_output
-        # Limit to last 500 lines to avoid excessive memory usage
-        kernel_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+        if [[ "$journald_available" -eq 1 ]]; then
+            kernel_output="$(timeout 5 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+        fi
         if [[ -n "$kernel_output" ]]; then
             printf '%s\n' "$kernel_output"
         else
@@ -2683,8 +2697,9 @@ export_all_logs() {
         printf '[3] USER SERVICES\n'
         printf '=============================================================\n'
         local service_output
-        # Limit to last 500 lines to avoid excessive memory usage
-        service_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+        if [[ "$journald_available" -eq 1 ]]; then
+            service_output="$(timeout 5 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+        fi
         if [[ -n "$service_output" ]]; then
             printf '%s\n' "$service_output"
         else
