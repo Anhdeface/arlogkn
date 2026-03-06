@@ -382,6 +382,11 @@ detect_display() {
             local modes_file="${connector_dir}/modes"
             if [[ -f "$modes_file" ]]; then
                 res="$(head -1 "$modes_file" 2>/dev/null)"
+                # Defense-in-depth: sanitize against ANSI injection
+                # (VM/passthrough GPU drivers may write unexpected data)
+                res="$(printf '%s' "$res" | \
+                    sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g; s/\x1b[^[]*//g' | \
+                    tr -d '[:cntrl:]')"
             fi
 
             local entry="${name}"
