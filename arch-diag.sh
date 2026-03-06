@@ -3173,7 +3173,7 @@ find_wiki_group_awk() {
     local query="$1"
 
     # Normalize query: lowercase, trim whitespace, remove special chars (security)
-    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_')"
+    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_ ')"
 
     # Early exit for empty or invalid query
     if [[ -z "$query" || ${#query} -gt 50 ]]; then
