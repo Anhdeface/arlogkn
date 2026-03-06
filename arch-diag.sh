@@ -173,7 +173,7 @@ detect_system_info() {
 
     # CPU Governor detection (may require root for full accuracy)
     if [[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]]; then
-        CPU_GOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "unknown")"
+        CPU_GOVERNOR="$(</sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)" 2>/dev/null || CPU_GOVERNOR="unknown"
     elif command -v cpupower &>/dev/null; then
         # Parse governor from cpupower output format:
         #   The governor "performance" may decide which speed to use
@@ -1604,16 +1604,17 @@ scan_usb_devices() {
         local product="" vendor="" dev_id="" bus_id="" manufacturer=""
 
         # Read from sysfs (no external commands)
-        vendor="$(cat "$dev_path/idVendor" 2>/dev/null || echo "")"
+        # Use $(<file) instead of $(cat file) to avoid fork overhead per device
+        vendor="$(< "$dev_path/idVendor")" 2>/dev/null || vendor=""
         [[ -z "$vendor" ]] && continue  # Skip if no vendor ID
 
-        dev_id="$(cat "$dev_path/devnum" 2>/dev/null || echo "?")"
-        bus_id="$(cat "$dev_path/busnum" 2>/dev/null || echo "?")"
+        dev_id="$(< "$dev_path/devnum")" 2>/dev/null || dev_id="?"
+        bus_id="$(< "$dev_path/busnum")" 2>/dev/null || bus_id="?"
 
         # Try product first, then manufacturer as fallback
-        product="$(cat "$dev_path/product" 2>/dev/null || echo "")"
+        product="$(< "$dev_path/product")" 2>/dev/null || product=""
         if [[ -z "$product" || "$product" =~ ^[[:cntrl:]]*$ ]]; then
-            manufacturer="$(cat "$dev_path/manufacturer" 2>/dev/null || echo "")"
+            manufacturer="$(< "$dev_path/manufacturer")" 2>/dev/null || manufacturer=""
             [[ -n "$manufacturer" && ! "$manufacturer" =~ ^[[:cntrl:]]*$ ]] && product="$manufacturer"
         fi
 
@@ -3088,6 +3089,8 @@ awk_fuzzy_match() {
         best_dist = 999
     }
     
+    # NOTE: min3 + levenshtein are duplicated in suggest_wiki_groups_awk()
+    # If you modify this logic, update BOTH copies (awk cannot share functions)
     function min3(a, b, c) {
         return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
     }
@@ -3147,11 +3150,11 @@ find_wiki_group_awk() {
     local query="$1"
 
     # Normalize query: lowercase, trim whitespace, remove special chars (security)
-    query="$(echo "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_')"
+    query="$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd '[:alnum:]_')"
 
     # Early exit for empty or invalid query
     if [[ -z "$query" || ${#query} -gt 50 ]]; then
-        echo "-1"
+        printf '%s\n' "-1"
         return 1
     fi
 
@@ -3160,7 +3163,7 @@ find_wiki_group_awk() {
         local target="${WIKI_ALIASES[$query]}"
         local i=0
         for group in "${WIKI_GROUP_NAMES[@]}"; do
-            [[ "$group" == *"$target"* ]] && echo $i && return 0
+            [[ "$group" == *"$target"* ]] && printf '%s\n' "$i" && return 0
             i=$((i+1))
         done
     fi
@@ -3205,7 +3208,9 @@ suggest_wiki_groups_awk() {
     local groups_str
     groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
 
-    echo "$groups_str" | awk -v q="$query" '
+    printf '%s\n' "$groups_str" | awk -v q="$query" '
+    # NOTE: min3 + levenshtein are duplicated in awk_fuzzy_match()
+    # If you modify this logic, update BOTH copies (awk cannot share functions)
     function min3(a, b, c) { return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c) }
     
     function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
@@ -3635,6 +3640,10 @@ show_wiki_group() {
             tbl_row "pacman -Syyu" "Force full system upgrade"
             tbl_row "downgrade <pkg>" "Downgrade package (AUR)"
             draw_table_end
+            ;;
+        *)  # Invalid group index
+            warn "show_wiki_group: invalid group index '$group_idx' (expected 0-19)"
+            return 1
             ;;
     esac
     
