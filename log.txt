@@ -3,6 +3,7 @@
 Generated: 2026-03-07
 
 ---
+7ec33f6 2026-03-07 Update version number to 1.0.7
 14e7b2f 2026-03-07 chore: bump version to v1.0.7
 45fbf70 2026-03-07 style: replace echo with printf in show_wiki
 3fd1673 2026-03-07 style: move 2>/dev/null inside command substitution in detect_system_info
