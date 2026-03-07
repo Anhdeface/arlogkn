@@ -999,11 +999,13 @@ scan_kernel_logs() {
 
     # Error entries with color highlighting
     printf '%s\n' "$output" | head -20 | while read -r line; do
-        # Highlight error patterns with red
+        # Highlight error patterns with red (case-insensitive)
         local colored_line="$line"
-        if [[ "$line" =~ [Ee]rror|[Ff]ail|[Uu]nable|[Cc]ritical ]]; then
+        shopt -s nocasematch
+        if [[ "$line" =~ error|fail|unable|critical ]]; then
             colored_line="${C_RED}${line}${C_RESET}"
         fi
+        shopt -u nocasematch
         draw_box_line "$colored_line"
     done
 
@@ -2948,9 +2950,10 @@ export_all_logs() {
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
-        # Restore caller's traps (best-effort: || true prevents set -e abort
-        # if trap command contains characters that cause eval to fail)
-        eval "$old_exit_trap" || true; eval "$old_int_trap" || true; eval "$old_term_trap" || true
+        # Restore caller's traps (WARN if command contains characters that cause eval to fail)
+        eval "$old_exit_trap" || warn "Failed to restore EXIT trap (possible nested quote issue)"
+        eval "$old_int_trap"  || warn "Failed to restore INT trap"
+        eval "$old_term_trap" || warn "Failed to restore TERM trap"
         return 1
     fi
 
@@ -2963,11 +2966,10 @@ export_all_logs() {
 
     # SUCCESS: Restore caller's traps (temp file moved, no cleanup needed)
     temp_file=""
-    # Restore caller's traps (best-effort: || true prevents set -e abort
-    # if trap command contains characters that cause eval to fail)
-    eval "$old_exit_trap" || true
-    eval "$old_int_trap" || true
-    eval "$old_term_trap" || true
+    # Restore caller's traps (WARN if command contains characters that cause eval to fail)
+    eval "$old_exit_trap" || warn "Failed to restore EXIT trap (possible nested quote issue)"
+    eval "$old_int_trap"  || warn "Failed to restore INT trap"
+    eval "$old_term_trap" || warn "Failed to restore TERM trap"
 
     info "All logs exported to: ${output_file}"
 }
