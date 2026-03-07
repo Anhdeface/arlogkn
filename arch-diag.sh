@@ -4017,7 +4017,8 @@ main() {
         fi
 
         # Clear individual flags covered by SCAN_SYSTEM to prevent double execution
-        SCAN_DRIVER=0 SCAN_VGA=0 SCAN_MOUNT=0 SCAN_USB=0
+        # (e.g., --system --kernel would otherwise run scan_kernel_logs twice)
+        SCAN_DRIVER=0 SCAN_VGA=0 SCAN_MOUNT=0 SCAN_USB=0 SCAN_KERNEL=0 SCAN_USER=0
     fi
 
     # Individual scan flags (independent of SCAN_ALL/SCAN_SYSTEM)
