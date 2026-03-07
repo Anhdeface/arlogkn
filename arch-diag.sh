@@ -700,7 +700,7 @@ draw_header() {
     local title="$1"
     local width="${2:-70}"
     local title_visible_len
-    title_visible_len="$(visible_len "$title")"
+    visible_len "$title" title_visible_len
     local padding=$((width - title_visible_len - 2))
     local right_pad=$((padding / 2))
     local left_pad=$((padding - right_pad))
@@ -731,7 +731,7 @@ draw_box_line() {
     local width="${2:-70}"
     local inner_width=$((width - 4))
     local content_visible_len
-    content_visible_len="$(visible_len "$content")"
+    visible_len "$content" content_visible_len
 
     # Truncate if too long
     # Note: Truncated lines lose color formatting (ANSI codes stripped)
@@ -741,7 +741,7 @@ draw_box_line() {
     if [[ $content_visible_len -gt $inner_width ]]; then
         local truncate_at=$((inner_width - 3))
         local stripped
-        stripped="$(strip_ansi "$content")"
+        strip_ansi "$content" stripped
         content="${stripped:0:$truncate_at}..."
         content_visible_len=$((truncate_at + 3))
     fi
@@ -759,7 +759,7 @@ draw_empty_box() {
     local width="${1:-70}"
     local message="✓ No Critical Issues Found"
     local msg_len
-    msg_len=$(visible_len "$message")
+    visible_len "$message" msg_len
     local padding=$((width - msg_len))
     local half_pad=$((padding / 2))
     local remainder=$((padding - half_pad))
@@ -776,7 +776,7 @@ draw_info_box() {
     local inner_width=$((width - 4))
     local full_line="$label: $value"
     local full_visible_len
-    full_visible_len="$(visible_len "$full_line")"
+    visible_len "$full_line" full_visible_len
     local padding=$((inner_width - full_visible_len))
 
     if [[ $padding -lt 0 ]]; then
@@ -793,6 +793,7 @@ draw_info_box() {
 # Strip ANSI codes (script variables + raw escape sequences)
 strip_ansi() {
     local s="$1"
+    local var_name="${2:-}"
 
     # Check if string contains raw ANSI escape sequences
     if [[ "$s" != *$'\x1b'* ]]; then
@@ -804,7 +805,11 @@ strip_ansi() {
         s="${s//${C_CYAN}/}"
         s="${s//${C_BOLD}/}"
         s="${s//${C_RESET}/}"
-        printf '%s' "$s"
+        if [[ -n "$var_name" ]]; then
+            printf -v "$var_name" '%s' "$s"
+        else
+            printf '%s' "$s"
+        fi
         return 0
     fi
 
@@ -823,16 +828,26 @@ strip_ansi() {
     while [[ "$s" =~ $'\x1b'\[[0-9\;]*[a-zA-Z] ]]; do
         s="${s//${BASH_REMATCH[0]}/}"
     done
-    printf '%s' "$s"
+    
+    if [[ -n "$var_name" ]]; then
+        printf -v "$var_name" '%s' "$s"
+    else
+        printf '%s' "$s"
+    fi
 }
 
 # Get visible length (excluding ANSI codes)
 # Calls strip_ansi() which handles both script colors and raw ANSI
 visible_len() {
     local s="$1"
+    local var_name="${2:-}"
     local stripped
-    stripped="$(strip_ansi "$s")"
-    printf '%d' "${#stripped}"
+    strip_ansi "$s" stripped
+    if [[ -n "$var_name" ]]; then
+        printf -v "$var_name" '%d' "${#stripped}"
+    else
+        printf '%d' "${#stripped}"
+    fi
 }
 
 # Global table state
@@ -858,7 +873,7 @@ tbl_begin() {
         # Use visible_len() to handle ANSI color codes correctly
         # ${#name} would count escape sequences, breaking alignment
         local vlen
-        vlen="$(visible_len "$name")"
+        visible_len "$name" vlen
         local pad=$((width - vlen))
         printf ' %s%*s' "$name" "$pad" ""
     done
@@ -881,13 +896,13 @@ tbl_row() {
         local width="${_TBL_COLS[$((i*2+1))]}"
         local val="${vals[$i]:-}"
         local vlen
-        vlen=$(visible_len "$val")
+        visible_len "$val" vlen
         local display_val="$val"
         
         # Truncate if too long (strip ANSI for truncation, but lose color)
         if [[ $vlen -gt $width ]]; then
             local clean
-            clean=$(strip_ansi "$val")
+            strip_ansi "$val" clean
             display_val="${clean:0:$((width-3))}..."
             vlen=$width
         fi
