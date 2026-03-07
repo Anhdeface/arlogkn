@@ -3,6 +3,25 @@
 Generated: 2026-03-07
 
 ---
+14e7b2f 2026-03-07 chore: bump version to v1.0.7
+45fbf70 2026-03-07 style: replace echo with printf in show_wiki
+3fd1673 2026-03-07 style: move 2>/dev/null inside command substitution in detect_system_info
+0266035 2026-03-07 fix: coredumpctl list json output truncated by tail -c
+42828bf 2026-03-07 fix: add journald pre-check to scan_kernel_logs and scan_user_services
+15b37d2 2026-03-07 perf: eliminate visible_len and strip_ansi subshell forks
+ff2aceb 2026-03-07 fix: trap restore warnings and regex consistency
+b3034d4 2026-03-07 fix: export_mounts inconsistent with scan_mounts
+b69ca77 2026-03-07 fix: sanitize hwmon chip_name and label to prevent IFS parsing failures
+ebd409f 2026-03-07 refactor: extract duplicate Levenshtein awk into shared variable
+c4de9ea 2026-03-07 fix: cluster_errors :PORT pattern too broad — corrupts IPv6 and line numbers
+6a526ec 2026-03-07 fix: coredump PID heuristic regression — use positional context
+be32c94 2026-03-07 fix: journalctl -n 0 stdout leak into export temp file
+5490e98 2026-03-07 fix: replace hardcoded {0..19} wiki group loop with dynamic array length
+6b8a26c 2026-03-07 fix: --system doesn't clear SCAN_KERNEL/SCAN_USER → double execution
+53e2bcb 2026-03-07 fix: use shopt nocasematch for pacman regex + unify lsusb head limit
+25d68f9 2026-03-07 perf: cache tput cols in show_wiki_group to avoid 20 forks
+bdd4ead 2026-03-07 fix: guard eval trap restoration with || true for set -e safety
+72fc8df 2026-03-07 docs: update log.txt with latest commits
 185de0d 2026-03-06 release: bump version to 1.0.6 and soften comments
 c59e9a2 2026-03-06 fix: journald timeout waste + export_mounts data source inconsistency
 0243ad3 2026-03-06 fix: coredumpctl parsing — use JSON output, fix year/PID confusion
