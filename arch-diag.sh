@@ -3735,7 +3735,7 @@ show_wiki() {
     if [[ -n "$WIKI_GROUP" ]]; then
         # Normalize input: trim whitespace, lowercase for matching
         local normalized_group
-        normalized_group="$(echo "$WIKI_GROUP" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        normalized_group="$(printf '%s\n' "$WIKI_GROUP" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
         # Find matching group (use || true to prevent exit on no match due to set -e)
         local group_idx
