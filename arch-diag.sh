@@ -3715,7 +3715,7 @@ show_wiki_group() {
             draw_table_end
             ;;
         *)  # Invalid group index
-            warn "show_wiki_group: invalid group index '$group_idx' (expected 0-19)"
+            warn "show_wiki_group: invalid group index '$group_idx' (expected 0-$((${#WIKI_GROUP_NAMES[@]} - 1)))"
             return 1
             ;;
     esac
@@ -3793,7 +3793,7 @@ show_wiki() {
     # Cache terminal width once to avoid 20 tput forks
     local cached_width i
     cached_width="$(tput cols 2>/dev/null)" || cached_width=80
-    for i in {0..19}; do
+    for ((i = 0; i < ${#WIKI_GROUP_NAMES[@]}; i++)); do
         show_wiki_group "$i" "$cached_width"
     done
 }
