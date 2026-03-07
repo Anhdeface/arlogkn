@@ -986,8 +986,10 @@ scan_kernel_logs() {
     draw_section_header "KERNEL CRITICAL"
 
     # Fetch kernel errors (priority 3 = ERR)
-    # Limit to last 500 lines to avoid excessive memory usage
-    journal_output="$(timeout 10 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    # Limit to last 500 lines. Check if journald is active to avoid 5s timeout on broken systems.
+    if command -v journalctl &>/dev/null && journalctl --no-pager -n 0 &>/dev/null; then
+        journal_output="$(timeout 5 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    fi
 
     if [[ -z "$journal_output" ]]; then
         draw_empty_box
@@ -1071,8 +1073,10 @@ scan_user_services() {
     draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
     printf '%s%*s%s\n' "$C_CYAN" 64 "" "$C_RESET"
 
-    # Limit to last 500 lines to avoid excessive memory usage
-    journal_output="$(timeout 10 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    # Limit to last 500 lines. Check if journald is active to avoid 5s timeout on broken systems.
+    if command -v journalctl &>/dev/null && journalctl --no-pager -n 0 &>/dev/null; then
+        journal_output="$(timeout 5 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
+    fi
 
     if [[ -z "$journal_output" ]]; then
         draw_empty_box
