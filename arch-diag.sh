@@ -173,7 +173,7 @@ detect_system_info() {
 
     # CPU Governor detection (may require root for full accuracy)
     if [[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]]; then
-        CPU_GOVERNOR="$(</sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)" 2>/dev/null || CPU_GOVERNOR="unknown"
+        CPU_GOVERNOR="$(</sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)" || CPU_GOVERNOR="unknown"
     elif command -v cpupower &>/dev/null; then
         # Parse governor from cpupower output format:
         #   The governor "performance" may decide which speed to use
