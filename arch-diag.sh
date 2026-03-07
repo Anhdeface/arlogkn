@@ -934,7 +934,7 @@ cluster_errors() {
     # - CPU numbers: CPU \d+ → CPU N
     # - Device names: sd[a-z], mmcblk\d+, nvme\d+n\d+ → DEVICE
     # - MAC addresses: xx:xx:xx:xx:xx:xx → MAC
-    # - Port numbers: :1234 → :PORT
+    # - Port numbers: host:1234 → host:PORT (context-aware, won't match IPv6)
     
     printf '%s\n' "$input" | \
         sed -E \
@@ -949,7 +949,7 @@ cluster_errors() {
             -e 's/nvme[0-9]+n[0-9]+/nvmeDEVICE/g' \
             -e 's/sector [0-9]+/sector N/g' \
             -e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/<MAC>/g' \
-            -e 's/:[0-9]+/:PORT/g' | \
+            -e 's/([0-9]|[a-zA-Z]|\]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' | \
         sort | uniq -c | sort -rn | \
         while read -r count msg; do
             # Escape % to prevent printf format string issues
