@@ -199,7 +199,7 @@ stub_globals() {
     _TBL_COLS=()
 
     # Script identity (bypass if already readonly, like in smoke tests)
-    [[ "$(declare -p VERSION 2>/dev/null)" == *" -r "* ]] || VERSION="1.0.6"
+    [[ "$(declare -p VERSION 2>/dev/null)" == *" -r "* ]] || VERSION="1.0.7"
     [[ "$(declare -p SCRIPT_NAME 2>/dev/null)" == *" -r "* ]] || SCRIPT_NAME="arch-diag.sh"
 }
 
