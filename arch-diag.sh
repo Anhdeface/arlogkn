@@ -2657,7 +2657,7 @@ export_all_logs() {
         # Helps prevent delays on systems where systemd-journald is stopped/restarting
         local journald_available=0
         if command -v journalctl &>/dev/null && \
-           journalctl --no-pager -n 0 2>/dev/null; then
+           journalctl --no-pager -n 0 &>/dev/null; then
             journald_available=1
         fi
 
