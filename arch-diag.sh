@@ -1143,7 +1143,9 @@ scan_coredumps() {
 
     # METHOD 1: Try structured JSON output (systemd ≥ v248)
     local json_output
-    json_output="$(coredumpctl list --json=short 2>/dev/null | tail -c 50000)" || json_output=""
+    # Native -r (reverse) and -n 5 gets the 5 most recent entries natively,
+    # preventing tail -c from truncating the JSON array string randomly:
+    json_output="$(coredumpctl list -r -n 5 --json=short 2>/dev/null)" || json_output=""
 
     if [[ -n "$json_output" ]] && printf '%s' "$json_output" | grep -q '"pid"'; then
         # Parse JSON: extract pid, sig, exe, timestamp
