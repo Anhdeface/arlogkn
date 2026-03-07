@@ -1,13 +1,30 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-04
+Generated: 2026-03-07
 
 ---
-db97349 2026-03-04 test: broaden regex for distro detection in CI environments
-3968976 2026-03-04 test: refine testing infrastructure based on review feedback
-e7385cd 2026-03-04 fix: resolve shellcheck SC2120 and SC2183 warnings
-9c238cd 2026-03-04 ci: add extreme unit tests, shellcheck, and github actions pipeline
-a46b043 2026-03-04 fix: MEDIUM #10 — add INT TERM to trap in export_all_logs()
+185de0d 2026-03-06 release: bump version to 1.0.6 and soften comments
+c59e9a2 2026-03-06 fix: journald timeout waste + export_mounts data source inconsistency
+0243ad3 2026-03-06 fix: coredumpctl parsing — use JSON output, fix year/PID confusion
+501e8a6 2026-03-06 fix: find_wiki_group_awk drops spaces in multi-word queries
+8d6c048 2026-03-06 cleanup: remove dead variables export_success and base_dir
+3e87307 2026-03-06 fix: blame BOOT_OFFSET, USB regex, dead code in export_all_logs
+0cb6bc2 2026-03-06 fix: sanitize DRM modes value against ANSI injection
+b2d9c3d 2026-03-06 fix: lsusb -v stdout noise — use verbose only as root
+6d66238 2026-03-06 fix: 5 code quality issues — wiki fallback, echo→printf, cat→$(<), sync comments
+0a8d822 2026-03-06 perf: pure-bash ANSI stripping + cache glxinfo output
+1f4b3af 2026-03-06 fix: scan_user_services overcount failed units via wc -l
+55ea0aa 2026-03-06 fix: export_kernel_logs use cluster_errors() for consistent clustering
+4df4b21 2026-03-06 fix: decode /proc/mounts octal escapes for paths with spaces
+35a863e 2026-03-06 fix: scan_mounts incorrect 'more mounts' count
+19ec5dc 2026-03-06 fix: check_internet false positive — operstate=up ≠ connected
+9b62972 2026-03-06 fix: defense-in-depth ANSI escape sanitization for USB product names
+ae8b690 2026-03-06 fix: save/restore caller traps in export_all_logs() — prevent silent trap deletion
+e80dce6 2026-03-04 docs: update log.txt with latest commits
+c055900 2026-03-04 test: broaden regex for distro detection in CI environments
+dc19e7c 2026-03-04 test: refine testing infrastructure based on review feedback
+a05698e 2026-03-04 fix: resolve shellcheck SC2120 and SC2183 warnings
+a1e832d 2026-03-04 ci: add extreme unit tests, shellcheck, and github actions pipeline
 c6dc8f0 2026-03-04 fix: MEDIUM #9 — restore umask after init_output_dir()
 d8833c6 2026-03-04 fix: HIGH #8 — sanitize awk injection in wiki fuzzy matching
 3c41142 2026-03-03 Update version number to 1.0.5 in README
