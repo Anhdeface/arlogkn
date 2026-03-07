@@ -7,6 +7,9 @@ stub_globals
 stub_logging
 extract_functions awk_fuzzy_match find_wiki_group_awk suggest_wiki_groups_awk
 
+# Extract the shared awk code variable
+_AWK_LEVENSHTEIN="$(awk '/^readonly _AWK_LEVENSHTEIN=/{flag=1} flag; flag && /^\x27$/{exit}' "$SCRIPT_UNDER_TEST" | sed '1s/.*=//; s/^\x27//; s/\x27$//')"
+
 # Set up WIKI data structures (same as in arch-diag.sh)
 declare -a WIKI_GROUP_NAMES=(
     "pacman package management"
