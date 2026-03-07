@@ -1219,13 +1219,15 @@ scan_pacman_logs() {
     printf '%s\n' "$issues" | while read -r line; do
         # Sanitize: remove potential ANSI/binary garbage
         line="$(printf '%s' "$line" | tr -cd '[:print:]\t')"
-        # Color-code based on severity
+        # Color-code based on severity (case-insensitive via nocasematch)
         local colored_line="$line"
-        if [[ "$line" =~ [Ee][Rr][Rr][Oo][Rr] ]]; then
+        shopt -s nocasematch
+        if [[ "$line" =~ error ]]; then
             colored_line="${C_RED}${line}${C_RESET}"
-        elif [[ "$line" =~ [Ww][Aa][Rr][Nn][Ii][Nn][Gg] ]]; then
+        elif [[ "$line" =~ warning ]]; then
             colored_line="${C_YELLOW}${line}${C_RESET}"
         fi
+        shopt -u nocasematch
         draw_box_line "$colored_line"
     done
 
@@ -2388,7 +2390,7 @@ export_drivers() {
         if command -v lsusb &>/dev/null; then
             # lsusb -v without root prints "Couldn't open device" to stdout
             if [[ $EUID -eq 0 ]]; then
-                timeout 15 lsusb -v 2>/dev/null | head -200 || timeout 5 lsusb 2>/dev/null || true
+                timeout 15 lsusb -v 2>/dev/null | head -100 || timeout 5 lsusb 2>/dev/null || true
             else
                 timeout 5 lsusb 2>/dev/null || true
             fi
