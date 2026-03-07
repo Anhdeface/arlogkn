@@ -3348,9 +3348,11 @@ suggest_wiki_groups() {
 show_wiki_group() {
     local group_idx="$1"
     
-    # Detect terminal width
-    local term_width
-    term_width="$(tput cols 2>/dev/null)" || term_width=80
+    # Accept optional cached term_width to avoid repeated tput forks
+    local term_width="${2:-}"
+    if [[ -z "$term_width" ]]; then
+        term_width="$(tput cols 2>/dev/null)" || term_width=80
+    fi
     [[ -z "$term_width" || "$term_width" -lt 70 ]] && term_width=80
     
     local col1_width=35
@@ -3786,9 +3788,11 @@ show_wiki() {
     fi
 
     # No group specified - show all 20 groups by calling show_wiki_group for each
-    local i
+    # Cache terminal width once to avoid 20 tput forks
+    local cached_width i
+    cached_width="$(tput cols 2>/dev/null)" || cached_width=80
     for i in {0..19}; do
-        show_wiki_group "$i"
+        show_wiki_group "$i" "$cached_width"
     done
 }
 
