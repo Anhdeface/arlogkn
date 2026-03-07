@@ -1288,8 +1288,13 @@ _gather_temperatures() {
                 label="${chip_name:-hwmon}"
             fi
 
+            # Sanitize pipe characters to prevent breaking the IFS='|' parser
+            local clean_chip="${chip_name:-hwmon}"
+            clean_chip="${clean_chip//|/_}"
+            local clean_label="${label//|/_}"
+
             # Output: chip_name|label|temp_c
-            printf '%s|%s|%d\n' "${chip_name:-hwmon}" "$label" "$temp_c"
+            printf '%s|%s|%d\n' "$clean_chip" "$clean_label" "$temp_c"
         done
     done
     shopt -u nullglob
