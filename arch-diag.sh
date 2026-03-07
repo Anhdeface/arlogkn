@@ -2784,10 +2784,13 @@ export_all_logs() {
         printf '=============================================================\n'
         printf '[7] MOUNTED FILESYSTEMS\n'
         printf '=============================================================\n'
-        if command -v findmnt &>/dev/null; then
-            findmnt -rn -o SOURCE,TARGET,FSTYPE,SIZE 2>/dev/null || true
-        else
-            cat /proc/mounts 2>/dev/null || true
+        if [[ -f /proc/mounts ]]; then
+            while read -r device mountpt fstype rest; do
+                [[ "$fstype" == "autofs" ]] && continue
+                # Decode octal spaces (e.g. \040 -> space)
+                mountpt="$(printf '%b' "${mountpt//\\0/\\}")"
+                printf '%s on %s type %s\n' "$device" "$mountpt" "$fstype"
+            done < /proc/mounts
         fi
         printf '\n\n'
 
