@@ -2932,7 +2932,9 @@ export_all_logs() {
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
-        eval "$old_exit_trap"; eval "$old_int_trap"; eval "$old_term_trap"
+        # Restore caller's traps (best-effort: || true prevents set -e abort
+        # if trap command contains characters that cause eval to fail)
+        eval "$old_exit_trap" || true; eval "$old_int_trap" || true; eval "$old_term_trap" || true
         return 1
     fi
 
@@ -2945,9 +2947,11 @@ export_all_logs() {
 
     # SUCCESS: Restore caller's traps (temp file moved, no cleanup needed)
     temp_file=""
-    eval "$old_exit_trap"
-    eval "$old_int_trap"
-    eval "$old_term_trap"
+    # Restore caller's traps (best-effort: || true prevents set -e abort
+    # if trap command contains characters that cause eval to fail)
+    eval "$old_exit_trap" || true
+    eval "$old_int_trap" || true
+    eval "$old_term_trap" || true
 
     info "All logs exported to: ${output_file}"
 }
