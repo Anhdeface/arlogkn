@@ -1159,11 +1159,17 @@ scan_coredumps() {
     printf '%s\n' "$coredumps" | while read -r line; do
         local formatted
         formatted="$(awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '{
-            # Find PID: first numeric field that is NOT a year-like number
-            # (e.g., to avoid confusing the year in the timestamp with the PID).
+            # Find PID by positional context:
+            # Timestamp always contains HH:MM:SS — find that field first,
+            # then the next purely numeric field after it is the PID.
+            # This avoids both year confusion (2024) and PID range assumptions.
             pid_field = 0
+            time_field = 0
             for(i=1; i<=NF; i++) {
-                if ($i ~ /^[0-9]+$/ && $i+0 < 1900) {
+                if ($i ~ /^[0-9]{1,2}:[0-9]{2}:[0-9]{2}/) {
+                    time_field = i
+                }
+                if (time_field > 0 && i > time_field && $i ~ /^[0-9]+$/) {
                     pid_field = i
                     break
                 }
