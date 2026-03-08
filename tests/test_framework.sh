@@ -192,7 +192,6 @@ stub_globals() {
 
     # Caches
     _DRIVERS_CACHE="" _LSPCI_CACHE="" _LSPCI_CACHE_INIT=0
-    _LSPCI_KNN_CACHE="" _LSPCI_KNN_CACHE_INIT=0
 
     # Table state
     _TBL_DEPTH=-1

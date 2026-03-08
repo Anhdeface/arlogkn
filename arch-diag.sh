@@ -52,8 +52,6 @@ declare -g DISPLAY_INFO=""
 declare -g _DRIVERS_CACHE=""
 declare -g _LSPCI_CACHE=""
 declare -g _LSPCI_CACHE_INIT=0
-declare -g _LSPCI_KNN_CACHE=""
-declare -g _LSPCI_KNN_CACHE_INIT=0
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
@@ -63,7 +61,7 @@ declare -g _LSPCI_KNN_CACHE_INIT=0
 _get_lspci() {
     if [[ "$_LSPCI_CACHE_INIT" -eq 0 ]]; then
         local lspci_output
-        if ! lspci_output="$(timeout 5 lspci -k 2>/dev/null)"; then
+        if ! lspci_output="$(timeout 5 lspci -knn 2>/dev/null)"; then
             warn "lspci command failed, hardware detection may be incomplete"
             _LSPCI_CACHE=""
         else
@@ -72,20 +70,6 @@ _get_lspci() {
         _LSPCI_CACHE_INIT=1
     fi
     printf '%s' "$_LSPCI_CACHE"
-}
-
-# Get lspci -knn output with caching (for export)
-_get_lspci_knn() {
-    if [[ "$_LSPCI_KNN_CACHE_INIT" -eq 0 ]]; then
-        local lspci_output
-        if ! lspci_output="$(timeout 5 lspci -knn 2>/dev/null)"; then
-            _LSPCI_KNN_CACHE=""
-        else
-            _LSPCI_KNN_CACHE="$lspci_output"
-        fi
-        _LSPCI_KNN_CACHE_INIT=1
-    fi
-    printf '%s' "$_LSPCI_KNN_CACHE"
 }
 
 die() {
@@ -2434,9 +2418,9 @@ export_drivers() {
         printf '=============================================================\n'
         printf '[2] PCI DEVICES WITH DRIVERS\n'
         printf '=============================================================\n\n'
-        _get_lspci_knn
-        if [[ -n "$_LSPCI_KNN_CACHE" ]]; then
-            printf '%s\n' "$_LSPCI_KNN_CACHE"
+        _get_lspci >/dev/null
+        if [[ -n "$_LSPCI_CACHE" ]]; then
+            printf '%s\n' "$_LSPCI_CACHE"
         else
             printf 'lspci not available\n'
         fi
