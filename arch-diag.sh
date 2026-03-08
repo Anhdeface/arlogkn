@@ -208,8 +208,8 @@ check_internet() {
     if [[ -d /sys/class/net ]]; then
         local iface operstate iface_name
         local has_link_up=0
-        shopt -s nullglob
         for iface in /sys/class/net/*; do
+            [[ -e "$iface" ]] || continue
             iface_name="$(basename "$iface")"
             # Skip loopback interface
             [[ "$iface_name" == "lo" ]] && continue
@@ -233,7 +233,6 @@ check_internet() {
                         # Has non-link-local IPv4? (exclude 169.254.x.x)
                         if printf '%s\n' "$ip_output" | grep -qE 'inet [0-9]' && \
                            ! printf '%s\n' "$ip_output" | grep -q 'inet 169\.254\.'; then
-                            shopt -u nullglob
                             INTERNET_STATUS="connected"
                             return 0
                         fi
@@ -243,7 +242,6 @@ check_internet() {
                 fi
             fi
         done
-        shopt -u nullglob
 
         # Interface(s) up but no routable IP confirmed
         if [[ "$has_link_up" -eq 1 ]]; then
