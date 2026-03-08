@@ -385,7 +385,11 @@ detect_display() {
     fi
 
     # Fallback: check if any DRM device exists
-    if ls /sys/class/drm/card* &>/dev/null; then
+    local -a cards
+    shopt -s nullglob
+    cards=(/sys/class/drm/card[0-9]*)
+    shopt -u nullglob
+    if [[ ${#cards[@]} -gt 0 ]]; then
         DISPLAY_INFO="DRM active (no connected display)"
         return 0
     fi
