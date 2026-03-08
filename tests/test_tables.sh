@@ -11,15 +11,13 @@ suite_begin "Table Drawing"
 
 # ─── tbl_begin() ──────────────────────────────────────────────────────────────
 test_tbl_begin_sets_width() {
-    _TBL_WIDTH=0
-    _TBL_COLS=()
+    _TBL_DEPTH=-1; _TBL_WIDTH_STACK=(); _TBL_COLS_STACK=(); _TBL_COLS_PTR_STACK=(); _TBL_NUMCOLS_STACK=()
     tbl_begin "Name" 20 "Value" 30 >/dev/null
-    assert_ne "tbl_begin sets _TBL_WIDTH" "$_TBL_WIDTH" "0"
+    assert_ne "tbl_begin sets _TBL_WIDTH" "${_TBL_WIDTH_STACK[0]:-0}" "0"
 }
 
 test_tbl_begin_outputs_header() {
-    _TBL_WIDTH=0
-    _TBL_COLS=()
+    _TBL_DEPTH=-1; _TBL_WIDTH_STACK=(); _TBL_COLS_STACK=(); _TBL_COLS_PTR_STACK=(); _TBL_NUMCOLS_STACK=()
     local output
     output="$(tbl_begin "Driver" 15 "Status" 10)"
     assert_contains "tbl_begin header has column name" "$output" "Driver"
@@ -28,8 +26,7 @@ test_tbl_begin_outputs_header() {
 
 # ─── tbl_row() ────────────────────────────────────────────────────────────────
 test_tbl_row_output() {
-    _TBL_WIDTH=0
-    _TBL_COLS=()
+    _TBL_DEPTH=-1; _TBL_WIDTH_STACK=(); _TBL_COLS_STACK=(); _TBL_COLS_PTR_STACK=(); _TBL_NUMCOLS_STACK=()
     tbl_begin "Key" 20 "Val" 30 >/dev/null
     local output
     output="$(tbl_row "GPU" "amdgpu")"
@@ -38,8 +35,7 @@ test_tbl_row_output() {
 }
 
 test_tbl_row_truncation() {
-    _TBL_WIDTH=0
-    _TBL_COLS=()
+    _TBL_DEPTH=-1; _TBL_WIDTH_STACK=(); _TBL_COLS_STACK=(); _TBL_COLS_PTR_STACK=(); _TBL_NUMCOLS_STACK=()
     tbl_begin "Col" 10 >/dev/null
     local long_val
     long_val="$(printf '%0.sX' {1..50})"
@@ -57,7 +53,7 @@ test_tbl_row_truncation() {
 
 # ─── tbl_end() ────────────────────────────────────────────────────────────────
 test_tbl_end_runs() {
-    _TBL_WIDTH=50
+    _TBL_DEPTH=0; _TBL_WIDTH_STACK=(50); _TBL_COLS_PTR_STACK=(0); _TBL_NUMCOLS_STACK=(1)
     local rc=0
     tbl_end >/dev/null 2>&1 || rc=$?
     assert_eq "tbl_end runs without error" "$rc" "0"
@@ -65,16 +61,14 @@ test_tbl_end_runs() {
 
 # ─── Legacy wrappers ──────────────────────────────────────────────────────────
 test_draw_table_begin_wrapper() {
-    _TBL_WIDTH=0
-    _TBL_COLS=()
+    _TBL_DEPTH=-1; _TBL_WIDTH_STACK=(); _TBL_COLS_STACK=(); _TBL_COLS_PTR_STACK=(); _TBL_NUMCOLS_STACK=()
     local output
     output="$(draw_table_begin "A" 20 "B" 20)"
     assert_contains "draw_table_begin wrapper works" "$output" "A"
 }
 
 test_draw_table_row_wrapper() {
-    _TBL_WIDTH=0
-    _TBL_COLS=()
+    _TBL_DEPTH=-1; _TBL_WIDTH_STACK=(); _TBL_COLS_STACK=(); _TBL_COLS_PTR_STACK=(); _TBL_NUMCOLS_STACK=()
     draw_table_begin "X" 20 >/dev/null
     local output
     output="$(draw_table_row "val1")"

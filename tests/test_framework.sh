@@ -195,8 +195,11 @@ stub_globals() {
     _LSPCI_KNN_CACHE="" _LSPCI_KNN_CACHE_INIT=0
 
     # Table state
-    _TBL_WIDTH=0
-    _TBL_COLS=()
+    _TBL_DEPTH=-1
+    _TBL_WIDTH_STACK=()
+    _TBL_COLS_STACK=()
+    _TBL_COLS_PTR_STACK=()
+    _TBL_NUMCOLS_STACK=()
 
     # Script identity (bypass if already readonly, like in smoke tests)
     [[ "$(declare -p VERSION 2>/dev/null)" == *" -r "* ]] || VERSION="1.0.8"

@@ -848,38 +848,49 @@ visible_len() {
     fi
 }
 
-# Global table state
-declare -g _TBL_WIDTH=0
-declare -ga _TBL_COLS=()
+# Global table state (Stack-managed for re-entrancy)
+declare -g _TBL_DEPTH=-1
+declare -ga _TBL_WIDTH_STACK=()
+declare -ga _TBL_COLS_STACK=()
+declare -ga _TBL_COLS_PTR_STACK=()
+declare -ga _TBL_NUMCOLS_STACK=()
 
 # Simple table - minimal borders
 # Usage: tbl_begin "Col1" width1 "Col2" width2 ...
 tbl_begin() {
-    _TBL_COLS=("$@")
-    _TBL_WIDTH=0
+    _TBL_DEPTH=$((_TBL_DEPTH + 1))
     
-    local i num_cols=$((${#_TBL_COLS[@]} / 2))
+    local start_idx=${#_TBL_COLS_STACK[@]}
+    _TBL_COLS_PTR_STACK[$_TBL_DEPTH]=$start_idx
+    
+    local i num_cols=$(($# / 2))
+    _TBL_NUMCOLS_STACK[$_TBL_DEPTH]=$num_cols
+    
+    _TBL_COLS_STACK+=("$@")
+    
+    local width_sum=0
+    local -a args=("$@")
+    
     for ((i=0; i<num_cols; i++)); do
-        _TBL_WIDTH=$((_TBL_WIDTH + ${_TBL_COLS[$((i*2+1))]} + 1))
+        width_sum=$((width_sum + args[i*2+1] + 1))
     done
+    _TBL_WIDTH_STACK[$_TBL_DEPTH]=$width_sum
     
     # Header row with simple separator
     printf '%s' "$C_BOLD"
     for ((i=0; i<num_cols; i++)); do
-        local name="${_TBL_COLS[$((i*2))]}"
-        local width="${_TBL_COLS[$((i*2+1))]}"
-        # Use visible_len() to handle ANSI color codes correctly
-        # ${#name} would count escape sequences, breaking alignment
-        local vlen
+        local name="${args[$((i*2))]}"
+        local width="${args[$((i*2+1))]}"
+        local vlen pad
         visible_len "$name" vlen
-        local pad=$((width - vlen))
+        pad=$((width - vlen))
         printf ' %s%*s' "$name" "$pad" ""
     done
     printf '%s\n' "$C_RESET"
     
     # Simple separator line
     printf '%s' "$C_CYAN"
-    for ((i=0; i<_TBL_WIDTH; i++)); do printf '─'; done
+    for ((i=0; i<width_sum; i++)); do printf '─'; done
     printf '%s\n' "$C_RESET"
 }
 
@@ -887,11 +898,15 @@ tbl_begin() {
 # Usage: tbl_row "val1" "val2" "val3" ...
 tbl_row() {
     local -a vals=("$@")
-    local num_cols=$((${#_TBL_COLS[@]} / 2))
-    local i
+    local start_idx=${_TBL_COLS_PTR_STACK[$_TBL_DEPTH]}
+    local num_cols=${_TBL_NUMCOLS_STACK[$_TBL_DEPTH]}
     
+    # Extract the schema for the current table level
+    local -a curr_cols=("${_TBL_COLS_STACK[@]:$start_idx:$((num_cols * 2))}")
+    
+    local i
     for ((i=0; i<num_cols; i++)); do
-        local width="${_TBL_COLS[$((i*2+1))]}"
+        local width="${curr_cols[$((i*2+1))]}"
         local val="${vals[$i]:-}"
         local vlen
         visible_len "$val" vlen
@@ -911,9 +926,21 @@ tbl_row() {
     printf '\n'
 }
 
-# Close table - no footer needed for minimal style
+# Close table
 tbl_end() {
-    : # No-op for clean look
+    if (( _TBL_DEPTH >= 0 )); then
+        local start_idx=${_TBL_COLS_PTR_STACK[$_TBL_DEPTH]}
+        if (( start_idx == 0 )); then
+            _TBL_COLS_STACK=()
+        else
+            _TBL_COLS_STACK=("${_TBL_COLS_STACK[@]:0:$start_idx}")
+        fi
+        
+        unset '_TBL_WIDTH_STACK[_TBL_DEPTH]'
+        unset '_TBL_COLS_PTR_STACK[_TBL_DEPTH]'
+        unset '_TBL_NUMCOLS_STACK[_TBL_DEPTH]'
+        _TBL_DEPTH=$((_TBL_DEPTH - 1))
+    fi
 }
 
 # Legacy wrappers for backward compatibility (102 call sites use these names)
