@@ -1581,9 +1581,8 @@ scan_mounts() {
     draw_table_begin "Device" 22 "Mountpoint" 24 "Type" 12 "Size" 10
 
     # Count filtered mounts (excluding autofs, comment lines)
-    # Used to accurately report truncation — raw wc -l includes filtered-out entries
     local filtered_total
-    filtered_total="$(grep -cvE '^#|autofs' /proc/mounts 2>/dev/null || echo "0")"
+    filtered_total="$(grep -cvE '^#|^[[:space:]]*[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+autofs[[:space:]]' /proc/mounts 2>/dev/null || echo "0")"
 
     local count=0
     while IFS=' ' read -r source target fstype opts freq pass; do
