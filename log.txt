@@ -1,8 +1,21 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-07
+Generated: 2026-03-08
 
 ---
+2c2cde2 2026-03-08 perf: optimization and internal consistencies
+1827f43 2026-03-08 fix(export): use safe bash octal decoding for mounts
+4e4e762 2026-03-08 fix(logs): remove obsolete percent escape in cluster_errors
+6676e06 2026-03-08 fix(hardware): replace unsafe \`ls\` glob with native bash array
+6529770 2026-03-08 fix(mounts): align grep filter with loop exclusions
+bd8bd35 2026-03-08 fix(ui): prevent negative padding overflow in draw_header
+d5c7229 2026-03-08 perf: unify lspci cache using -knn
+7c63fde 2026-03-08 fix: architectural refinements and table re-entrancy
+7431693 2026-03-08 fix: plug nullglob leak in check_internet
+e2ad3d0 2026-03-08 fix: add error guard to /proc/mounts read loop
+5fc3396 2026-03-08 Update version to 1.0.8 in README
+26f5485 2026-03-08 security: replace eval in trap restoration with safe string unwrap
+e13f017 2026-03-07 docs: update log.txt with latest commits
 757bf58 2026-03-07 docs: update log.txt with latest commits
 ec6b849 2026-03-07 docs: update log.txt with latest commits
 7ec33f6 2026-03-07 Update version number to 1.0.7
