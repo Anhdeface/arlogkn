@@ -16,7 +16,8 @@ shopt -s extglob  # Enable extglob at parse-time for +([[:space:]]) patterns
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 readonly VERSION="1.0.8"
-readonly SCRIPT_NAME="$(basename "$0")"
+SCRIPT_NAME="$(basename "$0")"
+readonly SCRIPT_NAME
 
 # Color state (set dynamically)
 declare -g C_RESET="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_BOLD=""
@@ -416,7 +417,7 @@ get_driver_from_sys() {
             driver="${driver_link##*/}"  # Extract basename
         fi
     fi
-    echo "$driver"
+    printf '%s\n' "$driver"
 }
 
 # Main driver detection - multi-source
@@ -461,18 +462,16 @@ detect_drivers() {
         shopt -s nullglob
         local net_path iface_driver
         local -a net_drvs=()
+        local -A seen_net_drvs=()
         for net_path in /sys/class/net/*; do
             [[ ! -d "$net_path" ]] && continue
             [[ "$(basename "$net_path")" == "lo" ]] && continue
             iface_driver="$(get_driver_from_sys "$net_path")"
             if [[ -n "$iface_driver" && "$iface_driver" != "N/A" ]]; then
-                # Avoid duplicates
-                local dup=0
-                # Use ${array[@]+"${array[@]}"} to handle empty array with set -u
-                for d in "${net_drvs[@]+"${net_drvs[@]}"}"; do
-                    [[ "$d" == "$iface_driver" ]] && dup=1 && break
-                done
-                [[ "$dup" -eq 0 ]] && net_drvs+=("$iface_driver")
+                if [[ -z "${seen_net_drvs[$iface_driver]:-}" ]]; then
+                    seen_net_drvs["$iface_driver"]=1
+                    net_drvs+=("$iface_driver")
+                fi
             fi
         done
         shopt -u nullglob
@@ -567,19 +566,17 @@ detect_drivers() {
     if [[ -d /sys/class/input ]]; then
         shopt -s nullglob
         local -a input_drvs=()
+        local -A seen_input_drvs=()
         local input_path
         for input_path in /sys/class/input/*; do
             [[ ! -d "$input_path" ]] && continue
             local inp_drv
             inp_drv="$(get_driver_from_sys "$input_path")"
             if [[ -n "$inp_drv" && "$inp_drv" != "N/A" ]]; then
-                # Check for duplicates (same pattern as network drivers)
-                local dup=0
-                # Use ${array[@]+"${array[@]}"} to handle empty array with set -u
-                for d in "${input_drvs[@]+"${input_drvs[@]}"}"; do
-                    [[ "$d" == "$inp_drv" ]] && dup=1 && break
-                done
-                [[ "$dup" -eq 0 ]] && input_drvs+=("$inp_drv")
+                if [[ -z "${seen_input_drvs[$inp_drv]:-}" ]]; then
+                    seen_input_drvs["$inp_drv"]=1
+                    input_drvs+=("$inp_drv")
+                fi
             fi
         done
         shopt -u nullglob
@@ -1299,7 +1296,7 @@ _gather_temperatures() {
         # Get chip name
         local chip_name=""
         if [[ -f "${hwmon_dir}/name" ]]; then
-            chip_name="$(cat "${hwmon_dir}/name" 2>/dev/null)"
+            chip_name="$(<"${hwmon_dir}/name")"
         fi
 
         for temp_input in "${hwmon_dir}"/temp*_input; do
@@ -2981,7 +2978,7 @@ export_all_logs() {
             for hw_dir in /sys/class/hwmon/hwmon*; do
                 [[ ! -d "$hw_dir" ]] && continue
                 local hw_name=""
-                [[ -f "${hw_dir}/name" ]] && hw_name="$(cat "${hw_dir}/name" 2>/dev/null)"
+                [[ -f "${hw_dir}/name" ]] && hw_name="$(<"${hw_dir}/name")"
                 for ti in "${hw_dir}"/temp*_input; do
                     [[ ! -f "$ti" ]] && continue
                     local tr_val
