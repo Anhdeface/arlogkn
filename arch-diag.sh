@@ -684,6 +684,10 @@ draw_header() {
     local title_visible_len
     visible_len "$title" title_visible_len
     local padding=$((width - title_visible_len - 2))
+    if [[ $padding -lt 0 ]]; then
+        padding=0
+        # Optional: could truncate the title, but for headers it's usually better to just draw it full
+    fi
     local right_pad=$((padding / 2))
     local left_pad=$((padding - right_pad))
 
