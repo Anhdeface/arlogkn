@@ -1609,7 +1609,7 @@ scan_mounts() {
 
         draw_table_row "${color}${source}${C_RESET}" "${target}" "${fstype}" "${size}"
         count=$((count + 1))
-    done < /proc/mounts
+    done < /proc/mounts 2>/dev/null || true
 
     # Warn if truncated (servers with many mounts: NFS, btrfs subvolumes, containers)
     if [[ "$filtered_total" -gt "$count" ]]; then
@@ -2835,7 +2835,7 @@ export_all_logs() {
                 # Decode octal spaces (e.g. \040 -> space)
                 mountpt="$(printf '%b' "${mountpt//\\0/\\}")"
                 printf '%s on %s type %s\n' "$device" "$mountpt" "$fstype"
-            done < /proc/mounts
+            done < /proc/mounts 2>/dev/null || true
         fi
         printf '\n\n'
 
