@@ -15,7 +15,7 @@ shopt -s extglob  # Enable extglob at parse-time for +([[:space:]]) patterns
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.7"
+readonly VERSION="1.0.8"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 # Color state (set dynamically)
@@ -2649,6 +2649,28 @@ EOF
 # CONSOLIDATED EXPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Safely extract a trap command string without eval vulnerabilities
+# This converts `trap -p` output back into a raw string suitable for `trap -- "$cmd" SIGNAL`
+# avoiding the use of `eval` which breaks on nested quotes or tainted input.
+_extract_trap_cmd() {
+    local sig="$1"
+    local var_name="$2"
+    local t
+    t="$(trap -p "$sig")"
+    if [[ -z "$t" ]]; then
+        printf -v "$var_name" ""
+        return
+    fi
+    t="${t#*trap -- }"
+    t="${t% $sig}"
+    t="${t% SIG$sig}"
+    t="${t#\'}"
+    t="${t%\'}"
+    # Unescape Bash's safe-escaped single quotes ('\'')
+    t="${t//\'\\\'\'/\'}"
+    printf -v "$var_name" "%s" "$t"
+}
+
 export_all_logs() {
     local -a boot_args=(-b "$BOOT_OFFSET")
 
@@ -2664,9 +2686,9 @@ export_all_logs() {
     # Save caller's traps to avoid side-effect
     # trap is GLOBAL in bash — clearing it affects caller
     local old_exit_trap old_int_trap old_term_trap
-    old_exit_trap="$(trap -p EXIT)"
-    old_int_trap="$(trap -p INT)"
-    old_term_trap="$(trap -p TERM)"
+    _extract_trap_cmd EXIT old_exit_trap
+    _extract_trap_cmd INT old_int_trap
+    _extract_trap_cmd TERM old_term_trap
 
     # Cleanup temp file on exit, interrupt (Ctrl+C), or termination
     trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
@@ -2971,10 +2993,10 @@ export_all_logs() {
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
-        # Restore caller's traps (WARN if command contains characters that cause eval to fail)
-        eval "$old_exit_trap" || warn "Failed to restore EXIT trap (possible nested quote issue)"
-        eval "$old_int_trap"  || warn "Failed to restore INT trap"
-        eval "$old_term_trap" || warn "Failed to restore TERM trap"
+        # Restore caller's traps safely without eval
+        if [[ -n "$old_exit_trap" ]]; then trap -- "$old_exit_trap" EXIT; else trap - EXIT; fi
+        if [[ -n "$old_int_trap" ]]; then trap -- "$old_int_trap" INT; else trap - INT; fi
+        if [[ -n "$old_term_trap" ]]; then trap -- "$old_term_trap" TERM; else trap - TERM; fi
         return 1
     fi
 
@@ -2987,10 +3009,10 @@ export_all_logs() {
 
     # SUCCESS: Restore caller's traps (temp file moved, no cleanup needed)
     temp_file=""
-    # Restore caller's traps (WARN if command contains characters that cause eval to fail)
-    eval "$old_exit_trap" || warn "Failed to restore EXIT trap (possible nested quote issue)"
-    eval "$old_int_trap"  || warn "Failed to restore INT trap"
-    eval "$old_term_trap" || warn "Failed to restore TERM trap"
+    # Restore caller's traps safely without eval
+    if [[ -n "$old_exit_trap" ]]; then trap -- "$old_exit_trap" EXIT; else trap - EXIT; fi
+    if [[ -n "$old_int_trap" ]]; then trap -- "$old_int_trap" INT; else trap - INT; fi
+    if [[ -n "$old_term_trap" ]]; then trap -- "$old_term_trap" TERM; else trap - TERM; fi
 
     info "All logs exported to: ${output_file}"
 }
