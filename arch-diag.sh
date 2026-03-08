@@ -984,13 +984,10 @@ cluster_errors() {
             -e 's/([0-9]|[a-zA-Z]|\]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' | \
         sort | uniq -c | sort -rn | \
         while read -r count msg; do
-            # Escape % to prevent printf format string issues
-            local safe_msg="${msg//%/%%}"
-
             if [[ "$count" -gt 1 ]]; then
-                printf '%s (x%d)\n' "${safe_msg}" "${count}"
+                printf '%s (x%d)\n' "$msg" "$count"
             else
-                printf '%s\n' "${safe_msg}"
+                printf '%s\n' "$msg"
             fi
         done
 }
