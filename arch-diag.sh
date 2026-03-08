@@ -1065,6 +1065,11 @@ scan_user_services() {
         draw_box_line "${C_RED}${C_BOLD}⚠ Failed Services (systemctl --failed):${C_RESET}"
         draw_box_line ""
 
+        # Note: 'read -r unit load ...' splits by default IFS (spaces/tabs).
+        # This correctly captures multi-word descriptions into the final 'description' variable.
+        # Edge case: If a 'unit' name itself contains spaces (very rare for systemd services),
+        # the parsing will shift and the description will be garbled. This is acceptable
+        # for a diagnostic script to keep the parser lightweight.
         printf '%s\n' "$failed_output" | head -10 | while read -r unit load active sub description; do
             [[ -z "$unit" ]] && continue
             draw_box_line "  ${C_RED}●${C_RESET} ${C_BOLD}${unit}${C_RESET} — ${C_YELLOW}${sub}${C_RESET} (${description})"
@@ -2845,8 +2850,9 @@ export_all_logs() {
         if [[ -f /proc/mounts ]]; then
             while read -r device mountpt fstype rest; do
                 [[ "$fstype" == "autofs" ]] && continue
-                # Decode octal spaces (e.g. \040 -> space)
-                mountpt="$(printf '%b' "${mountpt//\\0/\\}")"
+                mountpt="${mountpt//\\040/ }"
+                mountpt="${mountpt//\\011/$'\t'}"
+                mountpt="${mountpt//\\134/\\}"
                 printf '%s on %s type %s\n' "$device" "$mountpt" "$fstype"
             done < /proc/mounts 2>/dev/null || true
         fi
