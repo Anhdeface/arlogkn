@@ -1086,7 +1086,7 @@ scan_user_services() {
 
     # ── JOURNAL SERVICE ERRORS ──
     draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
-    printf '%s%*s%s\n' "$C_CYAN" 64 "" "$C_RESET"
+    printf '%s%*s%s\n' "$C_CYAN" 70 "" "$C_RESET"
 
     # Limit to last 500 lines. Check if journald is active to avoid 5s timeout on broken systems.
     if command -v journalctl &>/dev/null && journalctl --no-pager -n 0 &>/dev/null; then
@@ -1420,7 +1420,7 @@ scan_boot_timing() {
 
     if [[ -n "$blame_output" ]]; then
         draw_box_line "${C_BOLD}Top 10 Slowest Services:${C_RESET}"
-        printf '%s%*s%s\n' "$C_CYAN" 64 "" "$C_RESET"
+        printf '%s%*s%s\n' "$C_CYAN" 70 "" "$C_RESET"
 
         printf '%s\n' "$blame_output" | while read -r line; do
             [[ -z "$line" ]] && continue
