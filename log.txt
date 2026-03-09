@@ -1,8 +1,19 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-08
+Generated: 2026-03-09
 
 ---
+63b2a51 2026-03-09 fix(perf): move shopt nocasematch toggle outside loop to reduce overhead
+abc5cd9 2026-03-09 fix(ui): fix hardcoded width 64 in separator lines for consistent alignment
+4e1d444 2026-03-09 fix(export): use regex for robust trap command extraction in _extract_trap_cmd()
+e39393e 2026-03-09 fix(ui): correct regex char class in strip_ansi [0-9;] not [0-9\;]
+de0d79e 2026-03-09 fix(ui): disable colors when stdout is not a terminal in init_colors()
+39cc4f8 2026-03-09 style: add nullglob restore warning comment in detect_gpu()
+784433e 2026-03-09 fix(drivers): use plain readlink instead of readlink -f in get_driver_from_sys()
+58dbf5f 2026-03-09 fix(detection): remove false positive in check_internet() default route check
+e8c2f60 2026-03-09 fix(vga): use glxinfo -B flag instead of non-existent -s
+f55f238 2026-03-09 fix(ui): prevent infinite loop in strip_ansi
+66c8596 2026-03-08 docs: update log.txt with latest commits
 2c2cde2 2026-03-08 perf: optimization and internal consistencies
 1827f43 2026-03-08 fix(export): use safe bash octal decoding for mounts
 4e4e762 2026-03-08 fix(logs): remove obsolete percent escape in cluster_errors
