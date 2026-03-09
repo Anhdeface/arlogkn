@@ -401,9 +401,9 @@ get_driver_from_sys() {
 
     if [[ -L "${class_path}/device/driver" ]]; then
         # Extract basename using bash parameter expansion (no subprocess)
-        # Use readlink -f to resolve to canonical path
+        # Use plain readlink: we only need basename, -f is unnecessary and can fail on dangling symlinks
         local driver_link
-        driver_link="$(readlink -f "${class_path}/device/driver" 2>/dev/null)" || driver_link=""
+        driver_link="$(readlink "${class_path}/device/driver" 2>/dev/null)" || driver_link=""
 
         if [[ -n "$driver_link" ]]; then
             driver="${driver_link##*/}"  # Extract basename
