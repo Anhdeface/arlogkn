@@ -809,7 +809,9 @@ strip_ansi() {
     # Strip raw ANSI escape sequences using pure bash (no sed subprocess)
     # Pattern: \x1b followed by [ then digits/semicolons then a letter
     # Uses bash parameter expansion loop to avoid spawning sed in tight loops
-    while [[ "$s" =~ $'\x1b'\[[0-9\;]*[a-zA-Z] ]]; do
+    # Note: Store regex in variable to prevent bash parsing ; as command separator
+    local ansi_pattern=$'\x1b\\[[0-9;]*[a-zA-Z]'
+    while [[ "$s" =~ $ansi_pattern ]]; do
         s="${s//"${BASH_REMATCH[0]}"/}"
     done
     
