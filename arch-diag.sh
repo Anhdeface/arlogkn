@@ -1025,16 +1025,19 @@ scan_kernel_logs() {
     draw_box_line ""
 
     # Error entries with color highlighting
-    printf '%s\n' "$output" | head -20 | while read -r line; do
-        # Highlight error patterns with red (case-insensitive)
-        local colored_line="$line"
+    # nocasematch in subshell (pipeline) — safe to set once for entire loop
+    {
         shopt -s nocasematch
-        if [[ "$line" =~ error|fail|unable|critical ]]; then
-            colored_line="${C_RED}${line}${C_RESET}"
-        fi
+        printf '%s\n' "$output" | head -20 | while read -r line; do
+            # Highlight error patterns with red (case-insensitive)
+            local colored_line="$line"
+            if [[ "$line" =~ error|fail|unable|critical ]]; then
+                colored_line="${C_RED}${line}${C_RESET}"
+            fi
+            draw_box_line "$colored_line"
+        done
         shopt -u nocasematch
-        draw_box_line "$colored_line"
-    done
+    }
 
     local total_lines
     total_lines="$(printf '%s\n' "$output" | wc -l)"
@@ -1260,20 +1263,23 @@ scan_pacman_logs() {
         return 0
     fi
 
-    printf '%s\n' "$issues" | while read -r line; do
-        # Sanitize: remove potential ANSI/binary garbage
-        line="$(printf '%s' "$line" | tr -cd '[:print:]\t')"
-        # Color-code based on severity (case-insensitive via nocasematch)
-        local colored_line="$line"
+    # Color-code based on severity (case-insensitive via nocasematch)
+    # nocasematch in subshell (pipeline) — safe to set once for entire loop
+    {
         shopt -s nocasematch
-        if [[ "$line" =~ error ]]; then
-            colored_line="${C_RED}${line}${C_RESET}"
-        elif [[ "$line" =~ warning ]]; then
-            colored_line="${C_YELLOW}${line}${C_RESET}"
-        fi
+        printf '%s\n' "$issues" | while read -r line; do
+            # Sanitize: remove potential ANSI/binary garbage
+            line="$(printf '%s' "$line" | tr -cd '[:print:]\t')"
+            local colored_line="$line"
+            if [[ "$line" =~ error ]]; then
+                colored_line="${C_RED}${line}${C_RESET}"
+            elif [[ "$line" =~ warning ]]; then
+                colored_line="${C_YELLOW}${line}${C_RESET}"
+            fi
+            draw_box_line "$colored_line"
+        done
         shopt -u nocasematch
-        draw_box_line "$colored_line"
-    done
+    }
 
 }
 
