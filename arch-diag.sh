@@ -175,19 +175,11 @@ detect_system_info() {
 
 check_internet() {
     # Connectivity check - local methods first, external only if enabled
+    # Note: Default route presence ≠ internet connectivity (could be local-only,
+    # captive portal, or broken gateway). Check actual IP assignment instead.
 
     # ─────────────────────────────────────────────────────────────────────────
-    # METHOD 1: Check default route
-    # ─────────────────────────────────────────────────────────────────────────
-    if command -v ip &>/dev/null; then
-        if ip route 2>/dev/null | grep -q '^default'; then
-            INTERNET_STATUS="connected"
-            return 0
-        fi
-    fi
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # METHOD 2: Check interface operstate from /sys
+    # METHOD 1: Check interface operstate + IP from /sys
     # Check all interfaces except loopback (lo)
     # ─────────────────────────────────────────────────────────────────────────
     if [[ -d /sys/class/net ]]; then
