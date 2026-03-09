@@ -1813,8 +1813,9 @@ scan_vga_info() {
     # OpenGL info (only if glxinfo available - from mesa-utils)
     if command -v glxinfo &>/dev/null; then
         # Cache glxinfo output (can take 0.5-1s per call if X server is busy)
+        # Use -B (brief) flag: -s does not exist and causes silent failure
         local glx_output glx_vendor glx_renderer
-        glx_output="$(glxinfo -s 2>/dev/null)" || glx_output=""
+        glx_output="$(glxinfo -B 2>/dev/null)" || glx_output=""
         glx_vendor="$(printf '%s\n' "$glx_output" | grep 'OpenGL vendor' | cut -d':' -f2 | sed 's/^ *//')"
         glx_renderer="$(printf '%s\n' "$glx_output" | grep 'OpenGL renderer' | cut -d':' -f2 | sed 's/^ *//')"
         
