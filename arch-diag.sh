@@ -271,6 +271,7 @@ detect_gpu() {
     local card_path driver gpu_name
 
     # Check all DRM cards (supports multiple GPUs, e.g., hybrid graphics)
+    # Note: shopt -u nullglob MUST be called after loop to restore shell state
     shopt -s nullglob
     for card_path in /sys/class/drm/card[0-9]*; do
         [[ ! -d "$card_path" ]] && continue
@@ -299,7 +300,7 @@ detect_gpu() {
             vmwgfx) gpu_name="VMware Virtual GPU" ;;
             *) gpu_name="" ;;
         esac
-        
+
         # Add to list if detected
         [[ -n "$gpu_name" ]] && gpu_names+=("$gpu_name")
     done
