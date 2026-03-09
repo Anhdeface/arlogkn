@@ -91,6 +91,10 @@ info() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 init_colors() {
+    # Disable colors if stdout is not a terminal (pipe or redirect)
+    # Prevents ANSI codes in output files: ./arch-diag.sh > report.txt
+    [[ ! -t 1 ]] && return 0
+
     local colors_avail
     # Check if terminal supports colors (redirect stderr to avoid noise)
     if ! colors_avail=$(tput colors 2>/dev/null) || [[ -z "$colors_avail" ]] || [[ "$colors_avail" -lt 8 ]]; then
