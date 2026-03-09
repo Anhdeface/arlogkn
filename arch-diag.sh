@@ -2667,6 +2667,9 @@ EOF
 # Safely extract a trap command string without eval vulnerabilities
 # This converts `trap -p` output back into a raw string suitable for `trap -- "$cmd" SIGNAL`
 # avoiding the use of `eval` which breaks on nested quotes or tainted input.
+#
+# trap -p format: trap -- 'COMMAND' SIGNAL
+# where COMMAND may contain nested quotes escaped as '\'' (end-quote, escaped-quote, start-quote)
 _extract_trap_cmd() {
     local sig="$1"
     local var_name="$2"
@@ -2676,13 +2679,21 @@ _extract_trap_cmd() {
         printf -v "$var_name" ""
         return
     fi
-    t="${t#*trap -- }"
-    t="${t% $sig}"
-    t="${t% SIG$sig}"
-    t="${t#\'}"
-    t="${t%\'}"
-    # Unescape Bash's safe-escaped single quotes ('\'')
-    t="${t//\'\\\'\'/\'}"
+    # Use regex to extract quoted command: trap -- '...' SIGNAL
+    # BASH_REMATCH[1] = content between outer single quotes
+    if [[ "$t" =~ ^trap\ --\ \'(.*)\'\ (SIG)?${sig}$ ]]; then
+        t="${BASH_REMATCH[1]}"
+        # Unescape bash's safe-escaped single quotes: '\'' → '
+        t="${t//\'\\\'\'/\'}"
+    else
+        # Fallback: legacy string manipulation (may fail on complex traps)
+        t="${t#*trap -- }"
+        t="${t% $sig}"
+        t="${t% SIG$sig}"
+        t="${t#\'}"
+        t="${t%\'}"
+        t="${t//\'\\\'\'/\'}"
+    fi
     printf -v "$var_name" "%s" "$t"
 }
 
