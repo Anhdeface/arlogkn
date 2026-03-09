@@ -801,19 +801,19 @@ strip_ansi() {
     fi
 
     # String has raw ANSI escape sequences - strip both types
-    s="${s//${C_RED}/}"
-    s="${s//${C_GREEN}/}"
-    s="${s//${C_YELLOW}/}"
-    s="${s//${C_BLUE}/}"
-    s="${s//${C_CYAN}/}"
-    s="${s//${C_BOLD}/}"
-    s="${s//${C_RESET}/}"
+    s="${s//"${C_RED}"/}"
+    s="${s//"${C_GREEN}"/}"
+    s="${s//"${C_YELLOW}"/}"
+    s="${s//"${C_BLUE}"/}"
+    s="${s//"${C_CYAN}"/}"
+    s="${s//"${C_BOLD}"/}"
+    s="${s//"${C_RESET}"/}"
 
     # Strip raw ANSI escape sequences using pure bash (no sed subprocess)
     # Pattern: \x1b followed by [ then digits/semicolons then a letter
     # Uses bash parameter expansion loop to avoid spawning sed in tight loops
     while [[ "$s" =~ $'\x1b'\[[0-9\;]*[a-zA-Z] ]]; do
-        s="${s//${BASH_REMATCH[0]}/}"
+        s="${s//"${BASH_REMATCH[0]}"/}"
     done
     
     if [[ -n "$var_name" ]]; then
