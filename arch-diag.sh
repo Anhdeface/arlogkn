@@ -3856,7 +3856,17 @@ show_wiki() {
         local normalized_group
         normalized_group="$(printf '%s\n' "$WIKI_GROUP" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
-        # Find matching group (use || true to prevent exit on no match due to set -e)
+        # Check if numeric index (1-20) - direct lookup
+        if [[ "$normalized_group" =~ ^[0-9]+$ ]]; then
+            local group_idx=$((normalized_group - 1))
+            if [[ "$group_idx" -ge 0 && "$group_idx" -lt "${#WIKI_GROUP_NAMES[@]}" ]]; then
+                show_wiki_group "$group_idx"
+                return 0
+            fi
+            # Out of range - fall through to error handling
+        fi
+
+        # Find matching group by keyword (use || true to prevent exit on no match due to set -e)
         local group_idx
         group_idx="$(find_wiki_group "$normalized_group" || true)"
 
