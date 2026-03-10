@@ -1789,7 +1789,11 @@ scan_usb_devices() {
         [[ -z "$model" ]] && model="USB Storage"
         
         # Check mount point from /proc/mounts
+        # Decode octal escapes: space=\040, tab=\011, backslash=\134
         mount="$(grep "^/dev/${bname}" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)"
+        mount="${mount//\\040/ }"
+        mount="${mount//\\011/$'\t'}"
+        mount="${mount//\\134/\\}"
         [[ -z "$mount" ]] && mount="<unmounted>"
         
         draw_table_row "/dev/${bname}" "$size" "${model:0:19}" "${mount:0:17}"
