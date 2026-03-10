@@ -1843,10 +1843,11 @@ scan_drivers() {
     local thunderbolt_drv input_drv platform_drv virtual_drv
     local nvme_drv sata_drv raid_drv i2c_drv smbus_drv watchdog_drv
 
+    # Note: || true prevents set -e exit when drivers_info is empty (read returns 1 on EOF)
     IFS='|' read -r loaded_count gpu_drv net_drv audio_drv storage_drv \
         usb_drv thunderbolt_drv input_drv platform_drv virtual_drv \
         nvme_drv sata_drv raid_drv i2c_drv smbus_drv watchdog_drv \
-        <<< "$drivers_info"
+        <<< "$drivers_info" || true
 
     # Helper function for status display
     local status_active="${C_GREEN}Active${C_RESET}"
