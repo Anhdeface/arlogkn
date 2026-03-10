@@ -1030,19 +1030,20 @@ scan_kernel_logs() {
     draw_box_line ""
 
     # Error entries with color highlighting
-    # nocasematch in subshell (pipeline) — safe to set once for entire loop
-    {
-        shopt -s nocasematch
-        printf '%s\n' "$output" | head -20 | while read -r line; do
-            # Highlight error patterns with red (case-insensitive)
-            local colored_line="$line"
-            if [[ "$line" =~ error|fail|unable|critical ]]; then
-                colored_line="${C_RED}${line}${C_RESET}"
-            fi
-            draw_box_line "$colored_line"
-        done
-        shopt -u nocasematch
-    }
+    # Note: { } is grouping (NOT subshell), so shopt affects parent shell
+    # Use ERR trap to ensure nocasematch is cleaned up if set -e triggers mid-pipeline
+    shopt -s nocasematch
+    trap 'shopt -u nocasematch' ERR
+    printf '%s\n' "$output" | head -20 | while read -r line; do
+        # Highlight error patterns with red (case-insensitive)
+        local colored_line="$line"
+        if [[ "$line" =~ error|fail|unable|critical ]]; then
+            colored_line="${C_RED}${line}${C_RESET}"
+        fi
+        draw_box_line "$colored_line"
+    done
+    trap - ERR
+    shopt -u nocasematch
 
     local total_lines
     total_lines="$(printf '%s\n' "$output" | wc -l)"
@@ -1269,22 +1270,23 @@ scan_pacman_logs() {
     fi
 
     # Color-code based on severity (case-insensitive via nocasematch)
-    # nocasematch in subshell (pipeline) — safe to set once for entire loop
-    {
-        shopt -s nocasematch
-        printf '%s\n' "$issues" | while read -r line; do
-            # Sanitize: remove potential ANSI/binary garbage
-            line="$(printf '%s' "$line" | tr -cd '[:print:]\t')"
-            local colored_line="$line"
-            if [[ "$line" =~ error ]]; then
-                colored_line="${C_RED}${line}${C_RESET}"
-            elif [[ "$line" =~ warning ]]; then
-                colored_line="${C_YELLOW}${line}${C_RESET}"
-            fi
-            draw_box_line "$colored_line"
-        done
-        shopt -u nocasematch
-    }
+    # Note: { } is grouping (NOT subshell), so shopt affects parent shell
+    # Use ERR trap to ensure nocasematch is cleaned up if set -e triggers mid-pipeline
+    shopt -s nocasematch
+    trap 'shopt -u nocasematch' ERR
+    printf '%s\n' "$issues" | while read -r line; do
+        # Sanitize: remove potential ANSI/binary garbage
+        line="$(printf '%s' "$line" | tr -cd '[:print:]\t')"
+        local colored_line="$line"
+        if [[ "$line" =~ error ]]; then
+            colored_line="${C_RED}${line}${C_RESET}"
+        elif [[ "$line" =~ warning ]]; then
+            colored_line="${C_YELLOW}${line}${C_RESET}"
+        fi
+        draw_box_line "$colored_line"
+    done
+    trap - ERR
+    shopt -u nocasematch
 
 }
 
