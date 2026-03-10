@@ -3997,6 +3997,8 @@ ${C_CYAN}NOTES:${C_RESET}
     - With --save-all: Creates single consolidated log file (raw format)
     - Auto-detects internet connection status
     - Wiki supports fuzzy matching (e.g., 'soud' suggests 'sound')
+    - Scan modes are mutually exclusive; last flag takes precedence
+      Example: --all --kernel runs kernel only (last flag wins)
 
 EOF
 }
