@@ -1949,6 +1949,9 @@ scan_system_basics() {
             draw_box_line "${C_BOLD}Swap:${C_RESET}"
             printf '%s\n' "$swap_lines" | while read -r filename stype size used priority; do
                 [[ -z "$filename" ]] && continue
+                # Validate numeric fields before arithmetic (kernel may report '-' for zram)
+                [[ ! "$size" =~ ^[0-9]+$ ]] && continue
+                [[ ! "$used" =~ ^[0-9]+$ ]] && continue
                 # Convert KB to human readable
                 local size_h used_h
                 if [[ "$size" -ge 1048576 ]]; then
