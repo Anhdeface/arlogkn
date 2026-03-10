@@ -275,8 +275,9 @@ detect_gpu() {
     local card_path driver gpu_name
 
     # Check all DRM cards (supports multiple GPUs, e.g., hybrid graphics)
-    # Note: shopt -u nullglob MUST be called after loop to restore shell state
+    # Note: Use ERR trap to ensure nullglob is restored even if set -e triggers mid-loop
     shopt -s nullglob
+    trap 'shopt -u nullglob' ERR
     for card_path in /sys/class/drm/card[0-9]*; do
         [[ ! -d "$card_path" ]] && continue
 
@@ -308,6 +309,7 @@ detect_gpu() {
         # Add to list if detected
         [[ -n "$gpu_name" ]] && gpu_names+=("$gpu_name")
     done
+    trap - ERR
     shopt -u nullglob
 
     # Build GPU info string (supports multiple GPUs)
@@ -346,8 +348,10 @@ detect_display() {
     local connector status
 
     # Check DRM connectors directly from /sys (works without X11/Wayland)
+    # Note: Use ERR trap to ensure nullglob is restored even if set -e triggers mid-loop
     local display_parts=()
     shopt -s nullglob
+    trap 'shopt -u nullglob' ERR
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
         status="$(cat "$connector" 2>/dev/null)"
@@ -374,6 +378,7 @@ detect_display() {
             display_parts+=("$entry")
         fi
     done
+    trap - ERR
     shopt -u nullglob
 
     if [[ ${#display_parts[@]} -gt 0 ]]; then
