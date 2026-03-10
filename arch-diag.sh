@@ -2679,12 +2679,18 @@ EOF
 #
 # trap -p format: trap -- 'COMMAND' SIGNAL
 # where COMMAND may contain nested quotes escaped as '\'' (end-quote, escaped-quote, start-quote)
+#
+# Special handling: trap '' SIGNAL (ignore) vs trap - SIGNAL (default) are different!
+# - trap '' EXIT → ignore the signal
+# - trap - EXIT → reset to default handler
+# We use __IGNORE__ sentinel to preserve the ignore state during extraction.
 _extract_trap_cmd() {
     local sig="$1"
     local var_name="$2"
     local t
     t="$(trap -p "$sig")"
     if [[ -z "$t" ]]; then
+        # No trap set at all
         printf -v "$var_name" ""
         return
     fi
@@ -2692,8 +2698,13 @@ _extract_trap_cmd() {
     # BASH_REMATCH[1] = content between outer single quotes
     if [[ "$t" =~ ^trap\ --\ \'(.*)\'\ (SIG)?${sig}$ ]]; then
         t="${BASH_REMATCH[1]}"
-        # Unescape bash's safe-escaped single quotes: '\'' → '
-        t="${t//\'\\\'\'/\'}"
+        # Check for trap '' SIGNAL (ignore signal) - preserve this state
+        if [[ -z "$t" ]]; then
+            t="__IGNORE__"
+        else
+            # Unescape bash's safe-escaped single quotes: '\'' → '
+            t="${t//\'\\\'\'/\'}"
+        fi
     else
         # Fallback: legacy string manipulation (may fail on complex traps)
         t="${t#*trap -- }"
@@ -2701,7 +2712,11 @@ _extract_trap_cmd() {
         t="${t% SIG$sig}"
         t="${t#\'}"
         t="${t%\'}"
-        t="${t//\'\\\'\'/\'}"
+        if [[ -z "$t" ]]; then
+            t="__IGNORE__"
+        else
+            t="${t//\'\\\'\'/\'}"
+        fi
     fi
     printf -v "$var_name" "%s" "$t"
 }
@@ -3029,10 +3044,17 @@ export_all_logs() {
 
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
-        # Restore caller's traps safely without eval
-        if [[ -n "$old_exit_trap" ]]; then trap -- "$old_exit_trap" EXIT; else trap - EXIT; fi
-        if [[ -n "$old_int_trap" ]]; then trap -- "$old_int_trap" INT; else trap - INT; fi
-        if [[ -n "$old_term_trap" ]]; then trap -- "$old_term_trap" TERM; else trap - TERM; fi
+        # Restore caller's traps safely
+        # __IGNORE__ means trap '' SIGNAL (ignore signal), not trap - SIGNAL (default)
+        if [[ -n "$old_exit_trap" ]]; then
+            if [[ "$old_exit_trap" == "__IGNORE__" ]]; then trap '' EXIT; else trap -- "$old_exit_trap" EXIT; fi
+        fi
+        if [[ -n "$old_int_trap" ]]; then
+            if [[ "$old_int_trap" == "__IGNORE__" ]]; then trap '' INT; else trap -- "$old_int_trap" INT; fi
+        fi
+        if [[ -n "$old_term_trap" ]]; then
+            if [[ "$old_term_trap" == "__IGNORE__" ]]; then trap '' TERM; else trap -- "$old_term_trap" TERM; fi
+        fi
         return 1
     fi
 
@@ -3045,10 +3067,17 @@ export_all_logs() {
 
     # SUCCESS: Restore caller's traps (temp file moved, no cleanup needed)
     temp_file=""
-    # Restore caller's traps safely without eval
-    if [[ -n "$old_exit_trap" ]]; then trap -- "$old_exit_trap" EXIT; else trap - EXIT; fi
-    if [[ -n "$old_int_trap" ]]; then trap -- "$old_int_trap" INT; else trap - INT; fi
-    if [[ -n "$old_term_trap" ]]; then trap -- "$old_term_trap" TERM; else trap - TERM; fi
+    # Restore caller's traps safely
+    # __IGNORE__ means trap '' SIGNAL (ignore signal), not trap - SIGNAL (default)
+    if [[ -n "$old_exit_trap" ]]; then
+        if [[ "$old_exit_trap" == "__IGNORE__" ]]; then trap '' EXIT; else trap -- "$old_exit_trap" EXIT; fi
+    fi
+    if [[ -n "$old_int_trap" ]]; then
+        if [[ "$old_int_trap" == "__IGNORE__" ]]; then trap '' INT; else trap -- "$old_int_trap" INT; fi
+    fi
+    if [[ -n "$old_term_trap" ]]; then
+        if [[ "$old_term_trap" == "__IGNORE__" ]]; then trap '' TERM; else trap -- "$old_term_trap" TERM; fi
+    fi
 
     info "All logs exported to: ${output_file}"
 }
