@@ -1989,12 +1989,14 @@ scan_system_basics() {
     # Disk
     local disk_total disk_used disk_avail
     if command -v df &>/dev/null; then
-        local root_info
-        root_info="$(df -h / 2>/dev/null | tail -1)"
-        # Extract fields with pure bash (zero subprocesses)
-        # df output: Filesystem Size Used Avail Use% Mounted
-        # Fields:    $1        $2   $3   $4    $5   $6
-        read -r _ disk_total disk_used disk_avail _ _ <<< "$root_info"
+        # Use --output to avoid line wrapping with long device paths (LVM, dm-crypt, ZFS)
+        # df -h / --output=size,used,avail produces:
+        #   Size Used Avail
+        #    20G   10G   10G
+        local df_output
+        df_output="$(df -h / --output=size,used,avail 2>/dev/null | tail -1)"
+        # Trim leading/trailing whitespace and parse fields
+        read -r disk_total disk_used disk_avail <<< "$df_output"
         draw_box_line "${C_BOLD}Root Disk:${C_RESET} Total: ${disk_total} | Used: ${disk_used} | Available: ${disk_avail}"
     fi
 
