@@ -858,6 +858,11 @@ visible_len() {
 }
 
 # Global table state (Stack-managed for re-entrancy)
+# WARNING: Table state is stored in global variables. Do NOT call tbl_begin/tbl_row/tbl_end
+# from within pipeline subshells (e.g., ... | while read). Subshells cannot modify parent's
+# globals, so table state will be lost/corrupted.
+# Safe: _gather_temperatures | _format_temperatures_display (entire table in one function)
+# Unsafe: tbl_begin ...; cmd | while read; do tbl_row ...; done; tbl_end
 declare -g _TBL_DEPTH=-1
 declare -ga _TBL_WIDTH_STACK=()
 declare -ga _TBL_COLS_STACK=()
@@ -867,6 +872,12 @@ declare -ga _TBL_NUMCOLS_STACK=()
 # Simple table - minimal borders
 # Usage: tbl_begin "Col1" width1 "Col2" width2 ...
 tbl_begin() {
+    # Runtime check: detect if called from subshell (pipeline, command substitution)
+    # Subshells cannot propagate global state changes back to parent
+    if [[ "${BASHPID:-$$}" -ne "$$" ]]; then
+        printf '[WARN] tbl_begin called from subshell - table state will not propagate\n' >&2
+    fi
+
     _TBL_DEPTH=$((_TBL_DEPTH + 1))
     
     local start_idx=${#_TBL_COLS_STACK[@]}
