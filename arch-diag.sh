@@ -440,7 +440,8 @@ get_driver_from_sys() {
 # Main driver detection - multi-source
 detect_drivers() {
     # Return cached result if available (drivers don't change during session)
-    [[ -n "$_DRIVERS_CACHE" ]] && echo "$_DRIVERS_CACHE" && return 0
+    # Use printf instead of echo to avoid xpg_echo interpretation of -e, -n flags
+    [[ -n "$_DRIVERS_CACHE" ]] && printf '%s\n' "$_DRIVERS_CACHE" && return 0
 
     local lsmod_output
     lsmod_output="$(timeout 5 lsmod 2>/dev/null)" || true
@@ -687,7 +688,7 @@ detect_drivers() {
 
     # Cache result for session (drivers don't change during run)
     _DRIVERS_CACHE="$result"
-    echo "$result"
+    printf '%s\n' "$result"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
