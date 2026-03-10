@@ -208,12 +208,27 @@ check_internet() {
                 if [[ "$operstate" == "up" ]]; then
                     # Interface is UP — but does it have a routable IP?
                     # Check via ip command if available (most reliable)
+                    # Support both IPv4 and IPv6 (IPv6-only systems exist)
                     if command -v ip &>/dev/null; then
-                        local ip_output
+                        local ip_output has_valid_ip=0
+
+                        # Check IPv4 (exclude link-local 169.254.x.x)
                         ip_output="$(ip -4 addr show "$iface_name" 2>/dev/null)"
-                        # Has non-link-local IPv4? (exclude 169.254.x.x)
                         if printf '%s\n' "$ip_output" | grep -qE 'inet [0-9]' && \
                            ! printf '%s\n' "$ip_output" | grep -q 'inet 169\.254\.'; then
+                            has_valid_ip=1
+                        fi
+
+                        # Check IPv6 (exclude link-local fe80::/10 and loopback ::1)
+                        if [[ "$has_valid_ip" -eq 0 ]]; then
+                            ip_output="$(ip -6 addr show "$iface_name" 2>/dev/null)"
+                            if printf '%s\n' "$ip_output" | grep -qE 'inet6 [0-9a-f]' && \
+                               ! printf '%s\n' "$ip_output" | grep -qE 'inet6 (fe80:|::1)'; then
+                                has_valid_ip=1
+                            fi
+                        fi
+
+                        if [[ "$has_valid_ip" -eq 1 ]]; then
                             INTERNET_STATUS="connected"
                             return 0
                         fi
