@@ -1,8 +1,23 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-09
+Generated: 2026-03-10
 
 ---
+8eacb2b 2026-03-10 docs(help): document scan mode flag order dependency in --help output
+7e8ed29 2026-03-10 fix(tables): add subshell detection and warning for tbl_begin/tbl_row/tbl_end
+18a81b6 2026-03-10 fix(wiki): add numeric index support for --wiki N (1-20)
+5e984a1 2026-03-10 fix(perf): replace $(cat file) with $(<file) to eliminate subprocess forks
+e3976ce 2026-03-10 fix(logs): fix port normalization regex to preserve hex/NVMe identifiers
+f539910 2026-03-10 fix(drivers): use printf instead of echo to avoid xpg_echo issues
+da49b6b 2026-03-10 fix(detection): add IPv6 support to check_internet() for IPv6-only systems
+30a089c 2026-03-10 fix(perf): correct nocasematch cleanup with ERR trap
+53719eb 2026-03-10 fix(usb): decode octal escapes in USB storage mount point parsing
+f740e7b 2026-03-10 fix(system): validate numeric fields before arithmetic in /proc/swaps parsing
+6eac785 2026-03-10 fix(perf): add ERR trap to ensure nullglob cleanup on set -e
+747ee13 2026-03-10 fix(export): preserve trap '' SIGNAL (ignore) vs trap - SIGNAL (default) distinction
+1f85b21 2026-03-10 fix(system): use df --output to avoid line wrap with long device paths
+05ee5b8 2026-03-10 fix(drivers): add || true to IFS read to prevent set -e exit
+532dd29 2026-03-09 docs: update log.txt with latest commits
 63b2a51 2026-03-09 fix(perf): move shopt nocasematch toggle outside loop to reduce overhead
 abc5cd9 2026-03-09 fix(ui): fix hardcoded width 64 in separator lines for consistent alignment
 4e1d444 2026-03-09 fix(export): use regex for robust trap command extraction in _extract_trap_cmd()
