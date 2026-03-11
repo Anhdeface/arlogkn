@@ -1021,11 +1021,13 @@ draw_table_footer() { tbl_end "$@"; }
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Cluster identical errors and count occurrences
+# Returns: 0 on success (including empty input → empty output), 1 on critical error
 cluster_errors() {
     local input="$1"
 
+    # Empty input → empty output (not an error, just nothing to cluster)
     if [[ -z "$input" ]]; then
-        return 1
+        return 0
     fi
 
     # Normalize: remove timestamps, then normalize dynamic content for clustering
@@ -1041,7 +1043,10 @@ cluster_errors() {
     # - MAC addresses: xx:xx:xx:xx:xx:xx → MAC
     # - Port numbers: host:1234 → host:PORT (only after lowercase/digit to avoid
     #   corrupting normalized identifiers like 0xADDR:8080 or nvmeDEVICE:4096)
-
+    #
+    # Note: Pipeline ends with || true to prevent set -e abort on rare failures
+    # (e.g., EINTR from signals, disk full during sort, interrupted by timeout).
+    # Empty output from pipeline is valid (no errors to cluster).
     printf '%s\n' "$input" | \
         sed -E \
             -e 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' \
@@ -1063,7 +1068,7 @@ cluster_errors() {
             else
                 printf '%s\n' "$msg"
             fi
-        done
+        done || true
 }
 
 scan_kernel_logs() {

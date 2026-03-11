@@ -11,7 +11,9 @@ suite_begin "Log Parsing"
 
 # ─── cluster_errors() ─────────────────────────────────────────────────────────
 test_cluster_empty() {
-    assert_exit_code "cluster_errors empty → exit 1" 1 cluster_errors ""
+    # Empty input → empty output is success (0), not error (1)
+    # This allows safe use in command substitution with set -e
+    assert_exit_code "cluster_errors empty → exit 0 (success)" 0 cluster_errors ""
 }
 
 test_cluster_dedup() {
