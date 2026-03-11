@@ -881,15 +881,24 @@ strip_ansi() {
 
 # Get visible length (excluding ANSI codes)
 # Calls strip_ansi() which handles both script colors and raw ANSI
+# Note: Uses wc -m to count Unicode characters (not bytes). ${#var} returns
+# byte count which is wrong for multi-byte chars like box-drawing (─ = 3 bytes),
+# emoji (✓ = 3 bytes), or CJK characters. wc -m gives correct character count.
+# Limitation: Does not handle wide characters (CJK = 2 columns) - would need
+# wcswidth() from libc. For typical ASCII + box-drawing + emoji, this is sufficient.
 visible_len() {
     local s="$1"
     local var_name="${2:-}"
-    local stripped
+    local stripped char_count
     strip_ansi "$s" stripped
+    # wc -m counts characters, not bytes (unlike ${#var} or wc -c)
+    char_count="$(printf '%s' "$stripped" | wc -m)"
+    # Trim whitespace from wc output
+    char_count="${char_count//[[:space:]]/}"
     if [[ -n "$var_name" ]]; then
-        printf -v "$var_name" '%d' "${#stripped}"
+        printf -v "$var_name" '%d' "$char_count"
     else
-        printf '%d' "${#stripped}"
+        printf '%d' "$char_count"
     fi
 }
 
