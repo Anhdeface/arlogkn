@@ -902,6 +902,29 @@ visible_len() {
     fi
 }
 
+# Truncate string to N characters (not bytes!) for safe UTF-8 handling
+# Usage: truncate_str "string" max_length output_var
+# Note: Uses wc -m for character count, not ${#var} which counts bytes.
+# This prevents cutting in the middle of multibyte UTF-8 sequences which
+# would produce invalid UTF-8 and corrupt terminal display.
+truncate_str() {
+    local str="$1" max_len="$2" var_name="$3"
+    local char_count truncated
+    char_count="$(printf '%s' "$str" | wc -m)"
+    char_count="${char_count//[[:space:]]/}"
+    if [[ "$char_count" -le "$max_len" ]]; then
+        truncated="$str"
+    else
+        # Use cut -c for character-aware truncation (handles UTF-8 correctly)
+        truncated="$(printf '%s' "$str" | cut -c1-"$max_len")"
+    fi
+    if [[ -n "$var_name" ]]; then
+        printf -v "$var_name" '%s' "$truncated"
+    else
+        printf '%s' "$truncated"
+    fi
+}
+
 # Global table state (Stack-managed for re-entrancy)
 # WARNING: Table state is stored in global variables. Do NOT call tbl_begin/tbl_row/tbl_end
 # from within pipeline subshells (e.g., ... | while read). Subshells cannot modify parent's
@@ -1925,7 +1948,10 @@ scan_usb_devices() {
         local product_id
         product_id="$(< "$dev_path/idProduct" 2>/dev/null)" || product_id="??"
 
-        draw_table_row "${vendor}:${product_id}" "${product:0:29}" "Bus ${bus_id}" "$dev_type"
+        # Truncate product name to 29 characters (use character-aware truncation for UTF-8)
+        local product_truncated
+        truncate_str "$product" 29 product_truncated
+        draw_table_row "${vendor}:${product_id}" "$product_truncated" "Bus ${bus_id}" "$dev_type"
         count=$((count + 1))
     done
     shopt -u nullglob
@@ -1968,8 +1994,12 @@ scan_usb_devices() {
         mount="${mount//\\011/$'\t'}"
         mount="${mount//\\134/\\}"
         [[ -z "$mount" ]] && mount="<unmounted>"
-        
-        draw_table_row "/dev/${bname}" "$size" "${model:0:19}" "${mount:0:17}"
+
+        # Truncate model and mount to fit table columns (use character-aware truncation for UTF-8)
+        local model_truncated mount_truncated
+        truncate_str "$model" 19 model_truncated
+        truncate_str "$mount" 17 mount_truncated
+        draw_table_row "/dev/${bname}" "$size" "$model_truncated" "$mount_truncated"
     done
     
     if [[ $found_storage -eq 0 ]]; then
@@ -3489,9 +3519,12 @@ awk_fuzzy_match() {
     local query="$1"
     local groups="$2"
 
-    # Limit query length to prevent DoS
-    if [[ ${#query} -gt 50 ]]; then
-        query="${query:0:50}"
+    # Limit query length to prevent DoS (use character count, not bytes)
+    local query_len
+    query_len="$(printf '%s' "$query" | wc -m)"
+    query_len="${query_len//[[:space:]]/}"
+    if [[ "$query_len" -gt 50 ]]; then
+        query="$(printf '%s' "$query" | cut -c1-50)"
     fi
 
     # Sanitize: strip chars that can escape awk -v string context (", \, newline)
