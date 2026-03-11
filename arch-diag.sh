@@ -204,7 +204,7 @@ check_internet() {
             #   - Virtual interfaces (veth*, virbr*)
             # These do not necessarily indicate actual network connectivity
             if [[ -f "${iface}/operstate" ]]; then
-                operstate="$(< "${iface}/operstate")" 2>/dev/null || operstate=""
+                operstate="$(< "${iface}/operstate" 2>/dev/null)" || operstate=""
                 if [[ "$operstate" == "up" ]]; then
                     # Interface is UP — but does it have a routable IP?
                     # Check via ip command if available (most reliable)
@@ -369,7 +369,7 @@ detect_display() {
     trap 'shopt -u nullglob' ERR
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
-        status="$(< "$connector")" 2>/dev/null || status=""
+        status="$(< "$connector" 2>/dev/null)" || status=""
         if [[ "$status" == "connected" ]]; then
             local name connector_dir
             connector_dir="$(dirname "$connector")"
@@ -1549,13 +1549,13 @@ scan_network_interfaces() {
 
         # Read operstate
         local state="unknown"
-        [[ -f "${net_path}/operstate" ]] && state="$(< "${net_path}/operstate")" 2>/dev/null || state="unknown"
+        [[ -f "${net_path}/operstate" ]] && state="$(< "${net_path}/operstate" 2>/dev/null)" || state="unknown"
 
         # Read speed (may not exist for wireless or down interfaces)
         local speed="N/A"
         if [[ -f "${net_path}/speed" ]]; then
             local raw_speed
-            raw_speed="$(< "${net_path}/speed")" 2>/dev/null || raw_speed=""
+            raw_speed="$(< "${net_path}/speed" 2>/dev/null)" || raw_speed=""
             if [[ -n "$raw_speed" && "$raw_speed" =~ ^[0-9]+$ && "$raw_speed" -gt 0 ]]; then
                 if [[ "$raw_speed" -ge 1000 ]]; then
                     speed="$((raw_speed / 1000))Gbps"
@@ -1736,16 +1736,16 @@ scan_usb_devices() {
 
         # Read from sysfs (no external commands)
         # Use $(<file) instead of $(cat file) to avoid fork overhead per device
-        vendor="$(< "$dev_path/idVendor")" 2>/dev/null || vendor=""
+        vendor="$(< "$dev_path/idVendor" 2>/dev/null)" || vendor=""
         [[ -z "$vendor" ]] && continue  # Skip if no vendor ID
 
-        dev_id="$(< "$dev_path/devnum")" 2>/dev/null || dev_id="?"
-        bus_id="$(< "$dev_path/busnum")" 2>/dev/null || bus_id="?"
+        dev_id="$(< "$dev_path/devnum" 2>/dev/null)" || dev_id="?"
+        bus_id="$(< "$dev_path/busnum" 2>/dev/null)" || bus_id="?"
 
         # Try product first, then manufacturer as fallback
-        product="$(< "$dev_path/product")" 2>/dev/null || product=""
+        product="$(< "$dev_path/product" 2>/dev/null)" || product=""
         if [[ -z "$product" || "$product" =~ ^[[:cntrl:]]*$ ]]; then
-            manufacturer="$(< "$dev_path/manufacturer")" 2>/dev/null || manufacturer=""
+            manufacturer="$(< "$dev_path/manufacturer" 2>/dev/null)" || manufacturer=""
             [[ -n "$manufacturer" && ! "$manufacturer" =~ ^[[:cntrl:]]*$ ]] && product="$manufacturer"
         fi
 
@@ -1780,7 +1780,7 @@ scan_usb_devices() {
 
         # Read product ID from sysfs
         local product_id
-        product_id="$(< "$dev_path/idProduct")" 2>/dev/null || product_id="??"
+        product_id="$(< "$dev_path/idProduct" 2>/dev/null)" || product_id="??"
 
         draw_table_row "${vendor}:${product_id}" "${product:0:29}" "Bus ${bus_id}" "$dev_type"
         count=$((count + 1))
@@ -1805,17 +1805,17 @@ scan_usb_devices() {
 
         # Check if removable (USB drives are removable)
         local removable="0"
-        [[ -f "$block/removable" ]] && removable="$(< "$block/removable")" 2>/dev/null || removable="0"
+        [[ -f "$block/removable" ]] && removable="$(< "$block/removable" 2>/dev/null)" || removable="0"
         [[ "$removable" != "1" ]] && continue
 
         found_storage=1
         local size="?" model="" mount=""
 
-        [[ -f "$block/size" ]] && size="$(< "$block/size")" 2>/dev/null || size="?"
+        [[ -f "$block/size" ]] && size="$(< "$block/size" 2>/dev/null)" || size="?"
         [[ -n "$size" && "$size" != "?" ]] && size="$((size / 2 / 1024 / 1024))Gi"
 
-        [[ -f "$block/device/vendor" ]] && model="$(< "$block/device/vendor")" 2>/dev/null || model=""
-        [[ -f "$block/device/model" ]] && model="$model $(< "$block/device/model")" 2>/dev/null || model=""
+        [[ -f "$block/device/vendor" ]] && model="$(< "$block/device/vendor" 2>/dev/null)" || model=""
+        [[ -f "$block/device/model" ]] && model="$model $(< "$block/device/model" 2>/dev/null)" || model=""
         [[ -z "$model" ]] && model="USB Storage"
         
         # Check mount point from /proc/mounts
@@ -2392,10 +2392,10 @@ export_network_interfaces() {
                 iface_name="$(basename "$net_path")"
                 [[ "$iface_name" == "lo" ]] && continue
                 local e_state="unknown" e_speed="N/A" e_mac="N/A"
-                [[ -f "${net_path}/operstate" ]] && e_state="$(< "${net_path}/operstate")" 2>/dev/null || e_state="unknown"
+                [[ -f "${net_path}/operstate" ]] && e_state="$(< "${net_path}/operstate" 2>/dev/null)" || e_state="unknown"
                 if [[ -f "${net_path}/speed" ]]; then
                     local rs
-                    rs="$(< "${net_path}/speed")" 2>/dev/null || rs=""
+                    rs="$(< "${net_path}/speed" 2>/dev/null)" || rs=""
                     if [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]]; then
                         if [[ "$rs" -ge 1000 ]]; then
                             e_speed="$((rs / 1000))Gbps"
@@ -2404,7 +2404,7 @@ export_network_interfaces() {
                         fi
                     fi
                 fi
-                [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address")" 2>/dev/null || e_mac="N/A"
+                [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address" 2>/dev/null)" || e_mac="N/A"
                 local e_ip="N/A"
                 if command -v ip &>/dev/null; then
                     e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
@@ -2976,10 +2976,10 @@ export_all_logs() {
                 iface_name="$(basename "$net_path")"
                 [[ "$iface_name" == "lo" ]] && continue
                 local e_state="unknown" e_speed="N/A" e_mac="N/A"
-                [[ -f "${net_path}/operstate" ]] && e_state="$(< "${net_path}/operstate")" 2>/dev/null || e_state="unknown"
+                [[ -f "${net_path}/operstate" ]] && e_state="$(< "${net_path}/operstate" 2>/dev/null)" || e_state="unknown"
                 if [[ -f "${net_path}/speed" ]]; then
                     local rs
-                    rs="$(< "${net_path}/speed")" 2>/dev/null || rs=""
+                    rs="$(< "${net_path}/speed" 2>/dev/null)" || rs=""
                     if [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]]; then
                         if [[ "$rs" -ge 1000 ]]; then
                             e_speed="$((rs / 1000))Gbps"
@@ -2988,7 +2988,7 @@ export_all_logs() {
                         fi
                     fi
                 fi
-                [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address")" 2>/dev/null || e_mac="N/A"
+                [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address" 2>/dev/null)" || e_mac="N/A"
                 local e_ip="N/A"
                 if command -v ip &>/dev/null; then
                     e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
@@ -3060,11 +3060,11 @@ export_all_logs() {
                 for ti in "${hw_dir}"/temp*_input; do
                     [[ ! -f "$ti" ]] && continue
                     local tr_val
-                    tr_val="$(< "$ti")" 2>/dev/null || continue
+                    tr_val="$(< "$ti" 2>/dev/null)" || continue
                     [[ -z "$tr_val" || ! "$tr_val" =~ ^-?[0-9]+$ ]] && continue
                     local lbl_file="${ti%_input}_label"
                     local lbl="${hw_name:-hwmon}"
-                    [[ -f "$lbl_file" ]] && lbl="$(< "$lbl_file")" 2>/dev/null || lbl="${hw_name:-hwmon}"
+                    [[ -f "$lbl_file" ]] && lbl="$(< "$lbl_file" 2>/dev/null)" || lbl="${hw_name:-hwmon}"
                     printf '  %s/%s: %d°C\n' "${hw_name:-hwmon}" "$lbl" $((tr_val / 1000))
                     temp_found=1
                 done
