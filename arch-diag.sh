@@ -292,6 +292,11 @@ detect_gpu() {
     # Check all DRM cards (supports multiple GPUs, e.g., hybrid graphics)
     # Note: Use ERR trap to ensure nullglob is restored even if set -e triggers mid-loop
     shopt -s nullglob
+    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
+    local old_err_trap=""
+    if trap -p ERR >/dev/null 2>&1; then
+        old_err_trap="$(trap -p ERR)"
+    fi
     trap 'shopt -u nullglob' ERR
     for card_path in /sys/class/drm/card[0-9]*; do
         [[ ! -d "$card_path" ]] && continue
@@ -324,7 +329,20 @@ detect_gpu() {
         # Add to list if detected
         [[ -n "$gpu_name" ]] && gpu_names+=("$gpu_name")
     done
-    trap - ERR
+    # Restore previous ERR trap (or clear if none existed)
+    if [[ -n "$old_err_trap" ]]; then
+        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
+        local cmd="${old_err_trap#*trap -- }"
+        cmd="${cmd% ERR}"
+        cmd="${cmd% SIGERR}"
+        cmd="${cmd#\'}"
+        cmd="${cmd%\'}"
+        # Unescape bash's safe-escaped single quotes: '\'' → '
+        cmd="${cmd//\'\\\'\'/\'}"
+        trap -- "$cmd" ERR
+    else
+        trap - ERR
+    fi
     shopt -u nullglob
 
     # Build GPU info string (supports multiple GPUs)
@@ -366,6 +384,11 @@ detect_display() {
     # Note: Use ERR trap to ensure nullglob is restored even if set -e triggers mid-loop
     local display_parts=()
     shopt -s nullglob
+    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
+    local old_err_trap=""
+    if trap -p ERR >/dev/null 2>&1; then
+        old_err_trap="$(trap -p ERR)"
+    fi
     trap 'shopt -u nullglob' ERR
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
@@ -393,7 +416,20 @@ detect_display() {
             display_parts+=("$entry")
         fi
     done
-    trap - ERR
+    # Restore previous ERR trap (or clear if none existed)
+    if [[ -n "$old_err_trap" ]]; then
+        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
+        local cmd="${old_err_trap#*trap -- }"
+        cmd="${cmd% ERR}"
+        cmd="${cmd% SIGERR}"
+        cmd="${cmd#\'}"
+        cmd="${cmd%\'}"
+        # Unescape bash's safe-escaped single quotes: '\'' → '
+        cmd="${cmd//\'\\\'\'/\'}"
+        trap -- "$cmd" ERR
+    else
+        trap - ERR
+    fi
     shopt -u nullglob
 
     if [[ ${#display_parts[@]} -gt 0 ]]; then
@@ -1061,6 +1097,11 @@ scan_kernel_logs() {
     # Note: { } is grouping (NOT subshell), so shopt affects parent shell
     # Use ERR trap to ensure nocasematch is cleaned up if set -e triggers mid-pipeline
     shopt -s nocasematch
+    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
+    local old_err_trap=""
+    if trap -p ERR >/dev/null 2>&1; then
+        old_err_trap="$(trap -p ERR)"
+    fi
     trap 'shopt -u nocasematch' ERR
     printf '%s\n' "$output" | head -20 | while read -r line; do
         # Highlight error patterns with red (case-insensitive)
@@ -1070,7 +1111,20 @@ scan_kernel_logs() {
         fi
         draw_box_line "$colored_line"
     done
-    trap - ERR
+    # Restore previous ERR trap (or clear if none existed)
+    if [[ -n "$old_err_trap" ]]; then
+        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
+        local cmd="${old_err_trap#*trap -- }"
+        cmd="${cmd% ERR}"
+        cmd="${cmd% SIGERR}"
+        cmd="${cmd#\'}"
+        cmd="${cmd%\'}"
+        # Unescape bash's safe-escaped single quotes: '\'' → '
+        cmd="${cmd//\'\\\'\'/\'}"
+        trap -- "$cmd" ERR
+    else
+        trap - ERR
+    fi
     shopt -u nocasematch
 
     local total_lines
@@ -1301,6 +1355,11 @@ scan_pacman_logs() {
     # Note: { } is grouping (NOT subshell), so shopt affects parent shell
     # Use ERR trap to ensure nocasematch is cleaned up if set -e triggers mid-pipeline
     shopt -s nocasematch
+    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
+    local old_err_trap=""
+    if trap -p ERR >/dev/null 2>&1; then
+        old_err_trap="$(trap -p ERR)"
+    fi
     trap 'shopt -u nocasematch' ERR
     printf '%s\n' "$issues" | while read -r line; do
         # Sanitize: remove potential ANSI/binary garbage
@@ -1313,7 +1372,20 @@ scan_pacman_logs() {
         fi
         draw_box_line "$colored_line"
     done
-    trap - ERR
+    # Restore previous ERR trap (or clear if none existed)
+    if [[ -n "$old_err_trap" ]]; then
+        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
+        local cmd="${old_err_trap#*trap -- }"
+        cmd="${cmd% ERR}"
+        cmd="${cmd% SIGERR}"
+        cmd="${cmd#\'}"
+        cmd="${cmd%\'}"
+        # Unescape bash's safe-escaped single quotes: '\'' → '
+        cmd="${cmd//\'\\\'\'/\'}"
+        trap -- "$cmd" ERR
+    else
+        trap - ERR
+    fi
     shopt -u nocasematch
 
 }
