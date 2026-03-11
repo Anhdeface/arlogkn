@@ -1264,28 +1264,54 @@ scan_coredumps() {
 
     if [[ -n "$json_output" ]] && printf '%s' "$json_output" | grep -q '"pid"'; then
         # Parse JSON: extract pid, sig, exe, timestamp
+        # Note: Use regex capture to extract field values, NOT gsub which destroys
+        # the line. coredumpctl may emit multiple fields on one line:
+        #   {"pid": 1234, "signal": 11, "exe": "/usr/bin/foo"}
+        # Old code: gsub(/[^0-9]/, "", $0) → "123411" (pid+signal combined!) WRONG!
+        # New code: match field value after colon → correct extraction
         printf '%s' "$json_output" | awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '
-        BEGIN { count = 0 }
-        /"pid"/ { gsub(/[^0-9]/, "", $0); pid = $0 }
-        /"signal"/ { gsub(/[^0-9]/, "", $0); sig = $0 }
-        /"exe"/ {
-            gsub(/.*"exe" *: *"/, "", $0)
-            gsub(/".*/, "", $0)
-            exe = $0
-        }
-        /"timestamp"/ {
-            gsub(/.*"timestamp" *: */, "", $0)
-            gsub(/[^0-9]/, "", $0)
-            ts = $0
-        }
-        /\}/ {
-            if (pid != "" && exe != "") {
-                count++
-                if (count > 5) exit
-                printf "%s[coredump]%s PID %s%s%s - %s%s%s (signal: %s)\n", \
-                    cyan, rst, bold, pid, rst, yellow, exe, rst, sig
+        BEGIN { count = 0; pid = ""; sig = ""; exe = "" }
+
+        # Extract numeric field value after "key": number
+        function extract_num(key,    regex, val) {
+            regex = "\"" key "\"[[:space:]]*:[[:space:]]*([0-9]+)"
+            if (match($0, regex)) {
+                val = substr($0, RSTART, RLENGTH)
+                gsub(/.*:[[:space:]]*/, "", val)
+                return val
             }
-            pid = ""; sig = ""; exe = ""; ts = ""
+            return ""
+        }
+
+        # Extract string field value after "key": "value"
+        function extract_str(key,    regex, val) {
+            regex = "\"" key "\"[[:space:]]*:[[:space:]]*\"[^\"]*\""
+            if (match($0, regex)) {
+                val = substr($0, RSTART, RLENGTH)
+                gsub(/.*:[[:space:]]*"/, "", val)
+                gsub(/"$/, "", val)
+                return val
+            }
+            return ""
+        }
+
+        {
+            # Try to extract fields from this line (may have multiple fields)
+            tmp = extract_num("pid"); if (tmp != "") pid = tmp
+            tmp = extract_num("signal"); if (tmp != "") sig = tmp
+            tmp = extract_str("exe"); if (tmp != "") exe = tmp
+
+            # Object closing brace - emit if we have valid data
+            if (/\}/) {
+                if (pid != "" && exe != "") {
+                    count++
+                    if (count > 5) exit
+                    printf "%s[coredump]%s PID %s%s%s - %s%s%s (signal: %s)\n", \
+                        cyan, rst, bold, pid, rst, yellow, exe, rst, sig
+                }
+                # Reset for next object
+                pid = ""; sig = ""; exe = ""
+            }
         }
         ' | tail -5 | while read -r formatted; do
             draw_box_line "$formatted"
