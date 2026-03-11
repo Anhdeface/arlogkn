@@ -2921,8 +2921,27 @@ export_all_logs() {
     _extract_trap_cmd INT old_int_trap
     _extract_trap_cmd TERM old_term_trap
 
-    # Cleanup temp file on exit, interrupt (Ctrl+C), or termination
-    trap '[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null' EXIT INT TERM
+    # Cleanup function: restore caller's traps AND clean up temp file
+    # This ensures trap restoration happens on ALL exit paths (success, error, interrupt)
+    _export_cleanup() {
+        local exit_code=$?
+        # Restore caller's traps first (before any other operations)
+        if [[ -n "$old_exit_trap" ]]; then
+            if [[ "$old_exit_trap" == "__IGNORE__" ]]; then trap '' EXIT; else trap -- "$old_exit_trap" EXIT; fi
+        fi
+        if [[ -n "$old_int_trap" ]]; then
+            if [[ "$old_int_trap" == "__IGNORE__" ]]; then trap '' INT; else trap -- "$old_int_trap" INT; fi
+        fi
+        if [[ -n "$old_term_trap" ]]; then
+            if [[ "$old_term_trap" == "__IGNORE__" ]]; then trap '' TERM; else trap -- "$old_term_trap" TERM; fi
+        fi
+        # Clean up temp file if it exists
+        [[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null
+        return $exit_code
+    }
+
+    # Set cleanup trap for EXIT, INT (Ctrl+C), and TERM
+    trap _export_cleanup EXIT INT TERM
 
     temp_file="$(mktemp)" || {
         warn "Failed to create temp file (disk full or /tmp unavailable)"
@@ -3221,43 +3240,36 @@ export_all_logs() {
     } > "$temp_file"
 
     # Validate temp file before moving (detect partial writes)
-    # NOTE: ! -f check removed — mktemp already created the file and returns 1 on failure.
-
     if [[ ! -s "$temp_file" ]]; then
         warn "Temp file is empty (possible write failure): $temp_file"
-        # Restore caller's traps safely
-        # __IGNORE__ means trap '' SIGNAL (ignore signal), not trap - SIGNAL (default)
-        if [[ -n "$old_exit_trap" ]]; then
-            if [[ "$old_exit_trap" == "__IGNORE__" ]]; then trap '' EXIT; else trap -- "$old_exit_trap" EXIT; fi
-        fi
-        if [[ -n "$old_int_trap" ]]; then
-            if [[ "$old_int_trap" == "__IGNORE__" ]]; then trap '' INT; else trap -- "$old_int_trap" INT; fi
-        fi
-        if [[ -n "$old_term_trap" ]]; then
-            if [[ "$old_term_trap" == "__IGNORE__" ]]; then trap '' TERM; else trap -- "$old_term_trap" TERM; fi
-        fi
+        # _export_cleanup EXIT trap will restore traps and clean up temp_file
         return 1
     fi
 
     # Move temp file to final location
     if ! mv "$temp_file" "$output_file"; then
         warn "Failed to move temp file to $output_file"
-        # Trap will clean up temp_file, don't clear it
+        # _export_cleanup EXIT trap will restore traps and clean up temp_file
         return 1
     fi
 
-    # SUCCESS: Restore caller's traps (temp file moved, no cleanup needed)
+    # SUCCESS: Clear temp_file so EXIT trap doesn't delete the output file
     temp_file=""
-    # Restore caller's traps safely
-    # __IGNORE__ means trap '' SIGNAL (ignore signal), not trap - SIGNAL (default)
+    # Restore caller's traps before disabling our cleanup trap
     if [[ -n "$old_exit_trap" ]]; then
         if [[ "$old_exit_trap" == "__IGNORE__" ]]; then trap '' EXIT; else trap -- "$old_exit_trap" EXIT; fi
+    else
+        trap - EXIT
     fi
     if [[ -n "$old_int_trap" ]]; then
         if [[ "$old_int_trap" == "__IGNORE__" ]]; then trap '' INT; else trap -- "$old_int_trap" INT; fi
+    else
+        trap - INT
     fi
     if [[ -n "$old_term_trap" ]]; then
         if [[ "$old_term_trap" == "__IGNORE__" ]]; then trap '' TERM; else trap -- "$old_term_trap" TERM; fi
+    else
+        trap - TERM
     fi
 
     info "All logs exported to: ${output_file}"
