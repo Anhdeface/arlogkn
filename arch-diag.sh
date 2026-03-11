@@ -1431,6 +1431,23 @@ scan_pacman_logs() {
 
 # Helper: Gather temperature data from /sys/class/hwmon
 # Output format: chip_name|label|temp_c (pipe-separated, one per line)
+#
+# IMPORTANT: This function is designed to be piped to _format_temperatures_display:
+#   _gather_temperatures | _format_temperatures_display
+#
+# The entire table lifecycle (begin→rows→end) occurs within _format_temperatures_display,
+# which runs in a subshell due to the pipeline. This is INTENTIONAL and SAFE because:
+# 1. All table state changes (_TBL_DEPTH, etc.) are contained within the subshell
+# 2. The subshell's output (formatted text) propagates to stdout correctly
+# 3. Parent shell's table state is not affected
+#
+# WARNING FOR FUTURE MODIFICATIONS:
+# - Do NOT call tbl_begin in parent shell and tbl_row inside _format_temperatures_display
+# - Do NOT expect table state to propagate from _format_temperatures_display to parent
+# - If you need table state in parent, refactor to use temp file or process substitution:
+#     _gather_temperatures > "$temp_file"
+#     _format_temperatures_display < "$temp_file"
+# This pattern ensures table state consistency across subshell boundaries.
 _gather_temperatures() {
     if [[ ! -d /sys/class/hwmon ]]; then
         return 1
@@ -1487,6 +1504,20 @@ _gather_temperatures() {
 }
 
 # Helper: Format temperature data for terminal display (with colors)
+# CONTRACT: Must be called via pipeline from _gather_temperatures:
+#   _gather_temperatures | _format_temperatures_display
+#
+# This function runs in a SUBSHELL (pipeline vế phải). It is SELF-CONTAINED:
+# - Calls draw_table_begin, tbl_row, draw_table_end entirely within subshell
+# - Table state (_TBL_DEPTH, etc.) does NOT propagate to parent (expected)
+# - Output (formatted text) propagates to stdout correctly
+#
+# DO NOT MODIFY to:
+# - Call tbl_begin without matching tbl_end (breaks table state in subshell)
+# - Expect table state to be visible in parent shell (won't work)
+# - Split table lifecycle across subshell boundaries (will corrupt state)
+#
+# See _gather_temperatures() for alternative patterns using temp files.
 _format_temperatures_display() {
     local found=0
     draw_table_begin "Sensor" 30 "Temperature" 18
