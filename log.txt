@@ -1,8 +1,17 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-10
+Generated: 2026-03-11
 
 ---
+3902f37 2026-03-11 fix(ui): use character-aware string truncation for UTF-8 safety
+5938692 2026-03-11 fix(logs): cluster_errors() return 0 for empty input, add || true to pipeline
+ee39788 2026-03-11 fix(export): ensure trap restoration in export_all_logs() on set -e exit
+5609df7 2026-03-11 docs(temps): add contract documentation for temperature pipeline subshell
+b314da9 2026-03-11 fix(coredumps): fix JSON parser to handle multi-field lines correctly
+25a0358 2026-03-11 fix(ui): visible_len() count Unicode characters not bytes with wc -m
+1cbdcf9 2026-03-11 fix(trap): save/restore ERR trap in nullglob/nocasematch cleanup blocks
+ab282c2 2026-03-11 fix(shell): move 2>/dev/null inside command substitution for $(<file) reads
+e1231e4 2026-03-10 docs: update log.txt with latest commits
 8eacb2b 2026-03-10 docs(help): document scan mode flag order dependency in --help output
 7e8ed29 2026-03-10 fix(tables): add subshell detection and warning for tbl_begin/tbl_row/tbl_end
 18a81b6 2026-03-10 fix(wiki): add numeric index support for --wiki N (1-20)
