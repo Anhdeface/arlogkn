@@ -3470,6 +3470,13 @@ parse_args() {
                 printf '%s version %s\n' "$SCRIPT_NAME" "$VERSION"
                 exit 0
                 ;;
+            --)
+                # End-of-options marker (POSIX convention)
+                # All remaining arguments are treated as positional (ignored for this script)
+                # Usage: ./arch-diag.sh -- --kernel  # runs full scan, ignores --kernel
+                shift
+                break
+                ;;
             *)
                 die "Unknown argument: $arg (use --help for usage)"
                 ;;
