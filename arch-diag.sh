@@ -1832,15 +1832,24 @@ scan_mounts() {
     # Table header
     draw_table_begin "Device" 22 "Mountpoint" 24 "Type" 12 "Size" 10
 
-    # Count filtered mounts (excluding autofs, comment lines)
-    local filtered_total
-    filtered_total="$(grep -cvE '^#|^[[:space:]]*[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+autofs[[:space:]]' /proc/mounts 2>/dev/null || echo "0")"
-
-    local count=0
+    # Read /proc/mounts ONCE into array to avoid race condition
+    # (NFS automount or other dynamic mounts could change between reads)
+    # Filter: exclude autofs and comment lines
+    local -a mount_lines=()
     while IFS=' ' read -r source target fstype opts freq pass; do
-        [[ $count -ge 12 ]] && break
         [[ "$source" =~ ^# ]] && continue
         [[ "$fstype" == "autofs" ]] && continue
+        mount_lines+=("$source|$target|$fstype")
+    done < /proc/mounts 2>/dev/null || true
+
+    local filtered_total=${#mount_lines[@]}
+    local count=0
+
+    for line in "${mount_lines[@]}"; do
+        [[ $count -ge 12 ]] && break
+
+        # Parse pipe-separated fields
+        IFS='|' read -r source target fstype <<< "$line"
 
         # Decode /proc/mounts octal escapes (pure bash, no subprocess)
         # /proc/mounts encodes: space→\040, tab→\011, backslash→\134
@@ -1873,7 +1882,7 @@ scan_mounts() {
 
         draw_table_row "${color}${source}${C_RESET}" "${target}" "${fstype}" "${size}"
         count=$((count + 1))
-    done < /proc/mounts 2>/dev/null || true
+    done
 
     # Warn if truncated (servers with many mounts: NFS, btrfs subvolumes, containers)
     if [[ "$filtered_total" -gt "$count" ]]; then
