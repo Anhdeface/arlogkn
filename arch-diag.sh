@@ -863,15 +863,13 @@ strip_ansi() {
     s="${s//"${C_BOLD}"/}"
     s="${s//"${C_RESET}"/}"
 
-    # Strip raw ANSI escape sequences using pure bash (no sed subprocess)
+    # Strip raw ANSI escape sequences using sed (single pass, O(n))
     # Pattern: \x1b followed by [ then digits/semicolons then a letter
-    # Uses bash parameter expansion loop to avoid spawning sed in tight loops
-    # Note: Store regex in variable to prevent bash parsing ; as command separator
-    local ansi_pattern=$'\x1b\\[[0-9;]*[a-zA-Z]'
-    while [[ "$s" =~ $ansi_pattern ]]; do
-        s="${s//"${BASH_REMATCH[0]}"/}"
-    done
-    
+    # Using sed instead of bash loop avoids O(n²) complexity for strings
+    # with many ANSI codes (e.g., colored journal errors with 20+ codes)
+    # Trade-off: 1 subprocess (~1ms) vs O(n²) bash operations
+    s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
+
     if [[ -n "$var_name" ]]; then
         printf -v "$var_name" '%s' "$s"
     else
