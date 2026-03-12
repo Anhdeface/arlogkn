@@ -80,7 +80,7 @@ test_detect_system_info_kernel() {
 test_check_internet_sets_status() {
     INTERNET_STATUS="unknown"
     check_internet || true
-    # Must be either "connected" or "disconnected", not "unknown"
+    # Must be a valid status, not "unknown"
     assert_ne "check_internet resolves status" "$INTERNET_STATUS" "unknown"
 }
 
@@ -88,7 +88,9 @@ test_check_internet_result_valid() {
     INTERNET_STATUS="unknown"
     check_internet || true
     local valid=0
-    [[ "$INTERNET_STATUS" == "connected" || "$INTERNET_STATUS" == "disconnected" ]] && valid=1
+    # Valid statuses: ip_assigned, link_up, connected, disconnected
+    [[ "$INTERNET_STATUS" == "ip_assigned" || "$INTERNET_STATUS" == "link_up" || \
+       "$INTERNET_STATUS" == "connected" || "$INTERNET_STATUS" == "disconnected" ]] && valid=1
     assert_eq "check_internet valid state" "$valid" "1"
 }
 

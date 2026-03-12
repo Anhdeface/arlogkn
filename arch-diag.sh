@@ -178,13 +178,20 @@ detect_system_info() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 check_internet() {
-    # Connectivity check - local methods first, external only if enabled
-    # Note: Default route presence ≠ internet connectivity (could be local-only,
-    # captive portal, or broken gateway). Check actual IP assignment instead.
+    # Network status check - local methods first, external only if enabled.
+    # Note: Having a routable IP does NOT guarantee internet connectivity.
+    # Private LAN (192.168.x.x) with down gateway, VPN tunnels without
+    # external route, or isolated network namespaces all have IPs but no
+    # actual internet access.
+    #
+    # Status values:
+    # - "ip_assigned": Interface UP + routable IP assigned (IPv4 or IPv6)
+    # - "link_up": Interface UP but no IP confirmed
+    # - "connected": External connectivity verified (HTTP check pass)
+    # - "disconnected": No interfaces UP
 
     # ─────────────────────────────────────────────────────────────────────────
     # METHOD 1: Check interface operstate + IP from /sys
-    # Check all interfaces except loopback (lo)
     # ─────────────────────────────────────────────────────────────────────────
     if [[ -d /sys/class/net ]]; then
         local iface operstate iface_name
@@ -196,19 +203,10 @@ check_internet() {
             [[ "$iface_name" == "lo" ]] && continue
 
             # Check if interface is UP
-            # Note: Only check for "up" state, not "unknown"
-            # "unknown" state can appear on:
-            #   - Wireless interfaces without carrier
-            #   - Docker bridges (docker0, br-*)
-            #   - VPN tunnels (tun0, tap0)
-            #   - Virtual interfaces (veth*, virbr*)
-            # These do not necessarily indicate actual network connectivity
             if [[ -f "${iface}/operstate" ]]; then
                 operstate="$(< "${iface}/operstate" 2>/dev/null)" || operstate=""
                 if [[ "$operstate" == "up" ]]; then
-                    # Interface is UP — but does it have a routable IP?
-                    # Check via ip command if available (most reliable)
-                    # Support both IPv4 and IPv6 (IPv6-only systems exist)
+                    # Interface is UP — check for routable IP assignment
                     if command -v ip &>/dev/null; then
                         local ip_output has_valid_ip=0
 
@@ -229,7 +227,8 @@ check_internet() {
                         fi
 
                         if [[ "$has_valid_ip" -eq 1 ]]; then
-                            INTERNET_STATUS="connected"
+                            # Has routable IP, but NOT confirmed internet yet
+                            INTERNET_STATUS="ip_assigned"
                             return 0
                         fi
                     fi
@@ -245,10 +244,10 @@ check_internet() {
             return 0
         fi
     fi
-    
+
     # ─────────────────────────────────────────────────────────────────────────
     # OPTIONAL: External connectivity checks (only if explicitly enabled)
-    # Controlled by ARLOGKN_CHECK_EXTERNAL environment variable
+    # This is the ONLY path that sets "connected" (verified internet access)
     # ─────────────────────────────────────────────────────────────────────────
     if [[ "${ARLOGKN_CHECK_EXTERNAL:-0}" == "1" ]]; then
         # Try gateway ping first (more reliable than hardcoded 8.8.8.8)
@@ -256,14 +255,14 @@ check_internet() {
         if command -v ip &>/dev/null; then
             gateway="$(ip route 2>/dev/null | grep '^default' | awk '{print $3}' | head -1)"
         fi
-        
+
         if [[ -n "$gateway" ]] && command -v ping &>/dev/null; then
             if ping -c1 -W2 "$gateway" &>/dev/null; then
                 INTERNET_STATUS="connected"
                 return 0
             fi
         fi
-        
+
         # Fallback to HTTP check with configurable endpoint
         local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
 
@@ -278,7 +277,7 @@ check_internet() {
             fi
         fi
     fi
-    
+
     # No connectivity detected
     INTERNET_STATUS="disconnected"
     return 1
@@ -2160,16 +2159,27 @@ scan_system_basics() {
     draw_section_header "SYSTEM INFORMATION"
     printf '\n'
 
-    # Internet status
-    local internet_icon
-    if [[ "$INTERNET_STATUS" == "connected" ]]; then
-        internet_icon="${C_GREEN}✓ Connected${C_RESET}"
-    elif [[ "$INTERNET_STATUS" == "link_up" ]]; then
-        internet_icon="${C_YELLOW}▲ Link Up (no IP confirmed)${C_RESET}"
-    else
-        internet_icon="${C_RED}✗ Disconnected${C_RESET}"
-    fi
-    draw_box_line "${C_BOLD}Internet:${C_RESET} ${internet_icon}"
+    # Network status (not internet — having IP ≠ internet access)
+    local network_icon
+    case "$INTERNET_STATUS" in
+        "connected")
+            # External connectivity verified via HTTP/gateway check
+            network_icon="${C_GREEN}✓ Connected${C_RESET}"
+            ;;
+        "ip_assigned")
+            # Has routable IP but external connectivity not verified
+            network_icon="${C_YELLOW}▲ IP Assigned (unverified)${C_RESET}"
+            ;;
+        "link_up")
+            # Interface UP but no IP confirmed
+            network_icon="${C_YELLOW}▲ Link Up (no IP)${C_RESET}"
+            ;;
+        *)
+            # disconnected or unknown
+            network_icon="${C_RED}✗ Disconnected${C_RESET}"
+            ;;
+    esac
+    draw_box_line "${C_BOLD}Network:${C_RESET} ${network_icon}"
 
     # CPU info
     local cpu_model
@@ -3270,7 +3280,7 @@ export_all_logs() {
         printf '=============================================================\n'
         printf '[13] SYSTEM INFO\n'
         printf '=============================================================\n'
-        printf 'Internet: %s\n' "$INTERNET_STATUS"
+        printf 'Network Status: %s\n' "$INTERNET_STATUS"
         printf 'CPU: %s\n' "$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d':' -f2 | sed 's/^ *//' || echo 'Unknown')"
         printf 'CPU Cores: %s\n' "$(nproc 2>/dev/null || echo '?')"
         printf 'Memory:\n'
@@ -4294,14 +4304,21 @@ main() {
     draw_info_box "Kernel" "${KERNEL_VER}"
     draw_info_box "CPU Governor" "${CPU_GOVERNOR}"
 
-    # Internet status
-    if [[ "$INTERNET_STATUS" == "connected" ]]; then
-        draw_info_box "Internet" "${C_GREEN}Connected${C_RESET}"
-    elif [[ "$INTERNET_STATUS" == "link_up" ]]; then
-        draw_info_box "Internet" "${C_YELLOW}Link Up (no IP confirmed)${C_RESET}"
-    else
-        draw_info_box "Internet" "${C_RED}Disconnected${C_RESET}"
-    fi
+    # Network status (not internet — having IP ≠ internet access)
+    case "$INTERNET_STATUS" in
+        "connected")
+            draw_info_box "Network" "${C_GREEN}Connected${C_RESET}"
+            ;;
+        "ip_assigned")
+            draw_info_box "Network" "${C_YELLOW}IP Assigned (unverified)${C_RESET}"
+            ;;
+        "link_up")
+            draw_info_box "Network" "${C_YELLOW}Link Up (no IP)${C_RESET}"
+            ;;
+        *)
+            draw_info_box "Network" "${C_RED}Disconnected${C_RESET}"
+            ;;
+    esac
 
     # Boot offset description
     local boot_desc
