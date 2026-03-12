@@ -2595,6 +2595,55 @@ export_boot_timing() {
     info "Boot timing exported: boot_timing.txt"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: Generate network interfaces export content (reusable)
+# Used by: export_network_interfaces(), export_all_logs()
+# Output: Formatted text for export files (no color codes)
+# ─────────────────────────────────────────────────────────────────────────────
+_export_network_interfaces_content() {
+    printf '=============================================================\n'
+    printf 'NETWORK INTERFACES\n'
+    printf '=============================================================\n\n'
+
+    if [[ -d /sys/class/net ]]; then
+        printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
+        printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
+        shopt -s nullglob
+        for net_path in /sys/class/net/*; do
+            [[ ! -d "$net_path" ]] && continue
+            local iface_name
+            iface_name="$(basename "$net_path")"
+            [[ "$iface_name" == "lo" ]] && continue
+            local e_state="unknown" e_speed="N/A" e_mac="N/A"
+            [[ -f "${net_path}/operstate" ]] && e_state="$(< "${net_path}/operstate" 2>/dev/null)" || e_state="unknown"
+            if [[ -f "${net_path}/speed" ]]; then
+                local rs
+                rs="$(< "${net_path}/speed" 2>/dev/null)" || rs=""
+                if [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]]; then
+                    if [[ "$rs" -ge 1000 ]]; then
+                        e_speed="$((rs / 1000))Gbps"
+                    else
+                        e_speed="${rs}Mbps"
+                    fi
+                fi
+            fi
+            [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address" 2>/dev/null)" || e_mac="N/A"
+            local e_ip="N/A"
+            if command -v ip &>/dev/null; then
+                e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+                if [[ -z "$e_ip" ]]; then
+                    e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
+                fi
+                [[ -z "$e_ip" ]] && e_ip="N/A"
+            fi
+            printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
+        done
+        shopt -u nullglob
+    else
+        printf '/sys/class/net not available.\n'
+    fi
+}
+
 export_network_interfaces() {
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
@@ -2604,49 +2653,7 @@ export_network_interfaces() {
 
     local output_file="${OUTPUT_DIR}/network_interfaces.txt"
 
-    {
-        printf '=============================================================\n'
-        printf 'NETWORK INTERFACES\n'
-        printf '=============================================================\n\n'
-
-        if [[ -d /sys/class/net ]]; then
-            printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
-            printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
-            shopt -s nullglob
-            for net_path in /sys/class/net/*; do
-                [[ ! -d "$net_path" ]] && continue
-                local iface_name
-                iface_name="$(basename "$net_path")"
-                [[ "$iface_name" == "lo" ]] && continue
-                local e_state="unknown" e_speed="N/A" e_mac="N/A"
-                [[ -f "${net_path}/operstate" ]] && e_state="$(< "${net_path}/operstate" 2>/dev/null)" || e_state="unknown"
-                if [[ -f "${net_path}/speed" ]]; then
-                    local rs
-                    rs="$(< "${net_path}/speed" 2>/dev/null)" || rs=""
-                    if [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]]; then
-                        if [[ "$rs" -ge 1000 ]]; then
-                            e_speed="$((rs / 1000))Gbps"
-                        else
-                            e_speed="${rs}Mbps"
-                        fi
-                    fi
-                fi
-                [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address" 2>/dev/null)" || e_mac="N/A"
-                local e_ip="N/A"
-                if command -v ip &>/dev/null; then
-                    e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-                    if [[ -z "$e_ip" ]]; then
-                        e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
-                    fi
-                    [[ -z "$e_ip" ]] && e_ip="N/A"
-                fi
-                printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
-            done
-            shopt -u nullglob
-        else
-            printf '/sys/class/net not available.\n'
-        fi
-    } > "$output_file"
+    _export_network_interfaces_content > "$output_file"
 
     info "Network interfaces exported: network_interfaces.txt"
 }
@@ -3211,45 +3218,9 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
         printf '[10] NETWORK INTERFACES\n'
-        printf '=============================================================\n'
-        if [[ -d /sys/class/net ]]; then
-            printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
-            printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
-            shopt -s nullglob
-            for net_path in /sys/class/net/*; do
-                [[ ! -d "$net_path" ]] && continue
-                local iface_name
-                iface_name="$(basename "$net_path")"
-                [[ "$iface_name" == "lo" ]] && continue
-                local e_state="unknown" e_speed="N/A" e_mac="N/A"
-                [[ -f "${net_path}/operstate" ]] && e_state="$(< "${net_path}/operstate" 2>/dev/null)" || e_state="unknown"
-                if [[ -f "${net_path}/speed" ]]; then
-                    local rs
-                    rs="$(< "${net_path}/speed" 2>/dev/null)" || rs=""
-                    if [[ -n "$rs" && "$rs" =~ ^[0-9]+$ && "$rs" -gt 0 ]]; then
-                        if [[ "$rs" -ge 1000 ]]; then
-                            e_speed="$((rs / 1000))Gbps"
-                        else
-                            e_speed="${rs}Mbps"
-                        fi
-                    fi
-                fi
-                [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address" 2>/dev/null)" || e_mac="N/A"
-                local e_ip="N/A"
-                if command -v ip &>/dev/null; then
-                    e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-                    if [[ -z "$e_ip" ]]; then
-                        e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
-                    fi
-                    [[ -z "$e_ip" ]] && e_ip="N/A"
-                fi
-                printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
-            done
-            shopt -u nullglob
-        else
-            printf '/sys/class/net not available.\n'
-        fi
-        printf '\n\n'
+        printf '=============================================================\n\n'
+        _export_network_interfaces_content
+        printf '\n'
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
         printf '[11] GPU / VGA INFO\n'
