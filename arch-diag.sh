@@ -1447,6 +1447,15 @@ scan_coredumps() {
 scan_pacman_logs() {
     draw_section_header "PACMAN / ALPM (Errors & Warnings)"
 
+    # Early check: pacman is Arch-specific. Skip gracefully on non-Arch systems.
+    # This prevents confusing "log not found" messages on Ubuntu, Fedora, etc.
+    if [[ "$DISTRO_TYPE" != "Arch-based" && "$DISTRO_TYPE" != "Performance Tuned" && \
+          "$DISTRO_NAME" != *"Arch"* && "$DISTRO_NAME" != *"CachyOS"* ]]; then
+        draw_box_line "${C_YELLOW}Skipping pacman scan (non-Arch system)${C_RESET}"
+        draw_box_line "${C_BLUE}Note: pacman is the package manager for Arch Linux${C_RESET}"
+        return 0
+    fi
+
     local pacman_log="/var/log/pacman.log"
 
     if [[ ! -f "$pacman_log" ]]; then
@@ -2465,7 +2474,15 @@ export_pacman_logs() {
         warn "export_pacman_logs: OUTPUT_DIR not set or invalid"
         return 1
     fi
-    
+
+    # Early check: pacman is Arch-specific. Skip gracefully on non-Arch systems.
+    if [[ "$DISTRO_TYPE" != "Arch-based" && "$DISTRO_TYPE" != "Performance Tuned" && \
+          "$DISTRO_NAME" != *"Arch"* && "$DISTRO_NAME" != *"CachyOS"* ]]; then
+        printf 'Skipping pacman export (non-Arch system)\n' > "${OUTPUT_DIR}/pacman_errors.txt"
+        info "Pacman export skipped (non-Arch system)"
+        return 0
+    fi
+
     local output_file="${OUTPUT_DIR}/pacman_errors.txt"
     local pacman_log="/var/log/pacman.log"
 
@@ -3169,20 +3186,28 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         printf '=============================================================\n'
         printf '[6] PACMAN LOGS (Errors & Warnings)\n'
-        printf '=============================================================\n'
-        local pacman_log="/var/log/pacman.log"
-        if [[ -f "$pacman_log" ]]; then
-            local pacman_issues
-            pacman_issues="$(tail -100 "$pacman_log" 2>/dev/null | grep -iE '(error|warning)' | grep -v '^#')" || true
-            if [[ -n "$pacman_issues" ]]; then
-                printf '%s\n' "$pacman_issues"
-            else
-                printf 'No pacman errors or warnings found in last 100 lines.\n'
-            fi
+        printf '=============================================================\n\n'
+
+        # Check if Arch-based system before attempting to read pacman log
+        if [[ "$DISTRO_TYPE" != "Arch-based" && "$DISTRO_TYPE" != "Performance Tuned" && \
+              "$DISTRO_NAME" != *"Arch"* && "$DISTRO_NAME" != *"CachyOS"* ]]; then
+            printf 'Skipping pacman scan (non-Arch system)\n'
+            printf 'Note: pacman is the package manager for Arch Linux\n\n'
         else
-            printf 'Pacman log not found (may require root).\n'
+            local pacman_log="/var/log/pacman.log"
+            if [[ -f "$pacman_log" ]]; then
+                local pacman_issues
+                pacman_issues="$(tail -100 "$pacman_log" 2>/dev/null | grep -iE '(error|warning)' | grep -v '^#')" || true
+                if [[ -n "$pacman_issues" ]]; then
+                    printf '%s\n' "$pacman_issues"
+                else
+                    printf 'No pacman errors or warnings found in last 100 lines.\n'
+                fi
+            else
+                printf 'Pacman log not found (may require root).\n'
+            fi
         fi
-        printf '\n\n'
+        printf '\n'
 
         # ─────────────────────────────────────────────────────────────────────
         # MOUNTED FILESYSTEMS
