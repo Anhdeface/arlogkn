@@ -3610,7 +3610,7 @@ find_wiki_group_awk() {
 
     # Early exit for empty or invalid query
     if [[ -z "$query" || ${#query} -gt 50 ]]; then
-        printf '%s\n' "-1"
+        printf '%d\n' "-1"
         return 1
     fi
 
@@ -3619,7 +3619,7 @@ find_wiki_group_awk() {
         local target="${WIKI_ALIASES[$query]}"
         local i=0
         for group in "${WIKI_GROUP_NAMES[@]}"; do
-            [[ "$group" == *"$target"* ]] && printf '%s\n' "$i" && return 0
+            [[ "$group" == *"$target"* ]] && printf '%d\n' "$i" && return 0
             i=$((i+1))
         done
     fi
@@ -3627,7 +3627,7 @@ find_wiki_group_awk() {
     # METHOD 2: Exact match
     local i=0
     for group in "${WIKI_GROUP_NAMES[@]}"; do
-        [[ "$group" == *"$query"* ]] && echo $i && return 0
+        [[ "$group" == *"$query"* ]] && printf '%d\n' "$i" && return 0
         i=$((i+1))
     done
 
@@ -3636,15 +3636,15 @@ find_wiki_group_awk() {
     groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
     local result
     result="$(awk_fuzzy_match "$query" "$groups_str")"
-    
+
     local best_idx="${result%%:*}"
     local best_dist="${result##*:}"
-    
+
     if [[ "$best_idx" -ge 0 && "$best_dist" -le 3 ]]; then
-        echo "$best_idx" && return 0
+        printf '%d\n' "$best_idx" && return 0
     fi
-    
-    echo "-1"
+
+    printf '%d\n' "-1"
     return 1
 }
 
