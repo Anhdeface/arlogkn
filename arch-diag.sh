@@ -473,32 +473,14 @@ get_driver_from_sys() {
     printf '%s\n' "$driver"
 }
 
-# Main driver detection - multi-source
-detect_drivers() {
-    # Return cached result if available (drivers don't change during session)
-    # Use printf instead of echo to avoid xpg_echo interpretation of -e, -n flags
-    [[ -n "$_DRIVERS_CACHE" ]] && printf '%s\n' "$_DRIVERS_CACHE" && return 0
-
-    local lsmod_output
-    lsmod_output="$(timeout 5 lsmod 2>/dev/null)" || true
-    # Count loaded modules (skip header line)
-    # Use NR>1{count++} to avoid -1 on empty input (awk with 0 bytes → NR=0 → NR-1=-1)
-    # count+0 ensures 0 is printed even if count is unset (empty input)
-    local loaded_count
-    loaded_count="$(awk 'NR>1{count++} END{print count+0}' <<< "$lsmod_output")"
-    
-    # Initialize all driver variables
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: Detect drivers from /sys/class (GPU, network, audio)
+# Returns: gpu_driver|network_driver|audio_driver (pipe-separated, 3 fields)
+# ─────────────────────────────────────────────────────────────────────────────
+_detect_drivers_sysclass() {
     local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
-    local storage_driver="N/A" usb_driver="N/A" thunderbolt_driver="N/A"
-    local input_driver="N/A" platform_driver="N/A" virtual_driver="N/A"
-    local nvme_driver="N/A" sata_driver="N/A" raid_driver="N/A"
-    local i2c_driver="N/A" smbus_driver="N/A" watchdog_driver="N/A"
-    
-    # ─────────────────────────────────────────────────────────────────────────
-    # SOURCE 1: /sys/class detection (most reliable)
-    # ─────────────────────────────────────────────────────────────────────────
 
-    # GPU from DRM (nullglob prevents literal pattern if no matches)
+    # GPU from DRM
     if [[ -d /sys/class/drm ]]; then
         shopt -s nullglob
         local card_path driver
@@ -529,7 +511,7 @@ detect_drivers() {
             fi
         done
         shopt -u nullglob
-        
+
         if [[ ${#net_drvs[@]} -gt 0 ]]; then
             network_driver="$(printf '%s, ' "${net_drvs[@]}")"
             network_driver="${network_driver%, }"
@@ -547,58 +529,61 @@ detect_drivers() {
         done
         shopt -u nullglob
     fi
-    
-    # ─────────────────────────────────────────────────────────────────────────
-    # SOURCE 2: lspci -k fallback/enhancement
-    # ─────────────────────────────────────────────────────────────────────────
 
-    if command -v lspci &>/dev/null; then
-        # Use cached lspci output (single subprocess per session)
-        local lspci_output
-        lspci_output="$(_get_lspci)"
+    printf '%s|%s|%s\n' "$gpu_driver" "$network_driver" "$audio_driver"
+}
 
-        # GPU (enhanced patterns)
-        [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'vga|3d|display' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: Detect drivers from lspci -k output
+# Input: $1 = lspci_output
+# Returns: storage|usb|thunderbolt|nvme|sata|i2c|smbus|platform (8 fields)
+# ─────────────────────────────────────────────────────────────────────────────
+_detect_drivers_lspci() {
+    local lspci_output="$1"
+    local storage_driver="N/A" usb_driver="N/A" thunderbolt_driver="N/A"
+    local nvme_driver="N/A" sata_driver="N/A" i2c_driver="N/A"
+    local smbus_driver="N/A" platform_driver="N/A"
 
-        # Network (enhanced patterns)
-        [[ "$network_driver" == "N/A" ]] && network_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'ethernet|network|wireless|wifi' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    # Storage controllers
+    storage_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'sata|ahci|ide|storage' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    [[ -z "$storage_driver" ]] && storage_driver="N/A"
 
-        # Audio
-        [[ "$audio_driver" == "N/A" ]] && audio_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'audio|hdmi|hd-audio' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    # NVMe
+    nvme_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'nvme' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    [[ -z "$nvme_driver" ]] && nvme_driver="N/A"
 
-        # Storage controllers
-        storage_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'sata|ahci|ide|storage' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        [[ -z "$storage_driver" ]] && storage_driver="N/A"
+    # USB Controller
+    usb_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'usb|xhci|ehci|ohci|uhci' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    [[ -z "$usb_driver" ]] && usb_driver="N/A"
 
-        # NVMe
-        nvme_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'nvme' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        [[ -z "$nvme_driver" ]] && nvme_driver="N/A"
+    # Thunderbolt
+    thunderbolt_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'thunderbolt' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    [[ -z "$thunderbolt_driver" ]] && thunderbolt_driver="N/A"
 
-        # USB Controller
-        usb_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'usb|xhci|ehci|ohci|uhci' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        [[ -z "$usb_driver" ]] && usb_driver="N/A"
+    # I2C/SMBus
+    smbus_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'smbus|i2c' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
 
-        # Thunderbolt
-        thunderbolt_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'thunderbolt' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        [[ -z "$thunderbolt_driver" ]] && thunderbolt_driver="N/A"
-
-        # I2C/SMBus
-        smbus_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'smbus|i2c' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
-
-        # ISA/LPC Bridge (platform)
-        # Prioritize ISA/LPC matches (specific platform bridges), then fallback to PCH/platform
-        # Avoid generic 'bridge' pattern which matches PCIe/SATA bridges incorrectly
-        platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'isa bridge|lpc bridge|isa|lpc' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        if [[ -z "$platform_driver" ]]; then
-            platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'platform|pch' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
-        fi
-        [[ -z "$platform_driver" ]] && platform_driver="N/A"
+    # ISA/LPC Bridge (platform)
+    # Prioritize ISA/LPC matches (specific platform bridges), then fallback to PCH/platform
+    # Avoid generic 'bridge' pattern which matches PCIe/SATA bridges incorrectly
+    platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'isa bridge|lpc bridge|isa|lpc' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    if [[ -z "$platform_driver" ]]; then
+        platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'platform|pch' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
     fi
+    [[ -z "$platform_driver" ]] && platform_driver="N/A"
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SOURCE 3: /sys/bus detection
-    # ─────────────────────────────────────────────────────────────────────────
+    printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
+        "$storage_driver" "$usb_driver" "$thunderbolt_driver" "$nvme_driver" \
+        "$sata_driver" "$i2c_driver" "$smbus_driver" "$platform_driver"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: Detect drivers from /sys/bus and /sys/class (virtual, input, watchdog)
+# Returns: virtual|input|watchdog (3 fields)
+# ─────────────────────────────────────────────────────────────────────────────
+_detect_drivers_sysbus() {
+    local virtual_driver="N/A" input_driver="N/A" watchdog_driver="N/A"
 
     # Virtual drivers from /sys/bus/pci/drivers
     if [[ -d /sys/bus/pci/drivers ]]; then
@@ -654,16 +639,77 @@ detect_drivers() {
         shopt -u nullglob
         [[ -z "$watchdog_driver" || "$watchdog_driver" == "N/A" ]] && watchdog_driver="N/A"
     fi
-    
+
+    printf '%s|%s|%s\n' "$virtual_driver" "$input_driver" "$watchdog_driver"
+}
+
+# Main driver detection - multi-source
+# Orchestrates 3 helper functions and merges results
+detect_drivers() {
+    # Return cached result if available (drivers don't change during session)
+    # Use printf instead of echo to avoid xpg_echo interpretation of -e, -n flags
+    [[ -n "$_DRIVERS_CACHE" ]] && printf '%s\n' "$_DRIVERS_CACHE" && return 0
+
+    local lsmod_output
+    lsmod_output="$(timeout 5 lsmod 2>/dev/null)" || true
+    # Count loaded modules (skip header line)
+    # Use NR>1{count++} to avoid -1 on empty input (awk with 0 bytes → NR=0 → NR-1=-1)
+    # count+0 ensures 0 is printed even if count is unset (empty input)
+    local loaded_count
+    loaded_count="$(awk 'NR>1{count++} END{print count+0}' <<< "$lsmod_output")"
+
+    # Initialize all driver variables with defaults
+    local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
+    local storage_driver="N/A" usb_driver="N/A" thunderbolt_driver="N/A"
+    local input_driver="N/A" platform_driver="N/A" virtual_driver="N/A"
+    local nvme_driver="N/A" sata_driver="N/A" raid_driver="N/A"
+    local i2c_driver="N/A" smbus_driver="N/A" watchdog_driver="N/A"
+
     # ─────────────────────────────────────────────────────────────────────────
-    # SOURCE 4: lsmod category detection
+    # SOURCE 1: /sys/class detection (GPU, network, audio)
+    # ─────────────────────────────────────────────────────────────────────────
+    local sysclass_result
+    sysclass_result="$(_detect_drivers_sysclass)"
+    IFS='|' read -r gpu_driver network_driver audio_driver <<< "$sysclass_result"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SOURCE 2: lspci -k fallback/enhancement
+    # ─────────────────────────────────────────────────────────────────────────
+    if command -v lspci &>/dev/null; then
+        # Use cached lspci output (single subprocess per session)
+        local lspci_output
+        lspci_output="$(_get_lspci)"
+
+        # GPU fallback (enhanced patterns) - only if /sys didn't find it
+        [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'vga|3d|display' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+
+        # Network fallback
+        [[ "$network_driver" == "N/A" ]] && network_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'ethernet|network|wireless|wifi' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+
+        # Audio fallback
+        [[ "$audio_driver" == "N/A" ]] && audio_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'audio|hdmi|hd-audio' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+
+        # Parse remaining drivers from lspci (8 fields)
+        local lspci_result
+        lspci_result="$(_detect_drivers_lspci "$lspci_output")"
+        IFS='|' read -r storage_driver usb_driver thunderbolt_driver nvme_driver \
+            sata_driver i2c_driver smbus_driver platform_driver <<< "$lspci_result"
+    fi
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SOURCE 3: /sys/bus detection (virtual, input, watchdog)
+    # ─────────────────────────────────────────────────────────────────────────
+    local sysbus_result
+    sysbus_result="$(_detect_drivers_sysbus)"
+    IFS='|' read -r virtual_driver input_driver watchdog_driver <<< "$sysbus_result"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SOURCE 4: lsmod category detection (RAID, SATA, I2C enhancement)
     # ─────────────────────────────────────────────────────────────────────────
 
     # RAID detection
     if printf '%s\n' "$lsmod_output" | grep -qE '^raid|^dm_raid'; then
         raid_driver="mdraid/dm-raid"
-    else
-        raid_driver="N/A"
     fi
 
     # SATA enhancement
@@ -677,7 +723,7 @@ detect_drivers() {
         i2c_driver="$(printf '%s\n' "$lsmod_output" | grep -E '^i2c_' | head -1 | awk '{print $1}')"
         [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
     fi
-    
+
     # Set defaults for any remaining empty values
     [[ -z "$gpu_driver" ]] && gpu_driver="N/A"
     [[ -z "$network_driver" ]] && network_driver="N/A"
