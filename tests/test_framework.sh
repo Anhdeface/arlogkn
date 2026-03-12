@@ -194,6 +194,7 @@ stub_globals() {
 
     # Table state
     _TBL_DEPTH=-1
+    _TBL_MAX_DEPTH=50
     _TBL_WIDTH_STACK=()
     _TBL_COLS_STACK=()
     _TBL_COLS_PTR_STACK=()

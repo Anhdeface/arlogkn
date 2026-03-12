@@ -974,7 +974,15 @@ truncate_str() {
 # globals, so table state will be lost/corrupted.
 # Safe: _gather_temperatures | _format_temperatures_display (entire table in one function)
 # Unsafe: tbl_begin ...; cmd | while read; do tbl_row ...; done; tbl_end
+#
+# MEMORY NOTE: _TBL_COLS_STACK accumulates column definitions for all tables.
+# Each tbl_begin appends (2 * num_cols) entries. tbl_end trims the array, but
+# if tables are created in a loop without tbl_end, the array grows unboundedly.
+# For 100 tables with 5 columns each: 100 * 10 = 1000 array entries.
+# This is O(n) memory and O(n) slice operations in tbl_row/tbl_end.
+# Mitigation: Maximum table depth limit prevents runaway nesting.
 declare -g _TBL_DEPTH=-1
+declare -g _TBL_MAX_DEPTH=50  # Maximum nested table depth (prevent unbounded growth)
 declare -ga _TBL_WIDTH_STACK=()
 declare -ga _TBL_COLS_STACK=()
 declare -ga _TBL_COLS_PTR_STACK=()
@@ -987,6 +995,17 @@ tbl_begin() {
     # Subshells cannot propagate global state changes back to parent
     if [[ "${BASHPID:-$$}" -ne "$$" ]]; then
         printf '[WARN] tbl_begin called from subshell - table state will not propagate\n' >&2
+    fi
+
+    # Guard: prevent unbounded _TBL_COLS_STACK growth
+    # Each tbl_begin appends (2 * num_cols) entries to global array.
+    # Without depth limit, runaway table creation (e.g., in loops) can
+    # accumulate thousands of entries, causing O(n) memory and slow slice ops.
+    # 50 nested tables is absurdly deep — if hit, it's a bug.
+    if [[ "$_TBL_DEPTH" -ge "$_TBL_MAX_DEPTH" ]]; then
+        printf '[ERROR] tbl_begin: maximum table depth (%d) exceeded — possible missing tbl_end or runaway loop\n' \
+            "$_TBL_MAX_DEPTH" >&2
+        return 1
     fi
 
     _TBL_DEPTH=$((_TBL_DEPTH + 1))
