@@ -1,8 +1,21 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-11
+Generated: 2026-03-12
 
 ---
+03da109 2026-03-12 fix(trap): handle multi-line trap commands in _extract_trap_cmd()
+dfaa9ca 2026-03-12 fix(tables): add _TBL_MAX_DEPTH guard to prevent unbounded _TBL_COLS_STACK growth
+7a893b1 2026-03-12 feat(detection): add graceful degradation for non-Arch systems in pacman functions
+2726817 2026-03-12 feat(cli): support -- end-of-options marker in parse_args()
+8dc294d 2026-03-12 fix(wiki): use printf '%d\n' consistently in find_wiki_group_awk()
+2f4ce9c 2026-03-12 fix(tables): add underflow guard in tbl_end() to detect mismatched begin/end
+da12a31 2026-03-12 fix(mounts): eliminate race condition in scan_mounts() /proc/mounts read
+7f2ca16 2026-03-12 refactor(export): extract _export_network_interfaces_content() to eliminate duplicate code
+cc3e5cd 2026-03-12 fix(semantics): INTERNET_STATUS 'connected' is misleading for local IP assignment
+188981c 2026-03-12 fix(security): embed awk Levenshtein code directly to avoid shell interpolation
+723be8a 2026-03-12 refactor(drivers): extract detect_drivers() thành 3 helper functions độc lập
+c46bafa 2026-03-12 fix(perf): strip_ansi() use sed for O(n) raw ANSI stripping
+a55f714 2026-03-11 docs: update log.txt with latest commits
 3902f37 2026-03-11 fix(ui): use character-aware string truncation for UTF-8 safety
 5938692 2026-03-11 fix(logs): cluster_errors() return 0 for empty input, add || true to pipeline
 ee39788 2026-03-11 fix(export): ensure trap restoration in export_all_logs() on set -e exit
