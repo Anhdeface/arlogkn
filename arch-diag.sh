@@ -1059,19 +1059,25 @@ tbl_row() {
 
 # Close table
 tbl_end() {
-    if (( _TBL_DEPTH >= 0 )); then
-        local start_idx=${_TBL_COLS_PTR_STACK[$_TBL_DEPTH]}
-        if (( start_idx == 0 )); then
-            _TBL_COLS_STACK=()
-        else
-            _TBL_COLS_STACK=("${_TBL_COLS_STACK[@]:0:$start_idx}")
-        fi
-        
-        unset '_TBL_WIDTH_STACK[_TBL_DEPTH]'
-        unset '_TBL_COLS_PTR_STACK[_TBL_DEPTH]'
-        unset '_TBL_NUMCOLS_STACK[_TBL_DEPTH]'
-        _TBL_DEPTH=$((_TBL_DEPTH - 1))
+    # Guard: prevent underflow if tbl_end() called without matching tbl_begin()
+    # This can happen from coding errors (extra tbl_end, missing tbl_begin)
+    # In a 4000+ line script with 100+ call sites, silent no-op is a bug attractor
+    if (( _TBL_DEPTH < 0 )); then
+        warn "tbl_end() called without matching tbl_begin() — table stack underflow prevented"
+        return 1
     fi
+
+    local start_idx=${_TBL_COLS_PTR_STACK[$_TBL_DEPTH]}
+    if (( start_idx == 0 )); then
+        _TBL_COLS_STACK=()
+    else
+        _TBL_COLS_STACK=("${_TBL_COLS_STACK[@]:0:$start_idx}")
+    fi
+
+    unset '_TBL_WIDTH_STACK[_TBL_DEPTH]'
+    unset '_TBL_COLS_PTR_STACK[_TBL_DEPTH]'
+    unset '_TBL_NUMCOLS_STACK[_TBL_DEPTH]'
+    _TBL_DEPTH=$((_TBL_DEPTH - 1))
 }
 
 # Legacy wrappers for backward compatibility (102 call sites use these names)
