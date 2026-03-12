@@ -181,7 +181,6 @@ stub_globals() {
     SCAN_DRIVER=0 SCAN_VGA=0 SCAN_SYSTEM=0 SCAN_WIKI=0
     WIKI_GROUP="" BOOT_OFFSET=0 SAVE_LOGS=0 SAVE_ALL=0
     INTERNET_STATUS="unknown"
-    [[ "$(declare -p _AWK_LEVENSHTEIN 2>/dev/null)" == *" -r "* ]] || _AWK_LEVENSHTEIN=""
 
     # Output
     OUTPUT_DIR="./arch-diag-logs"

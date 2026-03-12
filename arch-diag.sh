@@ -3484,34 +3484,6 @@ parse_args() {
 # ─────────────────────────────────────────────────────────────────────────────
 # WIKI GROUP DEFINITIONS
 # ─────────────────────────────────────────────────────────────────────────────
-# Shared awk functions for Levenshtein distance (used by awk_fuzzy_match and suggest_wiki_groups_awk)
-# Defined once to avoid duplication — changes here apply to both callers
-readonly _AWK_LEVENSHTEIN='
-function min3(a, b, c) {
-    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
-}
-function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
-    len1 = length(s1); len2 = length(s2)
-    if (len1 == 0) return len2
-    if (len2 == 0) return len1
-    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
-    split("", d)
-    for (j = 0; j <= len2; j++) d[0, j] = j
-    for (i = 1; i <= len1; i++) {
-        d[i, 0] = i; c1 = substr(s1, i, 1)
-        for (j = 1; j <= len2; j++) {
-            c2 = substr(s2, j, 1); cost = (c1 == c2) ? 0 : 1
-            d[i, j] = min3(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + cost)
-        }
-    }
-    return d[len1, len2]
-}
-function get_threshold(len) {
-    if (len <= 4) return 1
-    if (len <= 8) return 2
-    return 3
-}
-'
 
 # Group keywords for matching (lowercase, space-separated)
 declare -ga WIKI_GROUP_NAMES=(
@@ -3581,31 +3553,56 @@ awk_fuzzy_match() {
     fi
 
     # Use awk for fast string processing
+    # Note: Levenshtein functions embedded directly (no shell interpolation)
+    # to avoid vulnerabilities from single quotes breaking awk script syntax
     printf '%s\n' "$groups" | awk -v q="$query" '
+function min3(a, b, c) {
+    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
+}
+function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
+    len1 = length(s1); len2 = length(s2)
+    if (len1 == 0) return len2
+    if (len2 == 0) return len1
+    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
+    split("", d)
+    for (j = 0; j <= len2; j++) d[0, j] = j
+    for (i = 1; i <= len1; i++) {
+        d[i, 0] = i; c1 = substr(s1, i, 1)
+        for (j = 1; j <= len2; j++) {
+            c2 = substr(s2, j, 1); cost = (c1 == c2) ? 0 : 1
+            d[i, j] = min3(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + cost)
+        }
+    }
+    return d[len1, len2]
+}
+function get_threshold(len) {
+    if (len <= 4) return 1
+    if (len <= 8) return 2
+    return 3
+}
     BEGIN {
         best_idx = -1
         best_dist = 999
     }
-    '"$_AWK_LEVENSHTEIN"'
     {
         idx = NR - 1
         split($0, parts, " ")
         keyword = parts[1]
-        
+
         dist = levenshtein(q, keyword)
         threshold = get_threshold(length(keyword))
-        
+
         if (dist <= threshold && dist < best_dist) {
             best_dist = dist
             best_idx = idx
             if (dist == 0) exit
         }
     }
-    
+
     END {
         print best_idx ":" best_dist
     }
-    '
+'
 }
 
 # Find best match using awk fuzzy matching
@@ -3671,8 +3668,33 @@ suggest_wiki_groups_awk() {
     local groups_str
     groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
 
+    # Note: Levenshtein functions embedded directly (no shell interpolation)
+    # to avoid vulnerabilities from single quotes breaking awk script syntax
     printf '%s\n' "$groups_str" | awk -v q="$query" '
-    '"$_AWK_LEVENSHTEIN"'
+function min3(a, b, c) {
+    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
+}
+function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
+    len1 = length(s1); len2 = length(s2)
+    if (len1 == 0) return len2
+    if (len2 == 0) return len1
+    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
+    split("", d)
+    for (j = 0; j <= len2; j++) d[0, j] = j
+    for (i = 1; i <= len1; i++) {
+        d[i, 0] = i; c1 = substr(s1, i, 1)
+        for (j = 1; j <= len2; j++) {
+            c2 = substr(s2, j, 1); cost = (c1 == c2) ? 0 : 1
+            d[i, j] = min3(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + cost)
+        }
+    }
+    return d[len1, len2]
+}
+function get_threshold(len) {
+    if (len <= 4) return 1
+    if (len <= 8) return 2
+    return 3
+}
     {
         idx = NR - 1
         split($0, parts, " ")
@@ -3684,7 +3706,7 @@ suggest_wiki_groups_awk() {
             distances[count] = dist
         }
     }
-    
+
     END {
         # Simple bubble sort by distance
         for (i = 1; i < count; i++) {
@@ -3698,7 +3720,7 @@ suggest_wiki_groups_awk() {
         # Print top 3
         for (i = 1; i <= 3 && i <= count; i++) print suggestions[i]
     }
-    '
+'
 }
 
 # Find group index using awk fuzzy matching (optimized)

@@ -3,12 +3,12 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/test_framework.sh"
 
-stub_globals
-stub_logging
-extract_functions awk_fuzzy_match find_wiki_group_awk suggest_wiki_groups_awk
+# Create a library version of arch-diag.sh by stripping the final 'main "$@"' call
+LIB_SCRIPT="$TEST_TMPDIR/arch-diag-lib.sh"
+sed '/^main "\$@"/d' "$SCRIPT_UNDER_TEST" > "$LIB_SCRIPT"
+source "$LIB_SCRIPT"
 
-# Extract the shared awk code variable
-_AWK_LEVENSHTEIN="$(awk '/^readonly _AWK_LEVENSHTEIN=/{flag=1} flag; flag && /^\x27$/{exit}' "$SCRIPT_UNDER_TEST" | sed '1s/.*=//; s/^\x27//; s/\x27$//')"
+stub_globals
 
 # Set up WIKI data structures (same as in arch-diag.sh)
 declare -a WIKI_GROUP_NAMES=(
