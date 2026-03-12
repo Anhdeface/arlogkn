@@ -3015,37 +3015,54 @@ EOF
 _extract_trap_cmd() {
     local sig="$1"
     local var_name="$2"
-    local t
-    t="$(trap -p "$sig")"
-    if [[ -z "$t" ]]; then
+    local t trap_output
+    trap_output="$(trap -p "$sig")"
+
+    if [[ -z "$trap_output" ]]; then
         # No trap set at all
         printf -v "$var_name" ""
         return
     fi
-    # Use regex to extract quoted command: trap -- '...' SIGNAL
-    # BASH_REMATCH[1] = content between outer single quotes
-    if [[ "$t" =~ ^trap\ --\ \'(.*)\'\ (SIG)?${sig}$ ]]; then
+
+    # Check for trap - SIGNAL (default handler)
+    if [[ "$trap_output" == "trap - $sig" || "$trap_output" == "trap - SIG$sig" ]]; then
+        printf -v "$var_name" ""
+        return
+    fi
+
+    # Check for trap '' SIGNAL (ignore signal)
+    if [[ "$trap_output" == "trap '' $sig" || "$trap_output" == "trap '' SIG$sig" ]]; then
+        printf -v "$var_name" "__IGNORE__"
+        return
+    fi
+
+    # Extract command from: trap -- 'command' SIGNAL
+    # Use parameter expansion instead of regex to handle multi-line commands
+    # (bash regex .* doesn't match newlines)
+    # Format: trap -- '...' SIGNAL
+    t="${trap_output#trap -- }"
+    t="${t% $sig}"
+    t="${t% SIG$sig}"
+
+    # Extract content between outer single quotes
+    # Handle multi-line commands where bash escapes newlines as literal \n in the string
+    if [[ "$t" =~ ^\'(.*)\'$ ]]; then
         t="${BASH_REMATCH[1]}"
-        # Check for trap '' SIGNAL (ignore signal) - preserve this state
-        if [[ -z "$t" ]]; then
-            t="__IGNORE__"
-        else
-            # Unescape bash's safe-escaped single quotes: '\'' → '
-            t="${t//\'\\\'\'/\'}"
-        fi
     else
-        # Fallback: legacy string manipulation (may fail on complex traps)
-        t="${t#*trap -- }"
-        t="${t% $sig}"
-        t="${t% SIG$sig}"
+        # Fallback: strip leading/trailing quotes manually
         t="${t#\'}"
         t="${t%\'}"
-        if [[ -z "$t" ]]; then
-            t="__IGNORE__"
-        else
-            t="${t//\'\\\'\'/\'}"
-        fi
     fi
+
+    # Check for empty command (trap '' SIGNAL)
+    if [[ -z "$t" ]]; then
+        printf -v "$var_name" "__IGNORE__"
+        return
+    fi
+
+    # Unescape bash's safe-escaped single quotes: '\'' → '
+    t="${t//\'\\\'\'/\'}"
+
     printf -v "$var_name" "%s" "$t"
 }
 
