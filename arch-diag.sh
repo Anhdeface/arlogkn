@@ -2059,6 +2059,9 @@ scan_usb_devices() {
     local found_storage=0
     draw_table_begin "Device" 8 "Size" 10 "Model" 20 "Mount" 18
 
+    # Use nullglob to handle empty /sys/block/ gracefully
+    # Without nullglob, loop runs once with literal "/sys/block/*" string
+    shopt -s nullglob
     for block in /sys/block/*; do
         [[ ! -d "$block" ]] && continue
         local bname
@@ -2081,7 +2084,7 @@ scan_usb_devices() {
         [[ -f "$block/device/vendor" ]] && model="$(< "$block/device/vendor" 2>/dev/null)" || model=""
         [[ -f "$block/device/model" ]] && model="$model $(< "$block/device/model" 2>/dev/null)" || model=""
         [[ -z "$model" ]] && model="USB Storage"
-        
+
         # Check mount point from /proc/mounts
         # Decode octal escapes: space=\040, tab=\011, backslash=\134
         mount="$(grep "^/dev/${bname}" /proc/mounts 2>/dev/null | awk '{print $2}' | head -1)"
@@ -2096,6 +2099,7 @@ scan_usb_devices() {
         truncate_str "$mount" 17 mount_truncated
         draw_table_row "/dev/${bname}" "$size" "$model_truncated" "$mount_truncated"
     done
+    shopt -u nullglob
     
     if [[ $found_storage -eq 0 ]]; then
         printf ' %s✓ No USB storage devices detected%s\n' "$C_GREEN" "$C_RESET"
