@@ -4243,8 +4243,8 @@ show_wiki() {
                 printf '\n'
                 printf '%s\n' "$suggestions" | while read -r sug_line; do
                     local cmd desc
-                    cmd="$(echo "$sug_line" | awk '{print $1}')"
-                    desc="$(echo "$sug_line" | cut -d' ' -f2-)"
+                    cmd="$(printf '%s' "$sug_line" | awk '{print $1}')"
+                    desc="$(printf '%s' "$sug_line" | cut -d' ' -f2-)"
                     draw_box_line "  ${C_CYAN}--wiki ${cmd}${C_RESET} - Matches: ${desc}"
                 done
                 printf '\n'
