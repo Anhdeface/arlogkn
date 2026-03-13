@@ -1089,7 +1089,11 @@ draw_table_footer() { tbl_end "$@"; }
 # Cluster identical errors and count occurrences
 # Returns: 0 on success (including empty input → empty output), 1 on critical error
 cluster_errors() {
-    local input="$1"
+    # Read from stdin (stream processing, no intermediate copy)
+    # This is more efficient than passing large data as function argument
+    # and avoids shell argument length limits
+    local input
+    input="$(cat)"
 
     # Empty input → empty output (not an error, just nothing to cluster)
     if [[ -z "$input" ]]; then
@@ -1155,7 +1159,7 @@ scan_kernel_logs() {
         return 0
     fi
 
-    output="$(cluster_errors "$journal_output")"
+    output="$(cluster_errors <<< "$journal_output")"
 
     if [[ -z "$output" ]]; then
         draw_empty_box
@@ -2388,7 +2392,7 @@ export_kernel_logs() {
     # Reuse cluster_errors() for consistent normalization with terminal output
     # cluster_errors() normalizes: addresses, PIDs, IRQs, CPUs, device names,
     # MAC addresses, port numbers, sector numbers — then sorts by frequency
-    cluster_errors "$journal_output" > "$clustered_file"
+    cluster_errors <<< "$journal_output" > "$clustered_file"
 
     info "Kernel logs exported: kernel_errors.txt, kernel_errors_clustered.txt"
 }
