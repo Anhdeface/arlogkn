@@ -3714,11 +3714,22 @@ find_wiki_group_awk() {
     local result
     result="$(awk_fuzzy_match "$query" "$groups_str")"
 
+    # Parse result format: "index:distance" (e.g., "3:2")
+    # Validate result is non-empty and has expected format before parsing
+    if [[ -z "$result" || "$result" != *":"* ]]; then
+        printf '%d\n' "-1"
+        return 1
+    fi
+
     local best_idx="${result%%:*}"
     local best_dist="${result##*:}"
 
-    if [[ "$best_idx" -ge 0 && "$best_dist" -le 3 ]]; then
-        printf '%d\n' "$best_idx" && return 0
+    # Validate both values are numeric before comparison
+    # Prevents bash error: empty string -ge 0 (integer expression expected)
+    if [[ "$best_idx" =~ ^-?[0-9]+$ ]] && [[ "$best_dist" =~ ^[0-9]+$ ]]; then
+        if [[ "$best_idx" -ge 0 && "$best_dist" -le 3 ]]; then
+            printf '%d\n' "$best_idx" && return 0
+        fi
     fi
 
     printf '%d\n' "-1"
