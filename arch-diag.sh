@@ -1277,7 +1277,11 @@ scan_user_services() {
         local failed_count
         # Count only actual unit lines (exclude summary, blank, and trailing lines)
         # systemctl --no-legend may still emit "0 loaded units listed." or blanks
-        failed_count="$(printf '%s\n' "$failed_output" | grep -c '\.service' || echo "0")"
+        # Note: grep -c returns exit 1 when no matches, so we use || true to prevent
+        # command substitution failure (set -euo pipefail isolates the subshell)
+        failed_count="$(printf '%s\n' "$failed_output" | grep -c '\.service' || true)"
+        # If grep found no matches, failed_count will be empty — default to 0
+        [[ -z "$failed_count" ]] && failed_count=0
         if [[ "$failed_count" -gt 10 ]]; then
             draw_box_line "${C_YELLOW}... and $((failed_count - 10)) more failed units${C_RESET}"
         fi
