@@ -657,13 +657,45 @@ detect_drivers() {
         lspci_output="$(_get_lspci)"
 
         # GPU fallback (enhanced patterns) - only if /sys didn't find it
-        [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'vga|3d|display' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        # Use awk to respect device boundaries (same as _detect_drivers_lspci)
+        # Prevents false match where grep -A2 would grab driver from NEXT device
+        [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(printf '%s\n' "$lspci_output" | awk '
+            BEGIN { IGNORECASE=1; found=0 }
+            /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }
+            /vga|3d|display/ { found=1 }
+            /Kernel driver/ && found {
+                sub(/.*Kernel driver in use: /, "")
+                print
+                exit
+            }
+        ')"
+        [[ -z "$gpu_driver" ]] && gpu_driver="N/A"
 
         # Network fallback
-        [[ "$network_driver" == "N/A" ]] && network_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'ethernet|network|wireless|wifi' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ "$network_driver" == "N/A" ]] && network_driver="$(printf '%s\n' "$lspci_output" | awk '
+            BEGIN { IGNORECASE=1; found=0 }
+            /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }
+            /ethernet|network|wireless|wifi/ { found=1 }
+            /Kernel driver/ && found {
+                sub(/.*Kernel driver in use: /, "")
+                print
+                exit
+            }
+        ')"
+        [[ -z "$network_driver" ]] && network_driver="N/A"
 
         # Audio fallback
-        [[ "$audio_driver" == "N/A" ]] && audio_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'audio|hdmi|hd-audio' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        [[ "$audio_driver" == "N/A" ]] && audio_driver="$(printf '%s\n' "$lspci_output" | awk '
+            BEGIN { IGNORECASE=1; found=0 }
+            /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }
+            /audio|hdmi|hd-audio/ { found=1 }
+            /Kernel driver/ && found {
+                sub(/.*Kernel driver in use: /, "")
+                print
+                exit
+            }
+        ')"
+        [[ -z "$audio_driver" ]] && audio_driver="N/A"
 
         # Parse remaining drivers from lspci (8 fields)
         local lspci_result
