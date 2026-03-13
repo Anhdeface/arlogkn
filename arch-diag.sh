@@ -329,16 +329,17 @@ detect_gpu() {
         [[ -n "$gpu_name" ]] && gpu_names+=("$gpu_name")
     done
     # Restore previous ERR trap (or clear if none existed)
+    # Use _extract_trap_cmd() for robust parsing (handles multi-line, nested quotes)
     if [[ -n "$old_err_trap" ]]; then
-        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
-        local cmd="${old_err_trap#*trap -- }"
-        cmd="${cmd% ERR}"
-        cmd="${cmd% SIGERR}"
-        cmd="${cmd#\'}"
-        cmd="${cmd%\'}"
-        # Unescape bash's safe-escaped single quotes: '\'' → '
-        cmd="${cmd//\'\\\'\'/\'}"
-        trap -- "$cmd" ERR
+        local extracted_cmd=""
+        _extract_trap_cmd ERR extracted_cmd
+        if [[ "$extracted_cmd" == "__IGNORE__" ]]; then
+            trap '' ERR
+        elif [[ -n "$extracted_cmd" ]]; then
+            trap -- "$extracted_cmd" ERR
+        else
+            trap - ERR
+        fi
     else
         trap - ERR
     fi
@@ -416,16 +417,17 @@ detect_display() {
         fi
     done
     # Restore previous ERR trap (or clear if none existed)
+    # Use _extract_trap_cmd() for robust parsing (handles multi-line, nested quotes)
     if [[ -n "$old_err_trap" ]]; then
-        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
-        local cmd="${old_err_trap#*trap -- }"
-        cmd="${cmd% ERR}"
-        cmd="${cmd% SIGERR}"
-        cmd="${cmd#\'}"
-        cmd="${cmd%\'}"
-        # Unescape bash's safe-escaped single quotes: '\'' → '
-        cmd="${cmd//\'\\\'\'/\'}"
-        trap -- "$cmd" ERR
+        local extracted_cmd=""
+        _extract_trap_cmd ERR extracted_cmd
+        if [[ "$extracted_cmd" == "__IGNORE__" ]]; then
+            trap '' ERR
+        elif [[ -n "$extracted_cmd" ]]; then
+            trap -- "$extracted_cmd" ERR
+        else
+            trap - ERR
+        fi
     else
         trap - ERR
     fi
@@ -1217,16 +1219,17 @@ scan_kernel_logs() {
         draw_box_line "$colored_line"
     done
     # Restore previous ERR trap (or clear if none existed)
+    # Use _extract_trap_cmd() for robust parsing (handles multi-line, nested quotes)
     if [[ -n "$old_err_trap" ]]; then
-        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
-        local cmd="${old_err_trap#*trap -- }"
-        cmd="${cmd% ERR}"
-        cmd="${cmd% SIGERR}"
-        cmd="${cmd#\'}"
-        cmd="${cmd%\'}"
-        # Unescape bash's safe-escaped single quotes: '\'' → '
-        cmd="${cmd//\'\\\'\'/\'}"
-        trap -- "$cmd" ERR
+        local extracted_cmd=""
+        _extract_trap_cmd ERR extracted_cmd
+        if [[ "$extracted_cmd" == "__IGNORE__" ]]; then
+            trap '' ERR
+        elif [[ -n "$extracted_cmd" ]]; then
+            trap -- "$extracted_cmd" ERR
+        else
+            trap - ERR
+        fi
     else
         trap - ERR
     fi
