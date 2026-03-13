@@ -1887,11 +1887,13 @@ scan_mounts() {
     # Read /proc/mounts ONCE into array to avoid race condition
     # (NFS automount or other dynamic mounts could change between reads)
     # Filter: exclude autofs and comment lines
+    # Use Unit Separator (ASCII 31) as delimiter — safe for paths with '|'
     local -a mount_lines=()
+    local delim=$'\x1F'  # Unit Separator (control char, invalid in filenames)
     while IFS=' ' read -r source target fstype opts freq pass; do
         [[ "$source" =~ ^# ]] && continue
         [[ "$fstype" == "autofs" ]] && continue
-        mount_lines+=("$source|$target|$fstype")
+        mount_lines+=("${source}${delim}${target}${delim}${fstype}")
     done < /proc/mounts 2>/dev/null || true
 
     local filtered_total=${#mount_lines[@]}
@@ -1900,8 +1902,8 @@ scan_mounts() {
     for line in "${mount_lines[@]}"; do
         [[ $count -ge 12 ]] && break
 
-        # Parse pipe-separated fields
-        IFS='|' read -r source target fstype <<< "$line"
+        # Parse Unit-Separator-delimited fields
+        IFS="$delim" read -r source target fstype <<< "$line"
 
         # Decode /proc/mounts octal escapes (pure bash, no subprocess)
         # /proc/mounts encodes: space→\040, tab→\011, backslash→\134
