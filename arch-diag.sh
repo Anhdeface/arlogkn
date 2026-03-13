@@ -503,32 +503,49 @@ _detect_drivers_lspci() {
     local nvme_driver="N/A" sata_driver="N/A" i2c_driver="N/A"
     local smbus_driver="N/A" platform_driver="N/A"
 
+    # Helper: extract driver for devices matching pattern
+    # Uses awk to respect device boundaries (lines starting with XX:XX.X)
+    # Prevents false match where grep -A2 would grab driver from NEXT device
+    _get_driver() {
+        local pattern="$1"
+        printf '%s\n' "$lspci_output" | awk -v pat="$pattern" '
+        BEGIN { IGNORECASE=1; found=0 }
+        /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }  # New device: reset flag
+        $0 ~ pat { found=1 }                  # Match pattern: set flag
+        /Kernel driver/ && found {            # Driver line + flag set
+            sub(/.*Kernel driver in use: /, "")
+            print
+            exit
+        }
+        '
+    }
+
     # Storage controllers
-    storage_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'sata|ahci|ide|storage' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    storage_driver="$(_get_driver 'sata|ahci|ide|storage')"
     [[ -z "$storage_driver" ]] && storage_driver="N/A"
 
     # NVMe
-    nvme_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'nvme' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    nvme_driver="$(_get_driver 'nvme')"
     [[ -z "$nvme_driver" ]] && nvme_driver="N/A"
 
     # USB Controller
-    usb_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'usb|xhci|ehci|ohci|uhci' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    usb_driver="$(_get_driver 'usb|xhci|ehci|ohci|uhci')"
     [[ -z "$usb_driver" ]] && usb_driver="N/A"
 
     # Thunderbolt
-    thunderbolt_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'thunderbolt' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    thunderbolt_driver="$(_get_driver 'thunderbolt')"
     [[ -z "$thunderbolt_driver" ]] && thunderbolt_driver="N/A"
 
     # I2C/SMBus
-    smbus_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'smbus|i2c' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    smbus_driver="$(_get_driver 'smbus|i2c')"
     [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
 
     # ISA/LPC Bridge (platform)
     # Prioritize ISA/LPC matches (specific platform bridges), then fallback to PCH/platform
     # Avoid generic 'bridge' pattern which matches PCIe/SATA bridges incorrectly
-    platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'isa bridge|lpc bridge|isa|lpc' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+    platform_driver="$(_get_driver 'isa bridge|lpc bridge|isa|lpc')"
     if [[ -z "$platform_driver" ]]; then
-        platform_driver="$(printf '%s\n' "$lspci_output" | grep -A2 -iE 'platform|pch' | grep 'Kernel driver' | head -1 | cut -d':' -f2 | sed 's/^ *//')"
+        platform_driver="$(_get_driver 'platform|pch')"
     fi
     [[ -z "$platform_driver" ]] && platform_driver="N/A"
 
