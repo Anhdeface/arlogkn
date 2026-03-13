@@ -13,7 +13,16 @@ show_help() { printf 'USAGE: arch-diag.sh [OPTIONS]\n'; }
 suite_begin "CLI Argument Parser"
 
 # Helper since parse_args calls die() which calls exit
-bash_c() { bash -c "source \"$SCRIPT_UNDER_TEST\" && $1"; }
+# Strip main "$@" to avoid full script execution when sourcing
+bash_c() {
+    local lib_script
+    lib_script="$(mktemp /tmp/arlogkn_cli_test_XXXXXX.sh)"
+    sed '/^main "\$@"/d' "$SCRIPT_UNDER_TEST" > "$lib_script"
+    local rc=0
+    bash -c "source \"$lib_script\" && $1" || rc=$?
+    rm -f "$lib_script"
+    return "$rc"
+}
 
 # Helper: reset all scan flags before each test
 reset_flags() {

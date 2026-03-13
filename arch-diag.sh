@@ -1269,7 +1269,7 @@ scan_user_services() {
         return 0
     fi
 
-    output="$(cluster_errors "$journal_output")"
+    output="$(cluster_errors <<< "$journal_output")"
 
     if [[ -z "$output" ]]; then
         draw_empty_box
