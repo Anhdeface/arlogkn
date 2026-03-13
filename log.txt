@@ -1,8 +1,24 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-12
+Generated: 2026-03-13
 
 ---
+ff53736 2026-03-13 fix(services): scan_user_services() grep -c pattern fragile with set -euo pipefail
+bfccff4 2026-03-13 refactor(detection): detect_distro() remove redundant || echo "" from command substitution
+e5cf306 2026-03-13 style(wiki): show_wiki() uses echo instead of printf — inconsistency
+bbb0a75 2026-03-13 fix(usb): scan_usb_devices() /sys/block/* glob missing nullglob
+5e791fe 2026-03-13 fix(wiki): find_wiki_group() missing input validation — empty result causes bash error
+b541e8e 2026-03-13 fix(drivers): detect_drivers() fallback still uses grep -A2 — same false match bug
+d1c1e20 2026-03-13 fix: cluster_errors() stdin migration incomplete - scan_user_services and test fixes
+7ce6c7f 2026-03-13 test(log_parsing): fix cluster_errors() tests to use stdin (here-string)
+2c0d14d 2026-03-13 fix(drivers): _detect_drivers_lspci() false match from adjacent devices
+86b91d4 2026-03-13 refactor(logs): cluster_errors() read from stdin instead of argument
+0ade3b5 2026-03-13 refactor(trap): remove unnecessary ERR trap save/restore for nullglob/nocasematch
+a1271af 2026-03-13 fix(mounts): use Unit Separator delimiter to handle pipe chars in mount paths
+862024a 2026-03-13 perf(ui): optimize visible_len() with ASCII fast path to reduce subprocess forks
+b6fa3bc 2026-03-13 fix(cli): --system --kernel silently drops --kernel — bug fix
+1dd712f 2026-03-13 fix(trap): use _extract_trap_cmd() for ERR trap restoration (DRY fix)
+a671b2f 2026-03-12 docs: update log.txt with latest commits
 03da109 2026-03-12 fix(trap): handle multi-line trap commands in _extract_trap_cmd()
 dfaa9ca 2026-03-12 fix(tables): add _TBL_MAX_DEPTH guard to prevent unbounded _TBL_COLS_STACK growth
 7a893b1 2026-03-12 feat(detection): add graceful degradation for non-Arch systems in pacman functions
