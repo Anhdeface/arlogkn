@@ -289,14 +289,8 @@ detect_gpu() {
     local card_path driver gpu_name
 
     # Check all DRM cards (supports multiple GPUs, e.g., hybrid graphics)
-    # Note: Use ERR trap to ensure nullglob is restored even if set -e triggers mid-loop
+    # Note: nullglob ensures glob returns empty if no matches (no error)
     shopt -s nullglob
-    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
-    local old_err_trap=""
-    if trap -p ERR >/dev/null 2>&1; then
-        old_err_trap="$(trap -p ERR)"
-    fi
-    trap 'shopt -u nullglob' ERR
     for card_path in /sys/class/drm/card[0-9]*; do
         [[ ! -d "$card_path" ]] && continue
 
@@ -328,21 +322,6 @@ detect_gpu() {
         # Add to list if detected
         [[ -n "$gpu_name" ]] && gpu_names+=("$gpu_name")
     done
-    # Restore previous ERR trap (or clear if none existed)
-    # Use _extract_trap_cmd() for robust parsing (handles multi-line, nested quotes)
-    if [[ -n "$old_err_trap" ]]; then
-        local extracted_cmd=""
-        _extract_trap_cmd ERR extracted_cmd
-        if [[ "$extracted_cmd" == "__IGNORE__" ]]; then
-            trap '' ERR
-        elif [[ -n "$extracted_cmd" ]]; then
-            trap -- "$extracted_cmd" ERR
-        else
-            trap - ERR
-        fi
-    else
-        trap - ERR
-    fi
     shopt -u nullglob
 
     # Build GPU info string (supports multiple GPUs)
@@ -379,17 +358,11 @@ detect_gpu() {
 detect_display() {
     # Display detection - check DRM connectors from /sys
     local connector status
+    local display_parts=()
 
     # Check DRM connectors directly from /sys (works without X11/Wayland)
-    # Note: Use ERR trap to ensure nullglob is restored even if set -e triggers mid-loop
-    local display_parts=()
+    # Note: nullglob ensures glob returns empty if no matches (no error)
     shopt -s nullglob
-    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
-    local old_err_trap=""
-    if trap -p ERR >/dev/null 2>&1; then
-        old_err_trap="$(trap -p ERR)"
-    fi
-    trap 'shopt -u nullglob' ERR
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
         status="$(< "$connector" 2>/dev/null)" || status=""
@@ -416,21 +389,6 @@ detect_display() {
             display_parts+=("$entry")
         fi
     done
-    # Restore previous ERR trap (or clear if none existed)
-    # Use _extract_trap_cmd() for robust parsing (handles multi-line, nested quotes)
-    if [[ -n "$old_err_trap" ]]; then
-        local extracted_cmd=""
-        _extract_trap_cmd ERR extracted_cmd
-        if [[ "$extracted_cmd" == "__IGNORE__" ]]; then
-            trap '' ERR
-        elif [[ -n "$extracted_cmd" ]]; then
-            trap -- "$extracted_cmd" ERR
-        else
-            trap - ERR
-        fi
-    else
-        trap - ERR
-    fi
     shopt -u nullglob
 
     if [[ ${#display_parts[@]} -gt 0 ]]; then
@@ -1217,14 +1175,7 @@ scan_kernel_logs() {
 
     # Error entries with color highlighting
     # Note: { } is grouping (NOT subshell), so shopt affects parent shell
-    # Use ERR trap to ensure nocasematch is cleaned up if set -e triggers mid-pipeline
     shopt -s nocasematch
-    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
-    local old_err_trap=""
-    if trap -p ERR >/dev/null 2>&1; then
-        old_err_trap="$(trap -p ERR)"
-    fi
-    trap 'shopt -u nocasematch' ERR
     printf '%s\n' "$output" | head -20 | while read -r line; do
         # Highlight error patterns with red (case-insensitive)
         local colored_line="$line"
@@ -1233,21 +1184,6 @@ scan_kernel_logs() {
         fi
         draw_box_line "$colored_line"
     done
-    # Restore previous ERR trap (or clear if none existed)
-    # Use _extract_trap_cmd() for robust parsing (handles multi-line, nested quotes)
-    if [[ -n "$old_err_trap" ]]; then
-        local extracted_cmd=""
-        _extract_trap_cmd ERR extracted_cmd
-        if [[ "$extracted_cmd" == "__IGNORE__" ]]; then
-            trap '' ERR
-        elif [[ -n "$extracted_cmd" ]]; then
-            trap -- "$extracted_cmd" ERR
-        else
-            trap - ERR
-        fi
-    else
-        trap - ERR
-    fi
     shopt -u nocasematch
 
     local total_lines
