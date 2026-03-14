@@ -1,6 +1,6 @@
 # arlogkn
 
-**Version:** 1.0.8 | **Platform:** Arch Linux and derivatives | **License:** MIT
+**Version:** 1.0.9 | **Platform:** Arch Linux and derivatives | **License:** MIT
 
 A read-only system diagnostic and log extraction utility for Arch Linux. Performs comprehensive hardware and software state analysis without external dependencies.
 
@@ -59,7 +59,7 @@ arlogkn inspects your system's current state and extracts diagnostic information
 
 ## Why Single File?
 
-**Design Decision:** arlogkn is intentionally a single bash file (~4000 lines) rather than a modular project structure.
+**Design Decision:** arlogkn is intentionally a single bash file (~4600 lines) rather than a modular project structure.
 
 **Rationale:**
 
@@ -245,12 +245,12 @@ sound, systemd, file, emergency
 
 | Module | Data Source | Output |
 |--------|-------------|--------|
-| **Kernel Errors** | `journalctl -k -p 3` | Clustered error messages with boot context |
+| **Kernel Errors** | `journalctl -k -p 3` | Clustered error messages with boot context (normalizes addresses, PIDs, IRQs, CPUs, device names, MAC addresses) |
 | **Service Errors** | `systemctl --failed`, `journalctl -u *.service` | Failed units, journal errors |
 | **Core Dumps** | `coredumpctl list` | Last 5 crash entries |
 | **Pacman Logs** | `/var/log/pacman.log` | Errors and warnings (last 100 lines) |
 | **GPU / VGA** | `/sys/class/drm`, `lspci` | Graphics card, display, OpenGL info |
-| **Drivers** | `/sys/class`, `lspci -k`, `lsmod` | GPU, network, audio, storage, USB, platform drivers |
+| **Drivers** | `/sys/class`, `lspci -k`, `lsmod` | GPU, network, audio, storage, USB, platform drivers (awk-based device boundary detection prevents false matches) |
 | **Temperatures** | `/sys/class/hwmon` | Sensor readings with color thresholds |
 | **Boot Timing** | `systemd-analyze`, `systemd-analyze blame` | Boot time, top 10 slowest services |
 | **Network** | `/sys/class/net`, `ip` | Interface state, speed, MAC, IP |
@@ -274,12 +274,12 @@ sound, systemd, file, emergency
 
 ### Why is the script so large?
 
-The script is ~4000 lines because it:
+The script is ~4600 lines because it:
 
 - Implements 12+ scan modules
 - Includes offline Arch Wiki reference (20 command groups)
 - Handles edge cases and error conditions
-- Contains security mitigations (TOCTOU prevention, symlink protection, DoS limits)
+- Contains security mitigations (TOCTOU prevention, symlink protection, DoS limits, command injection prevention)
 - Has no external dependencies (implements everything internally)
 
 ### Is it safe to run on production systems?
@@ -322,6 +322,7 @@ The script is optimized for speed:
 
 - Caches expensive system calls (lspci, driver detection)
 - Uses pure bash operations where possible (80-90% fewer subprocesses)
+- O(n) ANSI stripping with fast-path optimization
 - Limits output to reasonable sizes (500 lines max for logs)
 - Typical runtime: 2-5 seconds for full scan
 
@@ -355,6 +356,12 @@ bash -x ./arch-diag.sh --kernel 2>&1 | head -100
 - No configuration modifications
 - No execution of state-changing binaries
 
+### Command Injection Prevention
+
+- `cluster_errors()` uses embedded awk code to avoid shell interpolation vulnerabilities
+- Input validation for wiki fuzzy matching (Levenshtein distance in awk, no shell escaping)
+- Query length limits (50 characters max) to prevent DoS
+
 ### TOCTOU Race Condition Prevention
 
 Uses `mkdir --no-dereference` to prevent symlink attacks during directory creation. Post-condition checks verify created paths are not symlinks.
@@ -381,6 +388,8 @@ Secure temp file creation with automatic cleanup on exit or interrupt.
 - Timeout on external commands (10s for journalctl, 15s for lsusb)
 - Query length limits in wiki mode (50 characters max)
 - Bounded output sizes throughout
+- Input validation for numeric fields (boot offset bounds: -50 to 50)
+- Proper nullglob handling for /sys/ filesystem globs
 
 ---
 

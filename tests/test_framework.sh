@@ -201,7 +201,7 @@ stub_globals() {
     _TBL_NUMCOLS_STACK=()
 
     # Script identity (bypass if already readonly, like in smoke tests)
-    [[ "$(declare -p VERSION 2>/dev/null)" == *" -r "* ]] || VERSION="1.0.8"
+    [[ "$(declare -p VERSION 2>/dev/null)" == *" -r "* ]] || VERSION="1.0.9"
     [[ "$(declare -p SCRIPT_NAME 2>/dev/null)" == *" -r "* ]] || SCRIPT_NAME="arch-diag.sh"
 }
 

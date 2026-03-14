@@ -15,7 +15,7 @@ shopt -s extglob  # Enable extglob at parse-time for +([[:space:]]) patterns
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBALS & CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-readonly VERSION="1.0.8"
+readonly VERSION="1.0.9"
 SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_NAME
 
