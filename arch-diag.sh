@@ -160,9 +160,8 @@ detect_distro() {
 detect_system_info() {
     KERNEL_VER="$(uname -r)"
 
-    # CPU Governor detection (may require root for full accuracy)
-    # Note: File may exist but be unreadable (permission denied) → fallback to "unknown"
-    # Also handle empty file case (some systems have broken cpufreq interface)
+    # CPU Governor detection
+    # File may exist but be unreadable (permission denied)
     if [[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]]; then
         CPU_GOVERNOR="$(</sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)" || CPU_GOVERNOR="unknown"
         # Trim whitespace and handle empty result
@@ -185,17 +184,9 @@ detect_system_info() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 check_internet() {
-    # Network status check - local methods first, external only if enabled.
-    # Note: Having a routable IP does NOT guarantee internet connectivity.
-    # Private LAN (192.168.x.x) with down gateway, VPN tunnels without
-    # external route, or isolated network namespaces all have IPs but no
-    # actual internet access.
-    #
-    # Status values:
-    # - "ip_assigned": Interface UP + routable IP assigned (IPv4 or IPv6)
-    # - "link_up": Interface UP but no IP confirmed
-    # - "connected": External connectivity verified (HTTP check pass)
-    # - "disconnected": No interfaces UP
+    # Network status check — local methods first, external only if enabled
+    # routable IP ≠ internet connectivity (VPN, isolated namespace, etc.)
+    # Status: ip_assigned, link_up, connected, disconnected
 
     # ─────────────────────────────────────────────────────────────────────────
     # METHOD 1: Check interface operstate + IP from /sys
@@ -314,8 +305,8 @@ detect_gpu() {
     local gpu_names=()
     local card_path driver gpu_name
 
-    # Check all DRM cards (supports multiple GPUs, e.g., hybrid graphics)
-    # Note: nullglob ensures glob returns empty if no matches (no error)
+    # Check all DRM cards (supports multiple GPUs)
+    # nullglob ensures glob returns empty if no matches
     shopt -s nullglob
     for card_path in /sys/class/drm/card[0-9]*; do
         [[ ! -d "$card_path" ]] && continue
@@ -382,12 +373,8 @@ detect_gpu() {
 }
 
 detect_display() {
-    # Display detection - check DRM connectors from /sys
-    local connector status
-    local display_parts=()
-
-    # Check DRM connectors directly from /sys (works without X11/Wayland)
-    # Note: nullglob ensures glob returns empty if no matches (no error)
+    # Display detection — check DRM connectors from /sys (works without X11/Wayland)
+    # nullglob ensures glob returns empty if no matches
     shopt -s nullglob
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
@@ -816,8 +803,6 @@ detect_drivers() {
 # UI / BOX DRAWING
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Note: strip_ansi and visible_len are defined in TABLE section below
-
 draw_header() {
     local title="$1"
     local width="${2:-70}"
@@ -860,10 +845,8 @@ draw_box_line() {
     visible_len "$content" content_visible_len
 
     # Truncate if too long
-    # Note: Truncated lines lose color formatting (ANSI codes stripped)
-    # This is a bash limitation: ${var:0:N} counts bytes, not visible chars
+    # ${var:0:N} counts bytes, not visible chars — bash limitation
     # Trade-off: Correct truncation > Color preservation
-    # Non-truncated lines retain their colors
     if [[ $content_visible_len -gt $inner_width ]]; then
         local truncate_at=$((inner_width - 3))
         local stripped
@@ -1159,7 +1142,6 @@ tbl_end() {
 # Legacy wrappers for backward compatibility (102 call sites use these names)
 draw_table_begin() { tbl_begin "$@"; }
 draw_table_row() { tbl_row "$@"; }
-# shellcheck disable=SC2120
 draw_table_end() { tbl_end "$@"; }
 draw_table_header() { tbl_begin "$@"; }
 draw_table_footer() { tbl_end "$@"; }
@@ -1280,23 +1262,17 @@ scan_user_services() {
         draw_box_line "${C_RED}${C_BOLD}⚠ Failed Services (systemctl --failed):${C_RESET}"
         draw_box_line ""
 
-        # Note: 'read -r unit load ...' splits by default IFS (spaces/tabs).
-        # This correctly captures multi-word descriptions into the final 'description' variable.
-        # Edge case: If a 'unit' name itself contains spaces (very rare for systemd services),
-        # the parsing will shift and the description will be garbled. This is acceptable
-        # for a diagnostic script to keep the parser lightweight.
+        # read splits by IFS (spaces/tabs) — captures multi-word descriptions
+        # Edge case: unit names with spaces will shift fields (acceptable trade-off)
         printf '%s\n' "$failed_output" | head -10 | while read -r unit load active sub description; do
             [[ -z "$unit" ]] && continue
             draw_box_line "  ${C_RED}●${C_RESET} ${C_BOLD}${unit}${C_RESET} — ${C_YELLOW}${sub}${C_RESET} (${description})"
         done
 
         local failed_count
-        # Count only actual unit lines (exclude summary, blank, and trailing lines)
-        # systemctl --no-legend may still emit "0 loaded units listed." or blanks
-        # Note: grep -c returns exit 1 when no matches, so we use || true to prevent
-        # command substitution failure (set -euo pipefail isolates the subshell)
+        # Count actual unit lines (exclude summary/blank)
+        # grep -c returns exit 1 when no matches — use || true
         failed_count="$(printf '%s\n' "$failed_output" | grep -c '\.service' || true)"
-        # If grep found no matches, failed_count will be empty — default to 0
         [[ -z "$failed_count" ]] && failed_count=0
         if [[ "$failed_count" -gt 10 ]]; then
             draw_box_line "${C_YELLOW}... and $((failed_count - 10)) more failed units${C_RESET}"
@@ -1387,11 +1363,9 @@ scan_coredumps() {
 
     if [[ -n "$json_output" ]] && printf '%s' "$json_output" | grep -q '"pid"'; then
         # Parse JSON: extract pid, sig, exe, timestamp
-        # Note: Use regex capture to extract field values, NOT gsub which destroys
-        # the line. coredumpctl may emit multiple fields on one line:
-        #   {"pid": 1234, "signal": 11, "exe": "/usr/bin/foo"}
-        # Old code: gsub(/[^0-9]/, "", $0) → "123411" (pid+signal combined!) WRONG!
-        # New code: match field value after colon → correct extraction
+        # Use regex capture (NOT gsub) to avoid destroying the line
+        # coredumpctl may emit: {"pid": 1234, "signal": 11, "exe": "/usr/bin/foo"}
+        # gsub would merge pid+signal → "123411" (wrong!)
         printf '%s' "$json_output" | awk -v cyan="$C_CYAN" -v rst="$C_RESET" -v bold="$C_BOLD" -v yellow="$C_YELLOW" '
         BEGIN { count = 0; pid = ""; sig = ""; exe = "" }
 
@@ -1714,8 +1688,7 @@ scan_boot_timing() {
     printf '\n'
 
     # Top 10 slowest services
-    # NOTE: systemd-analyze blame does NOT support --boot=N in most versions
-    # Only show blame for current boot; warn if viewing older boot
+    # systemd-analyze blame does NOT support --boot=N in most versions
     local blame_output
     if [[ "$BOOT_OFFSET" -ne 0 ]]; then
         draw_box_line "${C_YELLOW}⚠ blame not available for boot offset ${BOOT_OFFSET} (systemd-analyze blame only supports current boot)${C_RESET}"
