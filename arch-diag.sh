@@ -2553,9 +2553,14 @@ export_mounts() {
         while IFS=' ' read -r source target fstype opts rest; do
             [[ "$source" =~ ^# ]] && continue
             [[ "$fstype" == "autofs" ]] && continue
-            # Decode /proc/mounts octal escapes
+            # Decode /proc/mounts octal escapes (same as scan_mounts for consistency)
+            # \040 = space, \011 = tab, \134 = backslash
             source="${source//\\040/ }"
+            source="${source//\\011/$'\t'}"
+            source="${source//\\134/\\}"
             target="${target//\\040/ }"
+            target="${target//\\011/$'\t'}"
+            target="${target//\\134/\\}"
             printf '%-30s %-30s %s\n' "$source" "$target" "$fstype"
         done < /proc/mounts 2>/dev/null || true
 
