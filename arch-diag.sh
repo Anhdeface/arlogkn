@@ -1234,17 +1234,18 @@ scan_kernel_logs() {
     draw_box_line ""
 
     # Error entries with color highlighting
-    # Note: { } is grouping (NOT subshell), so shopt affects parent shell
-    shopt -s nocasematch
-    printf '%s\n' "$output" | head -20 | while read -r line; do
-        # Highlight error patterns with red (case-insensitive)
-        local colored_line="$line"
-        if [[ "$line" =~ error|fail|unable|critical ]]; then
-            colored_line="${C_RED}${line}${C_RESET}"
-        fi
+    # Use awk for case-insensitive pattern matching (no shopt nocasematch needed)
+    # Avoids pipeline subshell anti-pattern where 'local' is semantically wrong
+    # and shopt inheritance is fragile ("works by accident")
+    printf '%s\n' "$output" | head -20 | awk -v red="$C_RED" -v rst="$C_RESET" '
+    tolower($0) ~ /error|fail|unable|critical/ {
+        print red $0 rst
+        next
+    }
+    { print }
+    ' | while read -r colored_line; do
         draw_box_line "$colored_line"
     done
-    shopt -u nocasematch
 
     local total_lines
     total_lines="$(printf '%s\n' "$output" | wc -l)"
@@ -1509,42 +1510,29 @@ scan_pacman_logs() {
         return 0
     fi
 
-    # Color-code based on severity (case-insensitive via nocasematch)
-    # Note: { } is grouping (NOT subshell), so shopt affects parent shell
-    # Use ERR trap to ensure nocasematch is cleaned up if set -e triggers mid-pipeline
-    shopt -s nocasematch
-    # Save existing ERR trap to restore later (avoid clobbering caller's trap)
-    local old_err_trap=""
-    if trap -p ERR >/dev/null 2>&1; then
-        old_err_trap="$(trap -p ERR)"
-    fi
-    trap 'shopt -u nocasematch' ERR
-    printf '%s\n' "$issues" | while read -r line; do
+    # Color-code based on severity using awk (case-insensitive via tolower())
+    # Avoids pipeline subshell anti-pattern:
+    # - 'local' in pipeline subshell is semantically wrong (no function scope)
+    # - shopt nocasematch inheritance is fragile ("works by accident")
+    # - Complex ERR trap handling to clean up nocasematch is unnecessary
+    printf '%s\n' "$issues" | awk -v red="$C_RED" -v ylw="$C_YELLOW" -v rst="$C_RESET" '
+    {
         # Sanitize: remove potential ANSI/binary garbage
-        line="$(printf '%s' "$line" | tr -cd '[:print:]\t')"
-        local colored_line="$line"
-        if [[ "$line" =~ error ]]; then
-            colored_line="${C_RED}${line}${C_RESET}"
-        elif [[ "$line" =~ warning ]]; then
-            colored_line="${C_YELLOW}${line}${C_RESET}"
-        fi
+        gsub(/[^[:print:]\t]/, "")
+        line = $0
+    }
+    tolower(line) ~ /error/ {
+        print red line rst
+        next
+    }
+    tolower(line) ~ /warning/ {
+        print ylw line rst
+        next
+    }
+    { print line }
+    ' | while read -r colored_line; do
         draw_box_line "$colored_line"
     done
-    # Restore previous ERR trap (or clear if none existed)
-    if [[ -n "$old_err_trap" ]]; then
-        # Extract command from trap output: "trap -- 'CMD' ERR" → CMD
-        local cmd="${old_err_trap#*trap -- }"
-        cmd="${cmd% ERR}"
-        cmd="${cmd% SIGERR}"
-        cmd="${cmd#\'}"
-        cmd="${cmd%\'}"
-        # Unescape bash's safe-escaped single quotes: '\'' → '
-        cmd="${cmd//\'\\\'\'/\'}"
-        trap -- "$cmd" ERR
-    else
-        trap - ERR
-    fi
-    shopt -u nocasematch
 
 }
 
