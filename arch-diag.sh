@@ -3108,29 +3108,39 @@ declare -g _EXPORT_CLEANUP_OLD_TERM=""
 
 # Cleanup handler for export_all_logs
 # Restores caller's traps and cleans up temp file
-# Called via EXIT/INT/TERM traps
+# Called via EXIT/INT/TERM traps OR directly on success
+# Usage: _export_cleanup [keep_temp_file]
+#   keep_temp_file=0 (default): delete temp file (error/interrupt path)
+#   keep_temp_file=1: preserve temp file (success path, already moved)
 _export_cleanup() {
+    local keep_temp_file="${1:-0}"
     local exit_code=$?
-    
+
     # Restore caller's traps first (before any other operations)
     if [[ -n "${_EXPORT_CLEANUP_OLD_EXIT:-}" ]]; then
         if [[ "$_EXPORT_CLEANUP_OLD_EXIT" == "__IGNORE__" ]]; then trap '' EXIT
         else trap -- "$_EXPORT_CLEANUP_OLD_EXIT" EXIT; fi
+    else
+        trap - EXIT
     fi
     if [[ -n "${_EXPORT_CLEANUP_OLD_INT:-}" ]]; then
         if [[ "$_EXPORT_CLEANUP_OLD_INT" == "__IGNORE__" ]]; then trap '' INT
         else trap -- "$_EXPORT_CLEANUP_OLD_INT" INT; fi
+    else
+        trap - INT
     fi
     if [[ -n "${_EXPORT_CLEANUP_OLD_TERM:-}" ]]; then
         if [[ "$_EXPORT_CLEANUP_OLD_TERM" == "__IGNORE__" ]]; then trap '' TERM
         else trap -- "$_EXPORT_CLEANUP_OLD_TERM" TERM; fi
+    else
+        trap - TERM
     fi
-    
-    # Clean up temp file if it exists
-    if [[ -n "${_EXPORT_CLEANUP_TEMP_FILE:-}" && -f "${_EXPORT_CLEANUP_TEMP_FILE}" ]]; then
+
+    # Clean up temp file if it exists and we're not preserving it
+    if [[ "$keep_temp_file" -eq 0 && -n "${_EXPORT_CLEANUP_TEMP_FILE:-}" && -f "${_EXPORT_CLEANUP_TEMP_FILE}" ]]; then
         rm -f "$_EXPORT_CLEANUP_TEMP_FILE" 2>/dev/null
     fi
-    
+
     return "$exit_code"
 }
 
@@ -3439,24 +3449,8 @@ export_all_logs() {
         return 1
     fi
 
-    # SUCCESS: Clear temp_file so EXIT trap doesn't delete the output file
-    _EXPORT_CLEANUP_TEMP_FILE=""
-    # Restore caller's traps before disabling our cleanup trap
-    if [[ -n "$_EXPORT_CLEANUP_OLD_EXIT" ]]; then
-        if [[ "$_EXPORT_CLEANUP_OLD_EXIT" == "__IGNORE__" ]]; then trap '' EXIT; else trap -- "$_EXPORT_CLEANUP_OLD_EXIT" EXIT; fi
-    else
-        trap - EXIT
-    fi
-    if [[ -n "$_EXPORT_CLEANUP_OLD_INT" ]]; then
-        if [[ "$_EXPORT_CLEANUP_OLD_INT" == "__IGNORE__" ]]; then trap '' INT; else trap -- "$_EXPORT_CLEANUP_OLD_INT" INT; fi
-    else
-        trap - INT
-    fi
-    if [[ -n "$_EXPORT_CLEANUP_OLD_TERM" ]]; then
-        if [[ "$_EXPORT_CLEANUP_OLD_TERM" == "__IGNORE__" ]]; then trap '' TERM; else trap -- "$_EXPORT_CLEANUP_OLD_TERM" TERM; fi
-    else
-        trap - TERM
-    fi
+    # SUCCESS: Call _export_cleanup to restore traps (preserve temp file since it was moved)
+    _export_cleanup 1
 
     info "All logs exported to: ${output_file}"
 }
