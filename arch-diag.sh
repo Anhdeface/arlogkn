@@ -1626,15 +1626,23 @@ _gather_temperatures() {
 # CONTRACT: Must be called via pipeline from _gather_temperatures:
 #   _gather_temperatures | _format_temperatures_display
 #
+# SUBSHELL DESIGN:
 # This function runs in a SUBSHELL (pipeline vế phải). It is SELF-CONTAINED:
 # - Calls draw_table_begin, tbl_row, draw_table_end entirely within subshell
-# - Table state (_TBL_DEPTH, etc.) does NOT propagate to parent (expected)
+# - Table state (_TBL_DEPTH, _TBL_COLS_STACK, etc.) does NOT propagate to parent
 # - Output (formatted text) propagates to stdout correctly
+#
+# DESIGN LIABILITY:
+# If parent shell calls tbl_begin/tbl_end around this pipeline, table stack
+# will be DESYNCED (parent expects tbl_end but subshell already called it).
+# Current scan_temperatures() avoids this by NOT wrapping the pipeline in
+# table calls — the table is entirely within the subshell.
 #
 # DO NOT MODIFY to:
 # - Call tbl_begin without matching tbl_end (breaks table state in subshell)
 # - Expect table state to be visible in parent shell (won't work)
 # - Split table lifecycle across subshell boundaries (will corrupt state)
+# - Add tbl_begin/tbl_end around the pipeline in caller (will desync stack)
 #
 # See _gather_temperatures() for alternative patterns using temp files.
 _format_temperatures_display() {
