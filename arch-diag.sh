@@ -1309,7 +1309,7 @@ scan_user_services() {
 
     # ── JOURNAL SERVICE ERRORS ──
     draw_box_line "${C_BOLD}Service Errors (journalctl):${C_RESET}"
-    printf '%s%*s%s\n' "$C_CYAN" 70 "" "$C_RESET"
+    draw_box_line ""
 
     # Limit to last 500 lines. Check if journald is active to avoid 5s timeout on broken systems.
     if command -v journalctl &>/dev/null && journalctl --no-pager -n 0 &>/dev/null; then
