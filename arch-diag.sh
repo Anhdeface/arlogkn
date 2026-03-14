@@ -161,8 +161,13 @@ detect_system_info() {
     KERNEL_VER="$(uname -r)"
 
     # CPU Governor detection (may require root for full accuracy)
+    # Note: File may exist but be unreadable (permission denied) → fallback to "unknown"
+    # Also handle empty file case (some systems have broken cpufreq interface)
     if [[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]]; then
         CPU_GOVERNOR="$(</sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)" || CPU_GOVERNOR="unknown"
+        # Trim whitespace and handle empty result
+        CPU_GOVERNOR="${CPU_GOVERNOR//[[:space:]]/}"
+        [[ -z "$CPU_GOVERNOR" ]] && CPU_GOVERNOR="unknown"
     elif command -v cpupower &>/dev/null; then
         # Parse governor from cpupower output format:
         #   The governor "performance" may decide which speed to use
@@ -170,6 +175,8 @@ detect_system_info() {
         CPU_GOVERNOR="$(cpupower frequency-info 2>/dev/null | \
             sed -n 's/.*The governor "\([^"]*\)".*/\1/p' | head -1)"
         CPU_GOVERNOR="${CPU_GOVERNOR:-unknown}"
+    else
+        CPU_GOVERNOR="unknown"
     fi
 }
 
