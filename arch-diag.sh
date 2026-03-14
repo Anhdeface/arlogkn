@@ -933,9 +933,9 @@ strip_ansi() {
 
 # Get visible length (excluding ANSI codes)
 # Calls strip_ansi() which handles both script colors and raw ANSI
-# Note: Uses wc -m to count Unicode characters (not bytes). ${#var} returns
-# byte count which is wrong for multi-byte chars like box-drawing (─ = 3 bytes),
-# emoji (✓ = 3 bytes), or CJK characters. wc -m gives correct character count.
+# Note: Uses awk for character count. ${#var} returns byte count in C/POSIX
+# locale which is wrong for multi-byte chars like box-drawing (─ = 3 bytes),
+# emoji (✓ = 3 bytes), or CJK characters. awk length() gives correct character count.
 # Limitation: Does not handle wide characters (CJK = 2 columns) - would need
 # wcswidth() from libc. For typical ASCII + box-drawing + emoji, this is sufficient.
 #
@@ -948,11 +948,13 @@ visible_len() {
     local var_name="${2:-}"
     local stripped char_count
     strip_ansi "$s" stripped
-    
-    # Fast path: ASCII-only strings (no multi-byte chars)
-    # Check if string contains only ASCII printable chars + space/tab
-    # This avoids fork overhead for common case (labels, numbers, plain text)
-    if [[ "$stripped" =~ ^[[:print:][:space:]]*$ ]]; then
+
+    # Fast path: ASCII-only strings (bytes 0x20-0x7E, no multi-byte UTF-8)
+    # Use explicit ASCII range to avoid matching UTF-8 multibyte chars.
+    # [[:print:]] in UTF-8 locale matches ANY printable char including ✓●─
+    # So we use explicit ASCII range: space (0x20) through tilde (0x7E)
+    # Note: Using $'...' syntax for hex escapes in bash regex
+    if [[ "$stripped" =~ ^[$'\x20'-$'\x7E']*$ ]]; then
         char_count="${#stripped}"
     else
         # Slow path: multi-byte UTF-8 — use awk for correct char count
