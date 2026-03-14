@@ -1170,57 +1170,39 @@ draw_table_footer() { tbl_end "$@"; }
 
 # Cluster identical errors and count occurrences
 # Returns: 0 on success (including empty input → empty output), 1 on critical error
+#
+# TRUE STREAM PROCESSING: Input flows directly through pipeline without buffering
+# in bash variables. This is memory-efficient for large inputs.
+# Pipeline: stdin → sed (normalize) → sort → uniq -c → sort -rn → format output
+#
+# Note: Pipeline ends with || true to prevent set -e abort on rare failures
+# (e.g., EINTR from signals, disk full during sort, interrupted by timeout).
+# Empty output from pipeline is valid (no errors to cluster).
 cluster_errors() {
-    # Read from stdin (stream processing, no intermediate copy)
-    # This is more efficient than passing large data as function argument
-    # and avoids shell argument length limits
-    local input
-    input="$(cat)"
-
-    # Empty input → empty output (not an error, just nothing to cluster)
-    if [[ -z "$input" ]]; then
-        return 0
-    fi
-
-    # Normalize: remove timestamps, then normalize dynamic content for clustering
-    # Kernel errors often contain dynamic values (addresses, PIDs, IRQs) that make
-    # identical errors appear unique. We normalize these to enable proper clustering.
-    #
-    # Normalization patterns:
-    # - Memory addresses: 0x[0-9a-fA-F]+ → 0xADDR
-    # - PIDs in brackets: [12345] → [PID]
-    # - IRQ numbers: IRQ \d+ → IRQ N
-    # - CPU numbers: CPU \d+ → CPU N
-    # - Device names: sd[a-z], mmcblk\d+, nvme\d+n\d+ → DEVICE
-    # - MAC addresses: xx:xx:xx:xx:xx:xx → MAC
-    # - Port numbers: host:1234 → host:PORT (only after lowercase/digit to avoid
-    #   corrupting normalized identifiers like 0xADDR:8080 or nvmeDEVICE:4096)
-    #
-    # Note: Pipeline ends with || true to prevent set -e abort on rare failures
-    # (e.g., EINTR from signals, disk full during sort, interrupted by timeout).
-    # Empty output from pipeline is valid (no errors to cluster).
-    printf '%s\n' "$input" | \
-        sed -E \
-            -e 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' \
-            -e 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' \
-            -e 's/0x[0-9a-fA-F]+/0xADDR/g' \
-            -e 's/\[[0-9]+\]/[PID]/g' \
-            -e 's/IRQ [0-9]+/IRQ N/g' \
-            -e 's/CPU [0-9]+/CPU N/g' \
-            -e 's/(sd)[a-z]+/\1DEVICE/g' \
-            -e 's/mmcblk[0-9]+/mmcblkDEVICE/g' \
-            -e 's/nvme[0-9]+n[0-9]+/nvmeDEVICE/g' \
-            -e 's/sector [0-9]+/sector N/g' \
-            -e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/<MAC>/g' \
-            -e 's/([0-9a-z]|\]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' | \
-        sort | uniq -c | sort -rn | \
-        while read -r count msg; do
-            if [[ "$count" -gt 1 ]]; then
-                printf '%s (x%d)\n' "$msg" "$count"
-            else
-                printf '%s\n' "$msg"
-            fi
-        done || true
+    # TRUE STREAM: Read from stdin directly into pipeline
+    # No intermediate bash variable = O(1) memory, not O(n)
+    # Empty input naturally produces empty output (correct behavior)
+    sed -E \
+        -e 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' \
+        -e 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' \
+        -e 's/0x[0-9a-fA-F]+/0xADDR/g' \
+        -e 's/\[[0-9]+\]/[PID]/g' \
+        -e 's/IRQ [0-9]+/IRQ N/g' \
+        -e 's/CPU [0-9]+/CPU N/g' \
+        -e 's/(sd)[a-z]+/\1DEVICE/g' \
+        -e 's/mmcblk[0-9]+/mmcblkDEVICE/g' \
+        -e 's/nvme[0-9]+n[0-9]+/nvmeDEVICE/g' \
+        -e 's/sector [0-9]+/sector N/g' \
+        -e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/<MAC>/g' \
+        -e 's/([0-9a-z]|\]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' | \
+    sort | uniq -c | sort -rn | \
+    while read -r count msg; do
+        if [[ "$count" -gt 1 ]]; then
+            printf '%s (x%d)\n' "$msg" "$count"
+        else
+            printf '%s\n' "$msg"
+        fi
+    done || true
 }
 
 scan_kernel_logs() {
