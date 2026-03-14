@@ -1741,13 +1741,17 @@ scan_boot_timing() {
                 # Also add remaining seconds if present (e.g., "3min 31.5s")
                 local rest="${time_str#*min }"
                 if [[ "$rest" != "$time_str" && "$rest" =~ ^([0-9]+\.?[0-9]*)s ]]; then
-                    local extra_sec
-                    extra_sec="$(printf '%.0f' "${BASH_REMATCH[1]}" 2>/dev/null)" || extra_sec=0
+                    # Integer truncation: 31.9 → 31 (fast, no subshell)
+                    # For coloring threshold (5s/10s), truncation is sufficient
+                    local extra_sec="${BASH_REMATCH[1]%.*}"
+                    extra_sec="${extra_sec:-0}"
                     time_sec=$((time_sec + extra_sec))
                 fi
             elif [[ "$time_val" =~ ^([0-9]+\.?[0-9]*)s$ ]]; then
-                # Round up: 4.999 → 5 for accurate threshold comparison
-                time_sec="$(printf '%.0f' "${BASH_REMATCH[1]}" 2>/dev/null)" || time_sec=0
+                # Integer truncation: 4.9 → 4, 5.1 → 5 (fast, no subshell)
+                # For coloring threshold, truncation is conservative (safe)
+                time_sec="${BASH_REMATCH[1]%.*}"
+                time_sec="${time_sec:-0}"
             elif [[ "$time_val" =~ ^([0-9]+)ms$ ]]; then
                 time_sec=0
             fi
