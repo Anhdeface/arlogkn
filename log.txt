@@ -1,8 +1,26 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-13
+Generated: 2026-03-14
 
 ---
+b977a20 2026-03-14 fix: re-add shellcheck disable=SC2120 for draw_table_end/draw_table_footer
+451c1f3 2026-03-14 docs: restructure README for conciseness and professional tone
+cb44e0a 2026-03-14 docs: cleanup redundant and overconfident comments
+8c75cdf 2026-03-14 docs(temps): clarify design liability of subshell table state in _format_temperatures_display
+f07fec4 2026-03-14 style(ui): replace hardcoded width 70 separator with draw_box_line()
+53a7599 2026-03-14 refactor(export): centralize trap restore logic in _export_cleanup() — eliminate duplication
+3f4fd73 2026-03-14 perf(boot): scan_boot_timing eliminate printf subshell for float rounding
+a9dc2f7 2026-03-14 perf(logs): cluster_errors() batch processing → true stream processing
+8a4b5cb 2026-03-14 perf(wiki): awk_fuzzy_match Levenshtein O(m×n) → O(min(m,n)) space optimization
+1d88045 2026-03-14 fix(network): check_internet() early return ignores higher-priority interfaces
+a9e31ca 2026-03-14 fix(detection): detect_system_info() handle empty CPU_GOVERNOR file + clarify fallback semantics
+0328bcd 2026-03-14 fix(export): export_mounts() incomplete octal decoding — inconsistent with scan_mounts()
+43048a4 2026-03-14 refactor(ui): eliminate shopt nocasematch in pipeline subshells — anti-pattern 'works by accident'
+897187b 2026-03-14 refactor(export): eliminate nested _export_cleanup() function — bash has no closures + race condition risk
+677ab52 2026-03-14 refactor(drivers): eliminate nested _get_driver() function — bash has no closures
+7b00486 2026-03-14 fix(ui): visible_len() fast path regex matches UTF-8 multibyte chars incorrectly
+ba21bf6 2026-03-14 release: version 1.0.9 - bug fixes and code quality improvements
+acffc07 2026-03-13 docs: update log.txt with latest commits
 ff53736 2026-03-13 fix(services): scan_user_services() grep -c pattern fragile with set -euo pipefail
 bfccff4 2026-03-13 refactor(detection): detect_distro() remove redundant || echo "" from command substitution
 e5cf306 2026-03-13 style(wiki): show_wiki() uses echo instead of printf — inconsistency
