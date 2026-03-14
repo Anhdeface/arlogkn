@@ -1142,8 +1142,10 @@ tbl_end() {
 # Legacy wrappers for backward compatibility (102 call sites use these names)
 draw_table_begin() { tbl_begin "$@"; }
 draw_table_row() { tbl_row "$@"; }
+# shellcheck disable=SC2120
 draw_table_end() { tbl_end "$@"; }
 draw_table_header() { tbl_begin "$@"; }
+# shellcheck disable=SC2120
 draw_table_footer() { tbl_end "$@"; }
 
 # ─────────────────────────────────────────────────────────────────────────────
