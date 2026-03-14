@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test_framework.sh"
 
 stub_globals
 stub_logging
-extract_functions get_driver_from_sys _get_lspci detect_drivers _detect_drivers_sysclass _detect_drivers_lspci _detect_drivers_sysbus
+extract_functions get_driver_from_sys _get_lspci detect_drivers _detect_drivers_sysclass _detect_drivers_lspci _detect_drivers_sysbus _lspci_get_driver
 
 suite_begin "Driver Detection"
 
