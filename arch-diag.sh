@@ -203,6 +203,11 @@ check_internet() {
     if [[ -d /sys/class/net ]]; then
         local iface operstate iface_name
         local has_link_up=0
+        local found_physical_ip=0
+        local found_virtual_ip=0
+        
+        # Collect all interfaces with valid IPs (don't early return)
+        # Priority: physical interfaces (eth*, enp*, wlp*) > virtual (docker*, tun*, br-*)
         for iface in /sys/class/net/*; do
             [[ -e "$iface" ]] || continue
             iface_name="$(basename "$iface")"
@@ -234,9 +239,14 @@ check_internet() {
                         fi
 
                         if [[ "$has_valid_ip" -eq 1 ]]; then
-                            # Has routable IP, but NOT confirmed internet yet
-                            INTERNET_STATUS="ip_assigned"
-                            return 0
+                            # Categorize interface: physical vs virtual/overlay
+                            # Physical: eth*, enp*, eno*, ens*, wlp*, wlan* (priority)
+                            # Virtual: docker*, tun*, tap*, br-*, veth*, virbr* (lower priority)
+                            if [[ "$iface_name" =~ ^(eth|enp|eno|ens|wlp|wlan) ]]; then
+                                found_physical_ip=1
+                            else
+                                found_virtual_ip=1
+                            fi
                         fi
                     fi
                     # No ip command or no valid IP — mark as link up
@@ -244,6 +254,15 @@ check_internet() {
                 fi
             fi
         done
+
+        # Priority: physical interface with IP > virtual interface with IP > link up
+        if [[ "$found_physical_ip" -eq 1 ]]; then
+            INTERNET_STATUS="ip_assigned"
+            return 0
+        elif [[ "$found_virtual_ip" -eq 1 ]]; then
+            INTERNET_STATUS="ip_assigned"
+            return 0
+        fi
 
         # Interface(s) up but no routable IP confirmed
         if [[ "$has_link_up" -eq 1 ]]; then
