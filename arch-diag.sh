@@ -3687,21 +3687,41 @@ awk_fuzzy_match() {
 function min3(a, b, c) {
     return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
 }
-function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
+# Optimized Levenshtein with O(min(m,n)) space using 2-row technique
+# Instead of storing full m×n matrix, only keep current and previous rows
+# Reduces memory from O(m×n) to O(min(m,n)) — critical for many comparisons
+function levenshtein(s1, s2,    len1, len2, i, j, prev, curr, c1, c2, cost, tmp) {
     len1 = length(s1); len2 = length(s2)
     if (len1 == 0) return len2
     if (len2 == 0) return len1
+    
+    # Ensure s2 is shorter for minimal space usage
     if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
-    split("", d)
-    for (j = 0; j <= len2; j++) d[0, j] = j
-    for (i = 1; i <= len1; i++) {
-        d[i, 0] = i; c1 = substr(s1, i, 1)
-        for (j = 1; j <= len2; j++) {
-            c2 = substr(s2, j, 1); cost = (c1 == c2) ? 0 : 1
-            d[i, j] = min3(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + cost)
+    
+    # Initialize previous row (represents row 0 of matrix)
+    # Only need len1+1 entries (shorter string length), not len2+1
+    split("", prev)
+    split("", curr)
+    for (j = 0; j <= len1; j++) prev[j] = j
+    
+    # Process each character of s2 (longer string)
+    for (i = 1; i <= len2; i++) {
+        curr[0] = i  # First column of current row
+        c2 = substr(s2, i, 1)
+        
+        # Compute current row from previous row
+        for (j = 1; j <= len1; j++) {
+            c1 = substr(s1, j, 1)
+            cost = (c1 == c2) ? 0 : 1
+            curr[j] = min3(prev[j] + 1, curr[j-1] + 1, prev[j-1] + cost)
         }
+        
+        # Copy current row to previous row for next iteration
+        # Using array copy instead of split("", prev) to preserve allocated memory
+        for (j = 0; j <= len1; j++) prev[j] = curr[j]
     }
-    return d[len1, len2]
+    
+    return prev[len1]
 }
 function get_threshold(len) {
     if (len <= 4) return 1
