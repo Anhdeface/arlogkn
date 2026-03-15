@@ -346,6 +346,7 @@ detect_gpu() {
         # Remove duplicates using pure bash (no subprocesses)
         local -A seen
         local -a unique=()
+        local name
         for name in "${gpu_names[@]}"; do
             if [[ -z "${seen[$name]:-}" ]]; then
                 unique+=("$name")
@@ -353,8 +354,12 @@ detect_gpu() {
             fi
         done
         # Join with ", " using pure bash
-        local IFS=', '
-        GPU_INFO="${unique[*]}"
+        # Note: "${array[*]}" only uses FIRST char of IFS, so we must join manually
+        local i
+        GPU_INFO="${unique[0]}"
+        for ((i=1; i<${#unique[@]}; i++)); do
+            GPU_INFO="${GPU_INFO}, ${unique[i]}"
+        done
     else
         GPU_INFO=""
     fi
