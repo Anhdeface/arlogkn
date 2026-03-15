@@ -522,10 +522,12 @@ _detect_drivers_sysclass() {
 _lspci_get_driver() {
     local pattern="$1"
     local lspci_output="$2"
+    # Use tolower() for case-insensitive matching (POSIX-compatible, works on mawk/nawk/gawk)
+    # IGNORECASE=1 is GNU awk extension, not portable
     printf '%s\n' "$lspci_output" | awk -v pat="$pattern" '
-    BEGIN { IGNORECASE=1; found=0 }
+    BEGIN { found=0 }
     /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }  # New device: reset flag
-    $0 ~ pat { found=1 }                  # Match pattern: set flag
+    tolower($0) ~ pat { found=1 }         # Match pattern: set flag (case-insensitive)
     /Kernel driver/ && found {            # Driver line + flag set
         sub(/.*Kernel driver in use: /, "")
         print
@@ -682,12 +684,12 @@ detect_drivers() {
         lspci_output="$(_get_lspci)"
 
         # GPU fallback (enhanced patterns) - only if /sys didn't find it
-        # Use awk to respect device boundaries (same as _detect_drivers_lspci)
-        # Prevents false match where grep -A2 would grab driver from NEXT device
+        # Use tolower() for case-insensitive matching (POSIX-compatible)
+        # IGNORECASE=1 is GNU awk extension, not portable
         [[ "$gpu_driver" == "N/A" ]] && gpu_driver="$(printf '%s\n' "$lspci_output" | awk '
-            BEGIN { IGNORECASE=1; found=0 }
+            BEGIN { found=0 }
             /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }
-            /vga|3d|display/ { found=1 }
+            tolower($0) ~ /vga|3d|display/ { found=1 }
             /Kernel driver/ && found {
                 sub(/.*Kernel driver in use: /, "")
                 print
@@ -697,10 +699,11 @@ detect_drivers() {
         [[ -z "$gpu_driver" ]] && gpu_driver="N/A"
 
         # Network fallback
+        # Use tolower() for case-insensitive matching (POSIX-compatible)
         [[ "$network_driver" == "N/A" ]] && network_driver="$(printf '%s\n' "$lspci_output" | awk '
-            BEGIN { IGNORECASE=1; found=0 }
+            BEGIN { found=0 }
             /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }
-            /ethernet|network|wireless|wifi/ { found=1 }
+            tolower($0) ~ /ethernet|network|wireless|wifi/ { found=1 }
             /Kernel driver/ && found {
                 sub(/.*Kernel driver in use: /, "")
                 print
@@ -710,10 +713,11 @@ detect_drivers() {
         [[ -z "$network_driver" ]] && network_driver="N/A"
 
         # Audio fallback
+        # Use tolower() for case-insensitive matching (POSIX-compatible)
         [[ "$audio_driver" == "N/A" ]] && audio_driver="$(printf '%s\n' "$lspci_output" | awk '
-            BEGIN { IGNORECASE=1; found=0 }
+            BEGIN { found=0 }
             /^[0-9a-f]+:[0-9a-f.]+/ { found=0 }
-            /audio|hdmi|hd-audio/ { found=1 }
+            tolower($0) ~ /audio|hdmi|hd-audio/ { found=1 }
             /Kernel driver/ && found {
                 sub(/.*Kernel driver in use: /, "")
                 print
