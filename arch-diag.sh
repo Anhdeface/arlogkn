@@ -1193,6 +1193,14 @@ cluster_errors() {
     # TRUE STREAM: Read from stdin directly into pipeline
     # No intermediate bash variable = O(1) memory, not O(n)
     # Empty input naturally produces empty output (correct behavior)
+    #
+    # Port normalization: Match :PORT followed by space or end-of-line
+    # Pattern is intentionally conservative to avoid false matches:
+    # - Only matches colon followed by 1-5 digits (valid port range)
+    # - Requires space or EOL after port (prevents matching hex like 0x1a:5)
+    # - Hex addresses already normalized to 0xADDR before this step
+    # - IPv6 addresses with ports (e.g., [::1]:8080) are rare in logs
+    # - Preserve ] before :PORT (common in log formats like [host]:port)
     sed -E \
         -e 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' \
         -e 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' \
@@ -1205,7 +1213,8 @@ cluster_errors() {
         -e 's/nvme[0-9]+n[0-9]+/nvmeDEVICE/g' \
         -e 's/sector [0-9]+/sector N/g' \
         -e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/<MAC>/g' \
-        -e 's/([0-9a-z]|\]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' | \
+        -e 's/(\]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' \
+        -e 's/:[0-9]{1,5}([ /]|$)/:PORT\1/g' | \
     sort | uniq -c | sort -rn | \
     while read -r count msg; do
         if [[ "$count" -gt 1 ]]; then
