@@ -3794,7 +3794,10 @@ function get_threshold(len) {
     }
 }
 END {
-    # Simple bubble sort by distance
+    # Sort suggestions by distance (ascending = best matches first)
+    # Using bubble sort O(n²) — acceptable for n≤20 (WIKI_GROUP_NAMES size)
+    # Worst case: 20×19/2 = 190 comparisons — negligible for this use case
+    # Trade-off: Code simplicity over micro-optimization (insertion sort would be faster but more complex)
     for (i = 1; i < count; i++) {
         for (j = i + 1; j <= count; j++) {
             if (distances[j] < distances[i]) {
