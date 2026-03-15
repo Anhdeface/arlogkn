@@ -1939,11 +1939,20 @@ scan_mounts() {
 
     draw_table_end
 
-    # Disk usage - use df with minimal output
+    # Disk usage - extract to helper to avoid 'local' in pipeline subshell
+    _render_disk_usage_table
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: Render disk usage table from df output
+# Called by scan_mounts() — avoids 'local' in pipeline subshell anti-pattern
+# ─────────────────────────────────────────────────────────────────────────────
+_render_disk_usage_table() {
     draw_section_header "DISK USAGE"
     draw_table_begin "Filesystem" 24 "Size" 9 "Used" 9 "Avail" 9 "Use%" 6
 
-    df -h 2>/dev/null | awk 'NR>1 && /^\/dev\// {print $1"|"$2"|"$3"|"$4"|"$5}' | sort -u | head -6 | while IFS='|' read -r fs size used avail usep; do
+    df -h 2>/dev/null | awk 'NR>1 && /^\/dev\// {print $1"|"$2"|"$3"|"$4"|"$5}' | \
+        sort -u | head -6 | while IFS='|' read -r fs size used avail usep; do
         local color="$C_RESET"
         local use_num="${usep%\%}"
         # Validate use_num is numeric before arithmetic comparison
