@@ -72,9 +72,9 @@ test_detect_drivers_lspci_empty_input() {
     result="$(_detect_drivers_lspci "")"
     local IFS='|'
     local -a fields=($result)
-    # Should have 8 fields, all N/A
+    # Should have 6 fields, all N/A (sata_driver and i2c_driver are from lsmod, not lspci)
     local all_na=1
-    [[ "${#fields[@]}" -ne 8 ]] && all_na=0
+    [[ "${#fields[@]}" -ne 6 ]] && all_na=0
     for f in "${fields[@]}"; do
         [[ "$f" != "N/A" ]] && all_na=0 && break
     done
@@ -82,12 +82,12 @@ test_detect_drivers_lspci_empty_input() {
 }
 
 test_detect_drivers_lspci_output_format() {
-    # Should return 8 pipe-separated fields
+    # Should return 6 pipe-separated fields (storage|usb|thunderbolt|nvme|smbus|platform)
     local result
     result="$(_detect_drivers_lspci "dummy")"
     local field_count
     field_count="$(echo "$result" | awk -F'|' '{print NF}')"
-    assert_eq "_detect_drivers_lspci returns 8 fields" "$field_count" "8"
+    assert_eq "_detect_drivers_lspci returns 6 fields" "$field_count" "6"
 }
 
 # ─── _detect_drivers_sysbus() ─────────────────────────────────────────────────

@@ -555,13 +555,14 @@ _lspci_get_driver() {
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: Detect drivers from lspci -k output
 # Input: $1 = lspci_output
-# Returns: storage|usb|thunderbolt|nvme|sata|i2c|smbus|platform (8 fields)
+# Returns: storage|usb|thunderbolt|nvme|smbus|platform (6 fields)
+# Note: sata_driver and i2c_driver are detected from lsmod (not lspci)
+#       because lspci cannot distinguish SATA/AHCI or I2C module variants
 # ─────────────────────────────────────────────────────────────────────────────
 _detect_drivers_lspci() {
     local lspci_output="$1"
     local storage_driver="N/A" usb_driver="N/A" thunderbolt_driver="N/A"
-    local nvme_driver="N/A" sata_driver="N/A" i2c_driver="N/A"
-    local smbus_driver="N/A" platform_driver="N/A"
+    local nvme_driver="N/A" smbus_driver="N/A" platform_driver="N/A"
 
     # Storage controllers
     storage_driver="$(_lspci_get_driver 'sata|ahci|ide|storage' "$lspci_output")"
@@ -579,7 +580,7 @@ _detect_drivers_lspci() {
     thunderbolt_driver="$(_lspci_get_driver 'thunderbolt' "$lspci_output")"
     [[ -z "$thunderbolt_driver" ]] && thunderbolt_driver="N/A"
 
-    # I2C/SMBus
+    # I2C/SMBus (combined — lspci cannot distinguish I2C from SMBus reliably)
     smbus_driver="$(_lspci_get_driver 'smbus|i2c' "$lspci_output")"
     [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
 
@@ -592,9 +593,9 @@ _detect_drivers_lspci() {
     fi
     [[ -z "$platform_driver" ]] && platform_driver="N/A"
 
-    printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
+    printf '%s|%s|%s|%s|%s|%s\n' \
         "$storage_driver" "$usb_driver" "$thunderbolt_driver" "$nvme_driver" \
-        "$sata_driver" "$i2c_driver" "$smbus_driver" "$platform_driver"
+        "$smbus_driver" "$platform_driver"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -742,11 +743,12 @@ detect_drivers() {
         ')"
         [[ -z "$audio_driver" ]] && audio_driver="N/A"
 
-        # Parse remaining drivers from lspci (8 fields)
+        # Parse remaining drivers from lspci (6 fields)
+        # Note: sata_driver and i2c_driver are detected from lsmod, not lspci
         local lspci_result
         lspci_result="$(_detect_drivers_lspci "$lspci_output")"
         IFS='|' read -r storage_driver usb_driver thunderbolt_driver nvme_driver \
-            sata_driver i2c_driver smbus_driver platform_driver <<< "$lspci_result"
+            smbus_driver platform_driver <<< "$lspci_result"
     fi
 
     # ─────────────────────────────────────────────────────────────────────────
