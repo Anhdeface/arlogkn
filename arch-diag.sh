@@ -375,19 +375,21 @@ detect_gpu() {
 detect_display() {
     # Display detection — check DRM connectors from /sys (works without X11/Wayland)
     # nullglob ensures glob returns empty if no matches
+    local -a display_parts=()
+    local status name connector_dir res modes_file entry
+
     shopt -s nullglob
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
         status="$(< "$connector" 2>/dev/null)" || status=""
         if [[ "$status" == "connected" ]]; then
-            local name connector_dir
             connector_dir="$(dirname "$connector")"
             name="$(basename "$connector_dir")"
             name="${name#card*-}"  # Remove "card*-" prefix
 
             # Get resolution from THIS connector's modes file
-            local res=""
-            local modes_file="${connector_dir}/modes"
+            res=""
+            modes_file="${connector_dir}/modes"
             if [[ -f "$modes_file" ]]; then
                 res="$(head -1 "$modes_file" 2>/dev/null)"
                 # Defense-in-depth: sanitize against ANSI injection
@@ -397,7 +399,7 @@ detect_display() {
                     tr -d '[:cntrl:]')"
             fi
 
-            local entry="${name}"
+            entry="${name}"
             [[ -n "$res" ]] && entry="${entry} ($res)"
             display_parts+=("$entry")
         fi
