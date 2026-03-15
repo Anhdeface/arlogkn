@@ -281,7 +281,23 @@ check_internet() {
         fi
 
         # Fallback to HTTP check with configurable endpoint
+        # Security: Validate URL scheme and host to prevent SSRF attacks
+        # Only allow https:// scheme with safe, public endpoints
         local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
+        
+        # Validate URL format: must start with https:// (no file://, gopher://, http://, etc.)
+        # Prevents: SSRF via malicious ARLOGKN_TEST_URL, internal network probing
+        if [[ ! "$test_url" =~ ^https:// ]]; then
+            warn "ARLOGKN_TEST_URL: invalid scheme (must be https://), using default"
+            test_url="https://clients3.google.com/generate_204"
+        fi
+        
+        # Block private/internal IP ranges to prevent internal network probing
+        # Exclude: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x, localhost
+        if [[ "$test_url" =~ https://(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|169\.254\.|localhost|::1) ]]; then
+            warn "ARLOGKN_TEST_URL: blocked private/internal endpoint, using default"
+            test_url="https://clients3.google.com/generate_204"
+        fi
 
         if command -v curl &>/dev/null; then
             local http_code
