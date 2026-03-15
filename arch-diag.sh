@@ -3640,7 +3640,151 @@ declare -A WIKI_ALIASES=(
     ["recover"]="emergency"
 )
 
-# AWK-based fuzzy matching - optimized for speed
+# ─────────────────────────────────────────────────────────────────────────────
+# WIKI FUZZY MATCHING
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: AWK-based Levenshtein distance with O(min(m,n)) space optimization
+# Uses 2-row technique instead of full m×n matrix to reduce memory usage
+# This is the SINGLE source of truth for Levenshtein in this script
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage: result=$(printf '%s\n' "$groups" | _levenshtein_awk -v q="$query")
+_levenshtein_awk() {
+    awk -v q="$1" '
+function min3(a, b, c) {
+    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
+}
+# Optimized Levenshtein with O(min(m,n)) space using 2-row technique
+# Instead of storing full m×n matrix, only keep current and previous rows
+# Reduces memory from O(m×n) to O(min(m,n)) — critical for many comparisons
+function levenshtein(s1, s2,    len1, len2, i, j, prev, curr, c1, c2, cost, tmp) {
+    len1 = length(s1); len2 = length(s2)
+    if (len1 == 0) return len2
+    if (len2 == 0) return len1
+
+    # Ensure s2 is shorter for minimal space usage
+    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
+
+    # Initialize previous row (represents row 0 of matrix)
+    # Only need len1+1 entries (shorter string length), not len2+1
+    split("", prev)
+    split("", curr)
+    for (j = 0; j <= len1; j++) prev[j] = j
+
+    # Process each character of s2 (longer string)
+    for (i = 1; i <= len2; i++) {
+        curr[0] = i  # First column of current row
+        c2 = substr(s2, i, 1)
+
+        # Compute current row from previous row
+        for (j = 1; j <= len1; j++) {
+            c1 = substr(s1, j, 1)
+            cost = (c1 == c2) ? 0 : 1
+            curr[j] = min3(prev[j] + 1, curr[j-1] + 1, prev[j-1] + cost)
+        }
+
+        # Copy current row to previous row for next iteration
+        # Using array copy instead of split("", prev) to preserve allocated memory
+        for (j = 0; j <= len1; j++) prev[j] = curr[j]
+    }
+
+    return prev[len1]
+}
+function get_threshold(len) {
+    if (len <= 4) return 1
+    if (len <= 8) return 2
+    return 3
+}
+BEGIN {
+    best_idx = -1
+    best_dist = 999
+}
+{
+    idx = NR - 1
+    split($0, parts, " ")
+    keyword = parts[1]
+
+    dist = levenshtein(q, keyword)
+    threshold = get_threshold(length(keyword))
+
+    if (dist <= threshold && dist < best_dist) {
+        best_dist = dist
+        best_idx = idx
+        if (dist == 0) exit
+    }
+}
+END {
+    print best_idx ":" best_dist
+}
+'
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: AWK-based Levenshtein for multiple suggestions (sorted by distance)
+# Uses same O(min(m,n)) space optimization as _levenshtein_awk()
+# Returns top 3 suggestions sorted by edit distance
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage: printf '%s\n' "$groups" | _suggestions_awk -v q="$query"
+_suggestions_awk() {
+    awk -v q="$1" '
+function min3(a, b, c) {
+    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
+}
+# Same O(min(m,n)) space-optimized Levenshtein as _levenshtein_awk()
+function levenshtein(s1, s2,    len1, len2, i, j, prev, curr, c1, c2, cost, tmp) {
+    len1 = length(s1); len2 = length(s2)
+    if (len1 == 0) return len2
+    if (len2 == 0) return len1
+    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
+    split("", prev)
+    split("", curr)
+    for (j = 0; j <= len1; j++) prev[j] = j
+    for (i = 1; i <= len2; i++) {
+        curr[0] = i
+        c2 = substr(s2, i, 1)
+        for (j = 1; j <= len1; j++) {
+            c1 = substr(s1, j, 1)
+            cost = (c1 == c2) ? 0 : 1
+            curr[j] = min3(prev[j] + 1, curr[j-1] + 1, prev[j-1] + cost)
+        }
+        for (j = 0; j <= len1; j++) prev[j] = curr[j]
+    }
+    return prev[len1]
+}
+function get_threshold(len) {
+    if (len <= 4) return 1
+    if (len <= 8) return 2
+    return 3
+}
+{
+    idx = NR - 1
+    split($0, parts, " ")
+    keyword = parts[1]
+    dist = levenshtein(q, keyword)
+    threshold = get_threshold(length(keyword))
+    if (dist <= threshold) {
+        suggestions[++count] = $0
+        distances[count] = dist
+    }
+}
+END {
+    # Simple bubble sort by distance
+    for (i = 1; i < count; i++) {
+        for (j = i + 1; j <= count; j++) {
+            if (distances[j] < distances[i]) {
+                tmp = suggestions[i]; suggestions[i] = suggestions[j]; suggestions[j] = tmp
+                tmp = distances[i]; distances[i] = distances[j]; distances[j] = tmp
+            }
+        }
+    }
+    # Print top 3
+    for (i = 1; i <= 3 && i <= count; i++) print suggestions[i]
+}
+'
+}
+
+# AWK-based fuzzy matching — optimized for speed
 # Uses Levenshtein distance with awk
 awk_fuzzy_match() {
     local query="$1"
@@ -3663,77 +3807,8 @@ awk_fuzzy_match() {
         return 1
     fi
 
-    # Use awk for fast string processing
-    # Note: Levenshtein functions embedded directly (no shell interpolation)
-    # to avoid vulnerabilities from single quotes breaking awk script syntax
-    printf '%s\n' "$groups" | awk -v q="$query" '
-function min3(a, b, c) {
-    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
-}
-# Optimized Levenshtein with O(min(m,n)) space using 2-row technique
-# Instead of storing full m×n matrix, only keep current and previous rows
-# Reduces memory from O(m×n) to O(min(m,n)) — critical for many comparisons
-function levenshtein(s1, s2,    len1, len2, i, j, prev, curr, c1, c2, cost, tmp) {
-    len1 = length(s1); len2 = length(s2)
-    if (len1 == 0) return len2
-    if (len2 == 0) return len1
-    
-    # Ensure s2 is shorter for minimal space usage
-    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
-    
-    # Initialize previous row (represents row 0 of matrix)
-    # Only need len1+1 entries (shorter string length), not len2+1
-    split("", prev)
-    split("", curr)
-    for (j = 0; j <= len1; j++) prev[j] = j
-    
-    # Process each character of s2 (longer string)
-    for (i = 1; i <= len2; i++) {
-        curr[0] = i  # First column of current row
-        c2 = substr(s2, i, 1)
-        
-        # Compute current row from previous row
-        for (j = 1; j <= len1; j++) {
-            c1 = substr(s1, j, 1)
-            cost = (c1 == c2) ? 0 : 1
-            curr[j] = min3(prev[j] + 1, curr[j-1] + 1, prev[j-1] + cost)
-        }
-        
-        # Copy current row to previous row for next iteration
-        # Using array copy instead of split("", prev) to preserve allocated memory
-        for (j = 0; j <= len1; j++) prev[j] = curr[j]
-    }
-    
-    return prev[len1]
-}
-function get_threshold(len) {
-    if (len <= 4) return 1
-    if (len <= 8) return 2
-    return 3
-}
-    BEGIN {
-        best_idx = -1
-        best_dist = 999
-    }
-    {
-        idx = NR - 1
-        split($0, parts, " ")
-        keyword = parts[1]
-
-        dist = levenshtein(q, keyword)
-        threshold = get_threshold(length(keyword))
-
-        if (dist <= threshold && dist < best_dist) {
-            best_dist = dist
-            best_idx = idx
-            if (dist == 0) exit
-        }
-    }
-
-    END {
-        print best_idx ":" best_dist
-    }
-'
+    # Use shared Levenshtein helper (single source of truth)
+    printf '%s\n' "$groups" | _levenshtein_awk "$query"
 }
 
 # Find best match using awk fuzzy matching
@@ -3794,7 +3869,7 @@ find_wiki_group_awk() {
     return 1
 }
 
-# Get suggestions using awk
+# Get suggestions using awk — uses shared Levenshtein helper
 suggest_wiki_groups_awk() {
     local query="$1"
 
@@ -3810,59 +3885,8 @@ suggest_wiki_groups_awk() {
     local groups_str
     groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
 
-    # Note: Levenshtein functions embedded directly (no shell interpolation)
-    # to avoid vulnerabilities from single quotes breaking awk script syntax
-    printf '%s\n' "$groups_str" | awk -v q="$query" '
-function min3(a, b, c) {
-    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
-}
-function levenshtein(s1, s2,    len1, len2, i, j, d, c1, c2, cost, tmp) {
-    len1 = length(s1); len2 = length(s2)
-    if (len1 == 0) return len2
-    if (len2 == 0) return len1
-    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
-    split("", d)
-    for (j = 0; j <= len2; j++) d[0, j] = j
-    for (i = 1; i <= len1; i++) {
-        d[i, 0] = i; c1 = substr(s1, i, 1)
-        for (j = 1; j <= len2; j++) {
-            c2 = substr(s2, j, 1); cost = (c1 == c2) ? 0 : 1
-            d[i, j] = min3(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + cost)
-        }
-    }
-    return d[len1, len2]
-}
-function get_threshold(len) {
-    if (len <= 4) return 1
-    if (len <= 8) return 2
-    return 3
-}
-    {
-        idx = NR - 1
-        split($0, parts, " ")
-        keyword = parts[1]
-        dist = levenshtein(q, keyword)
-        threshold = get_threshold(length(keyword))
-        if (dist <= threshold) {
-            suggestions[++count] = $0
-            distances[count] = dist
-        }
-    }
-
-    END {
-        # Simple bubble sort by distance
-        for (i = 1; i < count; i++) {
-            for (j = i + 1; j <= count; j++) {
-                if (distances[j] < distances[i]) {
-                    tmp = suggestions[i]; suggestions[i] = suggestions[j]; suggestions[j] = tmp
-                    tmp = distances[i]; distances[i] = distances[j]; distances[j] = tmp
-                }
-            }
-        }
-        # Print top 3
-        for (i = 1; i <= 3 && i <= count; i++) print suggestions[i]
-    }
-'
+    # Use shared Levenshtein helper (single source of truth, O(min(m,n)) space)
+    printf '%s\n' "$groups_str" | _suggestions_awk "$query"
 }
 
 # Find group index using awk fuzzy matching (optimized)
