@@ -3805,10 +3805,24 @@ BEGIN {
 {
     idx = NR - 1
     split($0, parts, " ")
-    keyword = parts[1]
-
-    dist = levenshtein(q, keyword)
-    threshold = get_threshold(length(keyword))
+    
+    # Match against ALL words in group name, not just first word
+    # This allows matching "managment" → "management" in "pacman package management"
+    # Use best (lowest) distance among all words for threshold check
+    best_word_dist = 999
+    best_word_len = 0
+    
+    for (p = 1; p in parts; p++) {
+        word = parts[p]
+        dist = levenshtein(q, word)
+        if (dist < best_word_dist) {
+            best_word_dist = dist
+            best_word_len = length(word)
+        }
+    }
+    
+    dist = best_word_dist
+    threshold = get_threshold(best_word_len)
 
     if (mode == "best") {
         # Best-match mode: track closest match only
