@@ -91,9 +91,18 @@ info() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 init_colors() {
-    # Disable colors if stdout is not a terminal (pipe or redirect)
-    # Prevents ANSI codes in output files: ./arch-diag.sh > report.txt
-    [[ ! -t 1 ]] && return 0
+    # Disable colors if neither stdout nor stderr is a terminal
+    # Rationale:
+    # - Main output goes to stdout → check fd 1
+    # - warn()/die() messages go to stderr → check fd 2
+    # If user runs ./arch-diag.sh > report.txt:
+    #   - stdout is file → no colors in main output (correct)
+    #   - stderr is terminal → colors in warn/die messages (correct)
+    # If BOTH are redirected → no colors anywhere (correct)
+    if [[ ! -t 1 ]] && [[ ! -t 2 ]]; then
+        C_RESET="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_BOLD=""
+        return 0
+    fi
 
     local colors_avail
     # Check if terminal supports colors (redirect stderr to avoid noise)
