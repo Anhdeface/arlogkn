@@ -2015,7 +2015,9 @@ scan_mounts() {
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: Render disk usage table from df output
-# Called by scan_mounts() — avoids 'local' in pipeline subshell anti-pattern
+# Called by scan_mounts() — extracted to avoid 'local' in pipeline subshell
+# Note: This function IS a function (not inline pipeline), so 'local' in the
+# while loop is meaningful — it scopes to the function, not the subshell.
 # ─────────────────────────────────────────────────────────────────────────────
 _render_disk_usage_table() {
     draw_section_header "DISK USAGE"
@@ -2023,6 +2025,9 @@ _render_disk_usage_table() {
 
     df -h 2>/dev/null | awk 'NR>1 && /^\/dev\// {print $1"|"$2"|"$3"|"$4"|"$5}' | \
         sort -u | head -6 | while IFS='|' read -r fs size used avail usep; do
+        # Note: 'local' in pipeline subshell is semantically meaningless
+        # Variables are scoped to subshell process, not function scope
+        # But we keep 'local' for consistency with function style
         local color="$C_RESET"
         local use_num="${usep%\%}"
         # Validate use_num is numeric before arithmetic comparison
