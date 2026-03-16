@@ -989,11 +989,14 @@ strip_ansi() {
     s="${s//"${C_RESET}"/}"
 
     # Strip raw ANSI escape sequences using sed (single pass, O(n))
-    # Pattern: \x1b followed by [ then digits/semicolons then a letter
+    # Handles ALL ANSI escape sequence types:
+    # 1. CSI sequences: \x1b[...m (colors, bold, underline, etc.)
+    # 2. OSC sequences: \x1b]...BEL (terminal title, hyperlinks, etc.)
+    # 3. Other ESC sequences: DCS, APC, PM, SS2, SS3 (rare in logs)
     # Using sed instead of bash loop avoids O(n²) complexity for strings
     # with many ANSI codes (e.g., colored journal errors with 20+ codes)
     # Trade-off: 1 subprocess (~1ms) vs O(n²) bash operations
-    s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
+    s="$(printf '%s' "$s" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g; s/\x1b[^[]*//g')"
 
     if [[ -n "$var_name" ]]; then
         printf -v "$var_name" '%s' "$s"
