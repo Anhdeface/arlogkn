@@ -1218,16 +1218,22 @@ draw_table_footer() { tbl_end "$@"; }
 # Cluster identical errors and count occurrences
 # Returns: 0 on success (including empty input → empty output), 1 on critical error
 #
-# TRUE STREAM PROCESSING: Input flows directly through pipeline without buffering
-# in bash variables. This is memory-efficient for large inputs.
-# Pipeline: stdin → sed (normalize) → sort → uniq -c → sort -rn → format output
+# PIPELINE PROCESSING: Input flows through pipeline without storing in bash
+# variables. This avoids O(n) bash variable allocation and string copying.
+# Pipeline: stdin → sed (normalize) → sort | uniq -c | sort -rn → format output
+#
+# Memory note: sed processes line-by-line (O(1)), but sort requires O(n) memory
+# to buffer and sort all input. This is acceptable because:
+# - Journal is limited to 500 lines by caller (scan_kernel_logs, scan_user_services)
+# - sort is implemented in C, highly optimized for memory and speed
+# - Alternative (bash-only dedup) would require O(n²) comparisons or associative arrays
 #
 # Note: Pipeline ends with || true to prevent set -e abort on rare failures
 # (e.g., EINTR from signals, disk full during sort, interrupted by timeout).
 # Empty output from pipeline is valid (no errors to cluster).
 cluster_errors() {
-    # TRUE STREAM: Read from stdin directly into pipeline
-    # No intermediate bash variable = O(1) memory, not O(n)
+    # Read from stdin directly into pipeline
+    # No intermediate bash variable avoids O(n) string copying
     # Empty input naturally produces empty output (correct behavior)
     #
     # Port normalization: Match :PORT followed by space or end-of-line
