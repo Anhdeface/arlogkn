@@ -388,13 +388,16 @@ detect_gpu() {
     fi
 
     # Fallback to lspci if available and no GPU detected yet
+    # Use _get_lspci() for caching + timeout protection (prevents hang on broken PCI bus)
     if [[ -z "$GPU_INFO" ]] && command -v lspci &>/dev/null; then
-        GPU_INFO="$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | head -1 | cut -d':' -f3- | sed 's/^ *//')"
+        local lspci_output
+        lspci_output="$(_get_lspci)"
+        GPU_INFO="$(printf '%s\n' "$lspci_output" | grep -iE 'vga|3d|display' | head -1 | cut -d':' -f3- | sed 's/^ *//')"
     fi
 
-    # Final fallback to lshw
+    # Final fallback to lshw (with timeout to prevent hang)
     if [[ -z "$GPU_INFO" ]] && command -v lshw &>/dev/null; then
-        GPU_INFO="$(lshw -class display 2>/dev/null | grep -m1 'product:' | cut -d':' -f2 | sed 's/^ *//')"
+        GPU_INFO="$(timeout 5 lshw -class display 2>/dev/null | grep -m1 'product:' | cut -d':' -f2 | sed 's/^ *//')" || GPU_INFO=""
     fi
 
     GPU_INFO="${GPU_INFO:-Unknown}"
