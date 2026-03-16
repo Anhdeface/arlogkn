@@ -3737,11 +3737,22 @@ declare -A WIKI_ALIASES=(
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: AWK-based Levenshtein distance with O(min(m,n)) space optimization
 # Uses 2-row technique instead of full m×n matrix to reduce memory usage
-# This is the SINGLE source of truth for Levenshtein in this script
+#
+# SINGLE source of truth for Levenshtein algorithm in this script.
+# Both best-match and suggestions modes use the SAME implementation.
+#
+# Modes:
+#   - "best": Returns best_idx:best_dist (for awk_fuzzy_match)
+#   - "suggest": Returns top 3 suggestions sorted by distance (for suggest_wiki_groups)
 # ─────────────────────────────────────────────────────────────────────────────
-# Usage: result=$(printf '%s\n' "$groups" | _levenshtein_awk -v q="$query")
-_levenshtein_awk() {
-    awk -v q="$1" '
+# Usage:
+#   result=$(printf '%s\n' "$groups" | _wiki_awk "$query" "best")
+#   result=$(printf '%s\n' "$groups" | _wiki_awk "$query" "suggest")
+_wiki_awk() {
+    local query="$1"
+    local mode="${2:-best}"
+    
+    awk -v q="$query" -v mode="$mode" '
 function min3(a, b, c) {
     return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
 }
@@ -3789,6 +3800,7 @@ function get_threshold(len) {
 BEGIN {
     best_idx = -1
     best_dist = 999
+    count = 0
 }
 {
     idx = NR - 1
@@ -3798,87 +3810,46 @@ BEGIN {
     dist = levenshtein(q, keyword)
     threshold = get_threshold(length(keyword))
 
-    if (dist <= threshold && dist < best_dist) {
-        best_dist = dist
-        best_idx = idx
-        if (dist == 0) exit
-    }
-}
-END {
-    print best_idx ":" best_dist
-}
-'
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helper: AWK-based Levenshtein for multiple suggestions (sorted by distance)
-# Uses same O(min(m,n)) space optimization as _levenshtein_awk()
-# Returns top 3 suggestions sorted by edit distance
-# ─────────────────────────────────────────────────────────────────────────────
-# Usage: printf '%s\n' "$groups" | _suggestions_awk -v q="$query"
-_suggestions_awk() {
-    awk -v q="$1" '
-function min3(a, b, c) {
-    return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c)
-}
-# Same O(min(m,n)) space-optimized Levenshtein as _levenshtein_awk()
-function levenshtein(s1, s2,    len1, len2, i, j, prev, curr, c1, c2, cost, tmp) {
-    len1 = length(s1); len2 = length(s2)
-    if (len1 == 0) return len2
-    if (len2 == 0) return len1
-    if (len1 > len2) { tmp = s1; s1 = s2; s2 = tmp; tmp = len1; len1 = len2; len2 = tmp }
-    split("", prev)
-    split("", curr)
-    for (j = 0; j <= len1; j++) prev[j] = j
-    for (i = 1; i <= len2; i++) {
-        curr[0] = i
-        c2 = substr(s2, i, 1)
-        for (j = 1; j <= len1; j++) {
-            c1 = substr(s1, j, 1)
-            cost = (c1 == c2) ? 0 : 1
-            curr[j] = min3(prev[j] + 1, curr[j-1] + 1, prev[j-1] + cost)
+    if (mode == "best") {
+        # Best-match mode: track closest match only
+        if (dist <= threshold && dist < best_dist) {
+            best_dist = dist
+            best_idx = idx
+            if (dist == 0) exit
         }
-        for (j = 0; j <= len1; j++) prev[j] = curr[j]
-    }
-    return prev[len1]
-}
-function get_threshold(len) {
-    if (len <= 4) return 1
-    if (len <= 8) return 2
-    return 3
-}
-{
-    idx = NR - 1
-    split($0, parts, " ")
-    keyword = parts[1]
-    dist = levenshtein(q, keyword)
-    threshold = get_threshold(length(keyword))
-    if (dist <= threshold) {
-        suggestions[++count] = $0
-        distances[count] = dist
+    } else {
+        # Suggestions mode: collect all matches within threshold
+        if (dist <= threshold) {
+            suggestions[++count] = $0
+            distances[count] = dist
+        }
     }
 }
 END {
-    # Sort suggestions by distance (ascending = best matches first)
-    # Using bubble sort O(n²) — acceptable for n≤20 (WIKI_GROUP_NAMES size)
-    # Worst case: 20×19/2 = 190 comparisons — negligible for this use case
-    # Trade-off: Code simplicity over micro-optimization (insertion sort would be faster but more complex)
-    for (i = 1; i < count; i++) {
-        for (j = i + 1; j <= count; j++) {
-            if (distances[j] < distances[i]) {
-                tmp = suggestions[i]; suggestions[i] = suggestions[j]; suggestions[j] = tmp
-                tmp = distances[i]; distances[i] = distances[j]; distances[j] = tmp
+    if (mode == "suggest") {
+        # Sort suggestions by distance (ascending = best matches first)
+        # Using bubble sort O(n²) — acceptable for n≤20 (WIKI_GROUP_NAMES size)
+        # Worst case: 20×19/2 = 190 comparisons — negligible for this use case
+        for (i = 1; i < count; i++) {
+            for (j = i + 1; j <= count; j++) {
+                if (distances[j] < distances[i]) {
+                    tmp = suggestions[i]; suggestions[i] = suggestions[j]; suggestions[j] = tmp
+                    tmp = distances[i]; distances[i] = distances[j]; distances[j] = tmp
+                }
             }
         }
+        # Print top 3
+        for (i = 1; i <= 3 && i <= count; i++) print suggestions[i]
+    } else {
+        # Best-match mode: print idx:dist
+        print best_idx ":" best_dist
     }
-    # Print top 3
-    for (i = 1; i <= 3 && i <= count; i++) print suggestions[i]
 }
 '
 }
 
 # AWK-based fuzzy matching — optimized for speed
-# Uses Levenshtein distance with awk
+# Uses Levenshtein distance with awk (single source of truth)
 awk_fuzzy_match() {
     local query="$1"
     local groups="$2"
@@ -3900,8 +3871,8 @@ awk_fuzzy_match() {
         return 1
     fi
 
-    # Use shared Levenshtein helper (single source of truth)
-    printf '%s\n' "$groups" | _levenshtein_awk "$query"
+    # Use shared Levenshtein helper (single source of truth, mode=best)
+    printf '%s\n' "$groups" | _wiki_awk "$query" "best"
 }
 
 # Find best match using awk fuzzy matching
@@ -3978,8 +3949,8 @@ suggest_wiki_groups_awk() {
     local groups_str
     groups_str="$(printf '%s\n' "${WIKI_GROUP_NAMES[@]}")"
 
-    # Use shared Levenshtein helper (single source of truth, O(min(m,n)) space)
-    printf '%s\n' "$groups_str" | _suggestions_awk "$query"
+    # Use shared Levenshtein helper (single source of truth, mode=suggest)
+    printf '%s\n' "$groups_str" | _wiki_awk "$query" "suggest"
 }
 
 # Find group index using awk fuzzy matching (optimized)
