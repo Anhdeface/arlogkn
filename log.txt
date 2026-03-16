@@ -1,8 +1,19 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-15
+Generated: 2026-03-16
 
 ---
+f21ce79 2026-03-16 fix(ui): init_colors() disables colors for stderr messages when stdout redirected
+09a7259 2026-03-16 refactor(network): rename check_internet() to detect_network_status() — name was misleading
+6506866 2026-03-16 fix(wiki): fuzzy match only first word of group name — misses typos in other words
+aa0b241 2026-03-16 refactor(wiki): unify duplicate Levenshtein implementations into single _wiki_awk() function
+3f991d0 2026-03-16 docs(logs): fix misleading 'TRUE STREAM' comment in cluster_errors()
+82ca86c 2026-03-16 fix(utils): strip_ansi() only strips CSI sequences — misses OSC/DCS/APC
+dbf3b48 2026-03-16 docs(mounts): clarify 'local' in _render_disk_usage_table() pipeline subshell
+c6fe2bb 2026-03-16 fix(gpu): detect_gpu() calls lspci directly — bypasses cache and timeout protection
+7daf18a 2026-03-16 fix(tables): tbl_row() uses byte-index truncation — corrupts UTF-8 multibyte chars
+5276d83 2026-03-16 fix(core): add EXIT trap for nullglob cleanup to prevent silent leak on set -e exit
+1d91c49 2026-03-15 docs: update log.txt with latest commits
 9548768 2026-03-15 fix(drivers): _detect_drivers_lspci() returns 6 fields, not 8 — sata_driver and i2c_driver from lsmod
 c8adba3 2026-03-15 docs(wiki): clarify bubble sort design decision in _suggestions_awk()
 8b8189e 2026-03-15 fix(logs): cluster_errors() port normalization regex too broad — false match on hex values
