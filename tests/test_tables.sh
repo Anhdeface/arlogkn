@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test_framework.sh"
 
 stub_globals
 stub_logging
-extract_functions strip_ansi visible_len tbl_begin tbl_row tbl_end draw_table_begin draw_table_row draw_table_end draw_table_header draw_table_footer
+extract_functions strip_ansi visible_len truncate_str tbl_begin tbl_row tbl_end draw_table_begin draw_table_row draw_table_end draw_table_header draw_table_footer
 
 suite_begin "Table Drawing"
 

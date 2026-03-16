@@ -1046,19 +1046,19 @@ visible_len() {
 # would produce invalid UTF-8 and corrupt terminal display.
 truncate_str() {
     local str="$1" max_len="$2" var_name="$3"
-    local char_count truncated
+    local char_count _truncated
     char_count="$(printf '%s' "$str" | wc -m)"
     char_count="${char_count//[[:space:]]/}"
     if [[ "$char_count" -le "$max_len" ]]; then
-        truncated="$str"
+        _truncated="$str"
     else
         # Use cut -c for character-aware truncation (handles UTF-8 correctly)
-        truncated="$(printf '%s' "$str" | cut -c1-"$max_len")"
+        _truncated="$(printf '%s' "$str" | cut -c1-"$max_len")"
     fi
     if [[ -n "$var_name" ]]; then
-        printf -v "$var_name" '%s' "$truncated"
+        printf -v "$var_name" '%s' "$_truncated"
     else
-        printf '%s' "$truncated"
+        printf '%s' "$_truncated"
     fi
 }
 
@@ -1144,10 +1144,10 @@ tbl_row() {
     local -a vals=("$@")
     local start_idx=${_TBL_COLS_PTR_STACK[$_TBL_DEPTH]}
     local num_cols=${_TBL_NUMCOLS_STACK[$_TBL_DEPTH]}
-    
+
     # Extract the schema for the current table level
     local -a curr_cols=("${_TBL_COLS_STACK[@]:$start_idx:$((num_cols * 2))}")
-    
+
     local i
     for ((i=0; i<num_cols; i++)); do
         local width="${curr_cols[$((i*2+1))]}"
@@ -1155,15 +1155,18 @@ tbl_row() {
         local vlen
         visible_len "$val" vlen
         local display_val="$val"
-        
+
         # Truncate if too long (strip ANSI for truncation, but lose color)
+        # Use truncate_str() for character-aware truncation (handles UTF-8 correctly)
+        # ${var:0:N} is byte-index and will corrupt multibyte UTF-8 (box-drawing, emoji, CJK)
         if [[ $vlen -gt $width ]]; then
-            local clean
+            local clean truncated
             strip_ansi "$val" clean
-            display_val="${clean:0:$((width-3))}..."
+            truncate_str "$clean" $((width-3)) truncated
+            display_val="${truncated}..."
             vlen=$width
         fi
-        
+
         local pad=$((width - vlen))
         printf ' %s%*s' "$display_val" "$pad" ""
     done
