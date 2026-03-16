@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test_framework.sh"
 
 stub_globals
 stub_logging
-extract_functions detect_distro detect_system_info check_internet
+extract_functions detect_distro detect_system_info check_internet detect_network_status
 
 suite_begin "System Detection"
 

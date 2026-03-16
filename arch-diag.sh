@@ -183,7 +183,25 @@ detect_system_info() {
 # SYSTEM DETECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-check_internet() {
+# ─────────────────────────────────────────────────────────────────────────────
+# NETWORK STATUS DETECTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Detect network status (NOT internet connectivity)
+# Sets INTERNET_STATUS to one of:
+#   - "connected": Verified internet access (only when ARLOGKN_CHECK_EXTERNAL=1)
+#   - "ip_assigned": Has routable IP but not verified (default behavior)
+#   - "link_up": Interface up but no IP
+#   - "disconnected": No connectivity detected
+#
+# Note: Function name is legacy — "check_internet" is misleading because:
+# - Default behavior only checks for IP assignment, not actual internet
+# - Return code is always 0 (success) for ip_assigned/link_up
+# - Caller ignores return code (check_internet || true)
+# - True internet check requires ARLOGKN_CHECK_EXTERNAL=1 (opt-in)
+#
+# Better name would be detect_network_status(), but keeping for backward compat.
+detect_network_status() {
     # Network status check — local methods first, external only if enabled
     # routable IP ≠ internet connectivity (VPN, isolated namespace, etc.)
     # Status: ip_assigned, link_up, connected, disconnected
@@ -315,6 +333,9 @@ check_internet() {
     INTERNET_STATUS="disconnected"
     return 1
 }
+
+# Backward compatibility alias
+check_internet() { detect_network_status "$@"; }
 
 detect_gpu() {
     # GPU detection - try /sys filesystem first
@@ -4524,7 +4545,7 @@ main() {
 
     detect_distro
     detect_system_info
-    check_internet || true
+    detect_network_status || true
     detect_gpu
     detect_display
 
