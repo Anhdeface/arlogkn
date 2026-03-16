@@ -320,6 +320,10 @@ detect_gpu() {
     # GPU detection - try /sys filesystem first
     local gpu_names=()
     local card_path driver gpu_name
+    
+    # Set cleanup trap for nullglob - fires on any exit (normal, set -e, return)
+    # No need to restore: if caller had EXIT trap, it will be re-established after we return
+    trap 'shopt -u nullglob 2>/dev/null' EXIT
 
     # Check all DRM cards (supports multiple GPUs)
     # nullglob ensures glob returns empty if no matches
@@ -356,6 +360,9 @@ detect_gpu() {
         [[ -n "$gpu_name" ]] && gpu_names+=("$gpu_name")
     done
     shopt -u nullglob
+    
+    # Clear our cleanup trap - caller's trap (if any) will be restored by bash
+    trap - EXIT
 
     # Build GPU info string (supports multiple GPUs)
     if [[ ${#gpu_names[@]} -gt 0 ]]; then
@@ -398,6 +405,9 @@ detect_display() {
     # nullglob ensures glob returns empty if no matches
     local -a display_parts=()
     local status name connector_dir res modes_file entry
+    
+    # Set cleanup trap for nullglob - fires on any exit (normal, set -e, return)
+    trap 'shopt -u nullglob 2>/dev/null' EXIT
 
     shopt -s nullglob
     for connector in /sys/class/drm/card*/card*-*/status; do
@@ -426,6 +436,9 @@ detect_display() {
         fi
     done
     shopt -u nullglob
+    
+    # Clear cleanup trap
+    trap - EXIT
 
     if [[ ${#display_parts[@]} -gt 0 ]]; then
         DISPLAY_INFO="$(printf '%s, ' "${display_parts[@]}")"
@@ -474,6 +487,9 @@ get_driver_from_sys() {
 # ─────────────────────────────────────────────────────────────────────────────
 _detect_drivers_sysclass() {
     local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
+    
+    # Set cleanup trap for nullglob
+    trap 'shopt -u nullglob 2>/dev/null' EXIT
 
     # GPU from DRM
     if [[ -d /sys/class/drm ]]; then
@@ -524,6 +540,9 @@ _detect_drivers_sysclass() {
         done
         shopt -u nullglob
     fi
+    
+    # Clear cleanup trap
+    trap - EXIT
 
     printf '%s|%s|%s\n' "$gpu_driver" "$network_driver" "$audio_driver"
 }
@@ -604,6 +623,9 @@ _detect_drivers_lspci() {
 # ─────────────────────────────────────────────────────────────────────────────
 _detect_drivers_sysbus() {
     local virtual_driver="N/A" input_driver="N/A" watchdog_driver="N/A"
+    
+    # Set cleanup trap for nullglob
+    trap 'shopt -u nullglob 2>/dev/null' EXIT
 
     # Virtual drivers from /sys/bus/pci/drivers
     if [[ -d /sys/bus/pci/drivers ]]; then
@@ -659,6 +681,9 @@ _detect_drivers_sysbus() {
         shopt -u nullglob
         [[ -z "$watchdog_driver" || "$watchdog_driver" == "N/A" ]] && watchdog_driver="N/A"
     fi
+    
+    # Clear cleanup trap
+    trap - EXIT
 
     printf '%s|%s|%s\n' "$virtual_driver" "$input_driver" "$watchdog_driver"
 }
@@ -1585,6 +1610,9 @@ _gather_temperatures() {
     if [[ ! -d /sys/class/hwmon ]]; then
         return 1
     fi
+    
+    # Set cleanup trap for nullglob
+    trap 'shopt -u nullglob 2>/dev/null' EXIT
 
     shopt -s nullglob
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
@@ -1634,6 +1662,9 @@ _gather_temperatures() {
         done
     done
     shopt -u nullglob
+    
+    # Clear cleanup trap
+    trap - EXIT
 }
 
 # Helper: Format temperature data for terminal display (with colors)
@@ -1800,6 +1831,9 @@ scan_network_interfaces() {
         draw_box_line "${C_YELLOW}/sys/class/net not available${C_RESET}"
         return 0
     fi
+    
+    # Set cleanup trap for nullglob
+    trap 'shopt -u nullglob 2>/dev/null' EXIT
 
     draw_table_begin "Interface" 14 "State" 8 "Speed" 10 "IP" 30
 
@@ -1859,6 +1893,9 @@ scan_network_interfaces() {
         found=1
     done
     shopt -u nullglob
+    
+    # Clear cleanup trap
+    trap - EXIT
 
     if [[ "$found" -eq 0 ]]; then
         draw_table_end
@@ -2009,6 +2046,9 @@ scan_usb_devices() {
         draw_box_line "${C_YELLOW}USB subsystem not available${C_RESET}"
         return 0
     fi
+    
+    # Set cleanup trap for nullglob
+    trap 'shopt -u nullglob 2>/dev/null' EXIT
 
     # Table header
     draw_table_begin "Vendor" 10 "Product" 30 "Bus/Dev" 8 "Type" 8
@@ -2091,6 +2131,9 @@ scan_usb_devices() {
         count=$((count + 1))
     done
     shopt -u nullglob
+    
+    # Clear cleanup trap
+    trap - EXIT
 
     draw_table_end
 
