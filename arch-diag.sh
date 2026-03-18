@@ -59,18 +59,29 @@ declare -g _LSPCI_CACHE_INIT=0
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Get lspci output with caching (single call per session)
+# Caches on FIRST SUCCESSFUL call. If lspci fails (timeout, broken PCI bus),
+# subsequent calls will retry instead of returning cached empty string.
+# This prevents permanent detection failure from transient hardware issues.
 _get_lspci() {
-    if [[ "$_LSPCI_CACHE_INIT" -eq 0 ]]; then
-        local lspci_output
-        if ! lspci_output="$(timeout 5 lspci -knn 2>/dev/null)"; then
-            warn "lspci command failed, hardware detection may be incomplete"
-            _LSPCI_CACHE=""
-        else
-            _LSPCI_CACHE="$lspci_output"
-        fi
-        _LSPCI_CACHE_INIT=1
+    # Return cached result if available (successful previous call)
+    if [[ "$_LSPCI_CACHE_INIT" -eq 1 && -n "$_LSPCI_CACHE" ]]; then
+        printf '%s' "$_LSPCI_CACHE"
+        return 0
     fi
-    printf '%s' "$_LSPCI_CACHE"
+    
+    # Try to get lspci output
+    local lspci_output
+    if lspci_output="$(timeout 5 lspci -knn 2>/dev/null)"; then
+        # Success: cache result and mark as initialized
+        _LSPCI_CACHE="$lspci_output"
+        _LSPCI_CACHE_INIT=1
+        printf '%s' "$_LSPCI_CACHE"
+    else
+        # Failure: warn user, return empty, DO NOT mark as initialized
+        # This allows retry on next call (transient hardware issues)
+        warn "lspci command failed, hardware detection may be incomplete"
+        printf ''
+    fi
 }
 
 die() {
