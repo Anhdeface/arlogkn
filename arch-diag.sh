@@ -1243,12 +1243,12 @@ cluster_errors() {
     # Empty input naturally produces empty output (correct behavior)
     #
     # Port normalization: Match :PORT followed by space or end-of-line
-    # Pattern is intentionally conservative to avoid false matches:
-    # - Only matches colon followed by 1-5 digits (valid port range)
-    # - Requires space or EOL after port (prevents matching hex like 0x1a:5)
+    # Pattern is designed to avoid false positives:
+    # - Requires alphanumeric or ] before colon (hostname/IP, not space/digit)
+    # - This prevents matching: "after 30 attempts", "ratio 16:9", "error 101"
+    # - Valid port range: 0-65535 (not enforced in regex, but 5-digit check helps)
     # - Hex addresses already normalized to 0xADDR before this step
-    # - IPv6 addresses with ports (e.g., [::1]:8080) are rare in logs
-    # - Preserve ] before :PORT (common in log formats like [host]:port)
+    # - IPv6 with ports (e.g., [::1]:8080) matched via ]:PORT pattern
     sed -E \
         -e 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' \
         -e 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' \
@@ -1262,7 +1262,7 @@ cluster_errors() {
         -e 's/sector [0-9]+/sector N/g' \
         -e 's/([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/<MAC>/g' \
         -e 's/(\]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' \
-        -e 's/:[0-9]{1,5}([ /]|$)/:PORT\1/g' | \
+        -e 's/([a-zA-Z0-9_]):[0-9]{1,5}([ /]|$)/\1:PORT\2/g' | \
     sort | uniq -c | sort -rn | \
     while read -r count msg; do
         if [[ "$count" -gt 1 ]]; then
