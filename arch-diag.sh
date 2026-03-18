@@ -826,6 +826,7 @@ detect_drivers() {
     [[ -z "$sata_driver" ]] && sata_driver="N/A"
     [[ -z "$raid_driver" ]] && raid_driver="N/A"
     [[ -z "$i2c_driver" ]] && i2c_driver="N/A"
+    [[ -z "$smbus_driver" ]] && smbus_driver="N/A"
     [[ -z "$watchdog_driver" ]] && watchdog_driver="N/A"
 
     # Sanitize driver names: remove '|' to prevent IFS parsing issues
