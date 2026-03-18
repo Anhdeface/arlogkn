@@ -306,9 +306,10 @@ detect_network_status() {
     # ─────────────────────────────────────────────────────────────────────────
     if [[ "${ARLOGKN_CHECK_EXTERNAL:-0}" == "1" ]]; then
         # Try gateway ping first (more reliable than hardcoded 8.8.8.8)
+        # Use single awk process instead of grep | awk | head pipeline (3 forks → 1 fork)
         local gateway=""
         if command -v ip &>/dev/null; then
-            gateway="$(ip route 2>/dev/null | grep '^default' | awk '{print $3}' | head -1)"
+            gateway="$(ip route 2>/dev/null | awk '/^default/ {print $3; exit}')"
         fi
 
         if [[ -n "$gateway" ]] && command -v ping &>/dev/null; then
@@ -478,11 +479,14 @@ detect_display() {
     fi
 
     # Fallback: check if any DRM device exists
+    # Use subshell to isolate nullglob — avoids EXIT trap requirement
     local -a cards
-    shopt -s nullglob
-    cards=(/sys/class/drm/card[0-9]*)
-    shopt -u nullglob
-    if [[ ${#cards[@]} -gt 0 ]]; then
+    cards=($(
+        shopt -s nullglob
+        printf '%s\n' /sys/class/drm/card[0-9]*
+        shopt -u nullglob
+    ))
+    if [[ ${#cards[@]} -gt 0 && -e "${cards[0]}" ]]; then
         DISPLAY_INFO="DRM active (no connected display)"
         return 0
     fi
@@ -2031,19 +2035,22 @@ scan_mounts() {
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: Render disk usage table from df output
-# Called by scan_mounts() — extracted to avoid 'local' in pipeline subshell
-# Note: This function IS a function (not inline pipeline), so 'local' in the
-# while loop is meaningful — it scopes to the function, not the subshell.
+# Called by scan_mounts()
+#
+# DESIGN: Uses process substitution instead of pipeline to avoid subshell issue.
+# Pipeline: df | while read → tbl_row runs in SUBSHELL (cannot modify parent state)
+# Process substitution: while read < <(df) → tbl_row runs in CURRENT shell
+#
+# This matters because tbl_begin/tbl_row/tbl_end use global state (_TBL_DEPTH, etc.)
+# that must be modified in the current shell, not a subshell copy.
 # ─────────────────────────────────────────────────────────────────────────────
 _render_disk_usage_table() {
     draw_section_header "DISK USAGE"
     draw_table_begin "Filesystem" 24 "Size" 9 "Used" 9 "Avail" 9 "Use%" 6
 
-    df -h 2>/dev/null | awk 'NR>1 && /^\/dev\// {print $1"|"$2"|"$3"|"$4"|"$5}' | \
-        sort -u | head -6 | while IFS='|' read -r fs size used avail usep; do
-        # Note: 'local' in pipeline subshell is semantically meaningless
-        # Variables are scoped to subshell process, not function scope
-        # But we keep 'local' for consistency with function style
+    # Use process substitution to avoid pipeline subshell
+    # while read < <(command) runs in current shell, not subshell
+    while IFS='|' read -r fs size used avail usep; do
         local color="$C_RESET"
         local use_num="${usep%\%}"
         # Validate use_num is numeric before arithmetic comparison
@@ -2059,7 +2066,7 @@ _render_disk_usage_table() {
         fi
         # Non-numeric values (e.g., "-") remain $C_RESET (no color)
         draw_table_row "${color}${fs}${C_RESET}" "$size" "$used" "$avail" "$usep"
-    done
+    done < <(df -h 2>/dev/null | awk 'NR>1 && /^\/dev\// {print $1"|"$2"|"$3"|"$4"|"$5}' | sort -u | head -6)
 
     draw_table_end
 }
