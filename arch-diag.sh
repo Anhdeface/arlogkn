@@ -908,7 +908,11 @@ draw_box_line() {
     visible_len "$content" content_visible_len
 
     # Truncate if too long
-    # ${var:0:N} counts bytes, not visible chars — bash limitation
+    # Note: ${var:0:N} behavior depends on locale:
+    # - UTF-8 locale (default): indexes by CHARACTER (correct for truncation)
+    # - C/POSIX locale: indexes by BYTE (may cut multibyte chars)
+    # Script does not set locale, so behavior is environment-dependent.
+    # In UTF-8 locale (99% of modern systems), this works correctly.
     # Trade-off: Correct truncation > Color preservation
     if [[ $content_visible_len -gt $inner_width ]]; then
         local truncate_at=$((inner_width - 3))
