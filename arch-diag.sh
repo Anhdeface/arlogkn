@@ -359,7 +359,10 @@ detect_network_status() {
 }
 
 # Backward compatibility alias
-check_internet() { detect_network_status "$@"; }
+# Guard with || true: detect_network_status() returns 1 on disconnect,
+# which would kill the script under set -e if called without || true.
+# Callers should check $INTERNET_STATUS instead of return code.
+check_internet() { detect_network_status "$@" || true; }
 
 detect_gpu() {
     # GPU detection - try /sys filesystem first
