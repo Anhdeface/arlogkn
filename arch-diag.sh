@@ -4532,6 +4532,33 @@ EOF
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Helper: Export individual components based on scan scope
+# Prevents DRY violation between SCAN_ALL and SCAN_SYSTEM branches
+_export_components() {
+    local is_full_scan="$1"
+    local export_failed=0
+
+    # These logs are only exported during a full scan
+    if [[ "$is_full_scan" -eq 1 ]]; then
+        export_kernel_logs || { warn "Export kernel logs failed"; export_failed=1; }
+        export_user_services || { warn "Export user services failed"; export_failed=1; }
+        export_coredumps || { warn "Export coredumps failed"; export_failed=1; }
+        export_pacman_logs || { warn "Export pacman logs failed"; export_failed=1; }
+    fi
+
+    # Hardware & system details exported by both scans
+    export_mounts || { warn "Export mounts failed"; export_failed=1; }
+    export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
+    export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
+    export_drivers || { warn "Export drivers failed"; export_failed=1; }
+    export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
+    export_boot_timing || { warn "Export boot timing failed"; export_failed=1; }
+    export_network_interfaces || { warn "Export network interfaces failed"; export_failed=1; }
+    export_summary || { warn "Export summary failed"; export_failed=1; }
+
+    return "$export_failed"
+}
+
 main() {
     init_colors
     parse_args "$@"
@@ -4619,25 +4646,10 @@ main() {
             printf '\n'
             draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
             
-            local export_failed=0
-            
-            export_kernel_logs || { warn "Export kernel logs failed"; export_failed=1; }
-            export_user_services || { warn "Export user services failed"; export_failed=1; }
-            export_coredumps || { warn "Export coredumps failed"; export_failed=1; }
-            export_pacman_logs || { warn "Export pacman logs failed"; export_failed=1; }
-            export_mounts || { warn "Export mounts failed"; export_failed=1; }
-            export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
-            export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
-            export_drivers || { warn "Export drivers failed"; export_failed=1; }
-            export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
-            export_boot_timing || { warn "Export boot timing failed"; export_failed=1; }
-            export_network_interfaces || { warn "Export network interfaces failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
+            if _export_components 1; then
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
+            else
+                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
             fi
         # Export all logs if --save-all is set (single file)
         elif [[ "$SAVE_ALL" -eq 1 ]]; then
@@ -4668,20 +4680,10 @@ main() {
             printf '\n'
             draw_box_line "${C_CYAN}Exporting logs to ${OUTPUT_DIR}...${C_RESET}"
             
-            local export_failed=0
-            export_mounts || { warn "Export mounts failed"; export_failed=1; }
-            export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
-            export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
-            export_drivers || { warn "Export drivers failed"; export_failed=1; }
-            export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
-            export_boot_timing || { warn "Export boot timing failed"; export_failed=1; }
-            export_network_interfaces || { warn "Export network interfaces failed"; export_failed=1; }
-            export_summary || { warn "Export summary failed"; export_failed=1; }
-            
-            if [[ "$export_failed" -eq 1 ]]; then
-                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
-            else
+            if _export_components 0; then
                 draw_box_line "${C_GREEN}✓ Export complete: ${OUTPUT_DIR}${C_RESET}"
+            else
+                draw_box_line "${C_YELLOW}⚠ Some exports failed (check warnings above)${C_RESET}"
             fi
         elif [[ "$SAVE_ALL" -eq 1 ]]; then
             printf '\n'
