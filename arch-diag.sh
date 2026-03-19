@@ -443,11 +443,18 @@ detect_gpu() {
 
 detect_display() {
     # Display detection — check DRM connectors from /sys (works without X11/Wayland)
-    # nullglob ensures glob returns empty if no matches
     local -a display_parts=()
     local status name connector_dir res modes_file entry
 
+    # Save nullglob state and restore on RETURN (guards against set -e early exit)
+    # Critical: this function runs in main shell context (not subshell),
+    # so nullglob leak here affects ALL subsequent code
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
     shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
         status="$(< "$connector" 2>/dev/null)" || status=""
@@ -473,7 +480,6 @@ detect_display() {
             display_parts+=("$entry")
         fi
     done
-    shopt -u nullglob
 
     if [[ ${#display_parts[@]} -gt 0 ]]; then
         DISPLAY_INFO="$(printf '%s, ' "${display_parts[@]}")"
@@ -482,12 +488,10 @@ detect_display() {
     fi
 
     # Fallback: check if any DRM device exists
-    # Use direct glob with nullglob — zero forks, ShellCheck compliant
+    # nullglob is already set — no need for separate toggle
     local -a cards=()
     if [[ -d /sys/class/drm ]]; then
-        shopt -s nullglob
         cards=(/sys/class/drm/card[0-9]*)
-        shopt -u nullglob
     fi
     if [[ ${#cards[@]} -gt 0 && -e "${cards[0]}" ]]; then
         DISPLAY_INFO="DRM active (no connected display)"
@@ -526,9 +530,15 @@ get_driver_from_sys() {
 _detect_drivers_sysclass() {
     local gpu_driver="N/A" network_driver="N/A" audio_driver="N/A"
 
+    # Save nullglob state and restore on RETURN (guards against set -e early exit)
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
+    shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+
     # GPU from DRM
     if [[ -d /sys/class/drm ]]; then
-        shopt -s nullglob
         local card_path driver
         for card_path in /sys/class/drm/card[0-9]*; do
             [[ ! -d "$card_path" ]] && continue
@@ -536,12 +546,10 @@ _detect_drivers_sysclass() {
             driver="$(get_driver_from_sys "$card_path")"
             [[ -n "$driver" && "$driver" != "N/A" ]] && gpu_driver="$driver"
         done
-        shopt -u nullglob
     fi
 
     # Network from net class
     if [[ -d /sys/class/net ]]; then
-        shopt -s nullglob
         local net_path iface_driver
         local -a net_drvs=()
         local -A seen_net_drvs=()
@@ -556,7 +564,6 @@ _detect_drivers_sysclass() {
                 fi
             fi
         done
-        shopt -u nullglob
 
         if [[ ${#net_drvs[@]} -gt 0 ]]; then
             network_driver="$(printf '%s, ' "${net_drvs[@]}")"
@@ -566,14 +573,12 @@ _detect_drivers_sysclass() {
 
     # Audio from sound class
     if [[ -d /sys/class/sound ]]; then
-        shopt -s nullglob
         local sound_path audio_drv
         for sound_path in /sys/class/sound/*; do
             [[ ! -d "$sound_path" ]] && continue
             audio_drv="$(get_driver_from_sys "$sound_path")"
             [[ -n "$audio_drv" && "$audio_drv" != "N/A" ]] && audio_driver="$audio_drv" && break
         done
-        shopt -u nullglob
     fi
 
     printf '%s|%s|%s\n' "$gpu_driver" "$network_driver" "$audio_driver"
@@ -656,9 +661,15 @@ _detect_drivers_lspci() {
 _detect_drivers_sysbus() {
     local virtual_driver="N/A" input_driver="N/A" watchdog_driver="N/A"
 
+    # Save nullglob state and restore on RETURN (guards against set -e early exit)
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
+    shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+
     # Virtual drivers from /sys/bus/pci/drivers
     if [[ -d /sys/bus/pci/drivers ]]; then
-        shopt -s nullglob
         for drv_dir in /sys/bus/pci/drivers/*; do
             local drv_name
             drv_name="$(basename "$drv_dir")"
@@ -669,12 +680,10 @@ _detect_drivers_sysbus() {
                 xen-*|xenplatform) virtual_driver="xen" ;;
             esac
         done
-        shopt -u nullglob
     fi
 
     # Input drivers from /sys/class/input
     if [[ -d /sys/class/input ]]; then
-        shopt -s nullglob
         local -a input_drvs=()
         local -A seen_input_drvs=()
         local input_path
@@ -689,7 +698,6 @@ _detect_drivers_sysbus() {
                 fi
             fi
         done
-        shopt -u nullglob
         # Join unique drivers with ", "
         if [[ ${#input_drvs[@]} -gt 0 ]]; then
             input_driver="$(printf '%s, ' "${input_drvs[@]}")"
@@ -699,7 +707,6 @@ _detect_drivers_sysbus() {
 
     # Watchdog
     if [[ -d /sys/class/watchdog ]]; then
-        shopt -s nullglob
         local wd_path
         for wd_path in /sys/class/watchdog/*; do
             [[ ! -d "$wd_path" ]] && continue
@@ -707,7 +714,6 @@ _detect_drivers_sysbus() {
             wd_drv="$(get_driver_from_sys "$wd_path")"
             [[ -n "$wd_drv" && "$wd_drv" != "N/A" ]] && watchdog_driver="$wd_drv" && break
         done
-        shopt -u nullglob
         [[ -z "$watchdog_driver" || "$watchdog_driver" == "N/A" ]] && watchdog_driver="N/A"
     fi
 
