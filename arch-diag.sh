@@ -479,13 +479,13 @@ detect_display() {
     fi
 
     # Fallback: check if any DRM device exists
-    # Use subshell to isolate nullglob — avoids EXIT trap requirement
-    local -a cards
-    cards=($(
+    # Use direct glob with nullglob — zero forks, ShellCheck compliant
+    local -a cards=()
+    if [[ -d /sys/class/drm ]]; then
         shopt -s nullglob
-        printf '%s\n' /sys/class/drm/card[0-9]*
+        cards=(/sys/class/drm/card[0-9]*)
         shopt -u nullglob
-    ))
+    fi
     if [[ ${#cards[@]} -gt 0 && -e "${cards[0]}" ]]; then
         DISPLAY_INFO="DRM active (no connected display)"
         return 0
