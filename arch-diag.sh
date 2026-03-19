@@ -335,8 +335,8 @@ detect_network_status() {
         fi
         
         # Block private/internal IP ranges to prevent internal network probing
-        # Exclude: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x, localhost
-        if [[ "$test_url" =~ https://(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|169\.254\.|localhost|::1) ]]; then
+        # Exclude: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x, 0.0.0.0, localhost, ::1, [::1], [::]
+        if [[ "$test_url" =~ https://(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|169\.254\.|0\.0\.0\.0|localhost|::1|\[::1\]|\[::\]) ]]; then
             warn "ARLOGKN_TEST_URL: blocked private/internal endpoint, using default"
             test_url="https://clients3.google.com/generate_204"
         fi
@@ -2962,7 +2962,6 @@ export_drivers() {
                 printf 'Device: %s\n' "$(basename "$card")"
                 if [[ -L "${card}/device/driver" ]]; then
                     # Extract basename using bash parameter expansion
-                    local driver_link
                     driver_link="$(readlink "${card}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
@@ -2987,7 +2986,6 @@ export_drivers() {
                 printf 'Interface: %s\n' "$iface_name"
                 if [[ -L "${iface}/device/driver" ]]; then
                     # Extract basename using bash parameter expansion
-                    local driver_link
                     driver_link="$(readlink "${iface}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
@@ -3010,7 +3008,6 @@ export_drivers() {
                 printf 'Device: %s\n' "$(basename "$sound")"
                 if [[ -L "${sound}/device/driver" ]]; then
                     # Extract basename using bash parameter expansion
-                    local driver_link
                     driver_link="$(readlink "${sound}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
@@ -3035,7 +3032,6 @@ export_drivers() {
                 printf 'Device: %s\n' "$bname"
                 if [[ -L "${block}/device/driver" ]]; then
                     # Extract basename using bash parameter expansion
-                    local driver_link
                     driver_link="$(readlink "${block}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
@@ -3058,7 +3054,6 @@ export_drivers() {
                 printf 'Device: %s\n' "$(basename "$input")"
                 if [[ -L "${input}/device/driver" ]]; then
                     # Extract basename using bash parameter expansion
-                    local driver_link
                     driver_link="$(readlink "${input}/device/driver" 2>/dev/null)"
                     printf 'Driver: %s\n' "${driver_link##*/}"
                 fi
@@ -3283,6 +3278,7 @@ _export_cleanup() {
 
 export_all_logs() {
     local -a boot_args=(-b "$BOOT_OFFSET")
+    local driver_link=""
 
     # Guard: validate OUTPUT_DIR
     if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
