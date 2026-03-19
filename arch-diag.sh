@@ -1063,7 +1063,11 @@ visible_len() {
     # Check if locale supports UTF-8 character counting
     # Most modern systems: UTF-8 locale → ${#var} counts characters correctly
     # Rare C/POSIX locale: ${#var} counts bytes → need awk fallback
-    if [[ "${LANG:-C}" != "C" && "${LANG:-C}" != "POSIX" && "${LC_ALL:-}" != "C" && "${LC_ALL:-}" != "POSIX" ]]; then
+    # LC_CTYPE overrides LANG for character classification — must check it too
+    # (LC_CTYPE=C with LANG=en_US.UTF-8 → ${#var} counts bytes, not chars)
+    if [[ "${LANG:-C}" != "C" && "${LANG:-C}" != "POSIX" && \
+          "${LC_ALL:-}" != "C" && "${LC_ALL:-}" != "POSIX" && \
+          "${LC_CTYPE:-}" != "C" && "${LC_CTYPE:-}" != "POSIX" ]]; then
         # Fast path: UTF-8 locale → ${#var} counts characters (not bytes)
         char_count="${#stripped}"
     else
