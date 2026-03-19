@@ -4387,7 +4387,7 @@ show_wiki() {
         local group_idx
         group_idx="$(find_wiki_group "$normalized_group" || true)"
 
-        if [[ "$group_idx" -ge 0 ]]; then
+        if [[ -n "$group_idx" && "$group_idx" =~ ^-?[0-9]+$ && "$group_idx" -ge 0 ]]; then
             # Found match - display single group
             show_wiki_group "$group_idx"
             return 0
