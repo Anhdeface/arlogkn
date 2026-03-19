@@ -1,8 +1,28 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-16
+Generated: 2026-03-19
 
 ---
+1e3bc85 2026-03-19 release: version 1.0.10
+735e1f4 2026-03-19 fix(core): init_output_dir() leaks umask 077 if disk space or mkdir fails via unhandled exception
+03fd325 2026-03-19 fix: resolve SSRF IPv6/0.0.0.0 bypass & clean up local var scope in export_all_logs()
+2d8a12e 2026-03-19 perf(ui): truncate_str() forks wc and cut per row — add native zero-fork path for UTF-8
+8055de9 2026-03-19 refactor(export): fix DRY violation - extract duplicate export logic in main() to _export_components()
+ea34229 2026-03-19 fix(coredumps): JSON parser fragile with compact/multi-field lines — flatten to one object per line
+65e6710 2026-03-19 fix(ui): visible_len() locale check misses LC_CTYPE=C — ${#var} counts bytes instead of characters
+6bedb84 2026-03-19 fix(network): check_internet() alias forwards return 1 — kills script under set -e on disconnect
+74760f2 2026-03-19 fix(core): nullglob not restored on early return under set -e — leak to caller
+0f14d1a 2026-03-19 fix(perf): _get_lspci() cache misses when lspci returns empty output — causes 5s×N retry loop
+8254b7b 2026-03-19 fix(wiki): show_wiki() empty string passes [[ "" -ge 0 ]] — calls show_wiki_group incorrectly
+ccd1b9c 2026-03-19 fix(detection): detect_display() SC2207 warning — replace command substitution with direct glob
+c00b416 2026-03-18 fix: three minor issues — gateway pipeline, tbl_row subshell, nullglob protection
+b66cddd 2026-03-18 fix(cache): _get_lspci() caches failure — permanent skip after first timeout
+436bad8 2026-03-18 docs(draw_box_line): fix misleading comment about ${var:0:N} byte-counting
+63f2c39 2026-03-18 perf(visible_len): eliminate awk fork for UTF-8 strings — use bash ${#var} in UTF-8 locale
+b837545 2026-03-18 fix(logs): cluster_errors() port regex too broad — false positives with timestamps/ratios
+8657d7b 2026-03-18 fix(drivers): detect_drivers() missing null-check for smbus_driver — causes double pipe in output
+824c0bc 2026-03-18 fix(core): EXIT trap clobber bug — trap - EXIT destroys caller's trap
+c25df88 2026-03-16 docs: update log.txt with latest commits
 f21ce79 2026-03-16 fix(ui): init_colors() disables colors for stderr messages when stdout redirected
 09a7259 2026-03-16 refactor(network): rename check_internet() to detect_network_status() — name was misleading
 6506866 2026-03-16 fix(wiki): fuzzy match only first word of group name — misses typos in other words
