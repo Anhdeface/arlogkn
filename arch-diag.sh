@@ -62,9 +62,12 @@ declare -g _LSPCI_CACHE_INIT=0
 # Caches on FIRST SUCCESSFUL call. If lspci fails (timeout, broken PCI bus),
 # subsequent calls will retry instead of returning cached empty string.
 # This prevents permanent detection failure from transient hardware issues.
+# Note: empty output from successful lspci (no PCI devices / VM) is a valid
+# cached result — do NOT require -n on _LSPCI_CACHE (causes 5s×N retry loop).
 _get_lspci() {
     # Return cached result if available (successful previous call)
-    if [[ "$_LSPCI_CACHE_INIT" -eq 1 && -n "$_LSPCI_CACHE" ]]; then
+    # Only check _LSPCI_CACHE_INIT — empty output is valid (VM, no PCI bus)
+    if [[ "$_LSPCI_CACHE_INIT" -eq 1 ]]; then
         printf '%s' "$_LSPCI_CACHE"
         return 0
     fi
