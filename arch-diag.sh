@@ -1091,15 +1091,32 @@ visible_len() {
 # would produce invalid UTF-8 and corrupt terminal display.
 truncate_str() {
     local str="$1" max_len="$2" var_name="$3"
-    local char_count _truncated
-    char_count="$(printf '%s' "$str" | wc -m)"
-    char_count="${char_count//[[:space:]]/}"
-    if [[ "$char_count" -le "$max_len" ]]; then
-        _truncated="$str"
+    local _truncated
+
+    # Check if locale supports UTF-8 character counting and substring slicing
+    # Most modern systems: UTF-8 locale → ${#var} and ${var:0:N} work on characters
+    if [[ "${LANG:-C}" != "C" && "${LANG:-C}" != "POSIX" && \
+          "${LC_ALL:-}" != "C" && "${LC_ALL:-}" != "POSIX" && \
+          "${LC_CTYPE:-}" != "C" && "${LC_CTYPE:-}" != "POSIX" ]]; then
+        # Fast path: zero forks
+        if [[ "${#str}" -le "$max_len" ]]; then
+            _truncated="$str"
+        else
+            _truncated="${str:0:$max_len}"
+        fi
     else
-        # Use cut -c for character-aware truncation (handles UTF-8 correctly)
-        _truncated="$(printf '%s' "$str" | cut -c1-"$max_len")"
+        # Slow path: C/POSIX locale → fallback to wc and cut
+        local char_count
+        char_count="$(printf '%s' "$str" | wc -m)"
+        char_count="${char_count//[[:space:]]/}"
+        if [[ "$char_count" -le "$max_len" ]]; then
+            _truncated="$str"
+        else
+            # Use cut -c for character-aware truncation (handles UTF-8 correctly)
+            _truncated="$(printf '%s' "$str" | cut -c1-"$max_len")"
+        fi
     fi
+
     if [[ -n "$var_name" ]]; then
         printf -v "$var_name" '%s' "$_truncated"
     else
