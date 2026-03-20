@@ -1,8 +1,21 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-19
+Generated: 2026-03-20
 
 ---
+38902b1 2026-03-20 fix(ui): visible_len() miscalculates multibyte characters on legacy encodings
+f0fbd30 2026-03-20 fix(ui): remove false positive subshell warning in tbl_begin
+b2f3eda 2026-03-20 refactor(detection): remove misplaced local variable inside subshell
+53a3cd3 2026-03-20 fix(ui): flag combinations silently drop individual options without warning
+fdc6086 2026-03-20 fix(security): detect_network_status() SSRF blocklist misses IPv6 ULA/Link-Local
+b21d9e4 2026-03-20 fix(logs): cluster_errors() sed pattern does not match single-digit days
+37a282b 2026-03-20 fix(core): TRAP RETURN on multiple functions overrides caller traps
+bd9238f 2026-03-20 fix(export): _export_cleanup() return $exit_code is a no-op in EXIT trap
+cedcb88 2026-03-20 fix(usb): scan_usb_devices() USB storage size/model lookup uses unreliable $(<file) exit code
+8ee947e 2026-03-20 fix(export): export_drivers() driver_link missing local — leaks into caller scope
+ef3c951 2026-03-20 fix(usb): scan_usb_devices() nullglob not saved/restored — leaks to caller
+b7e0fcc 2026-03-20 fix(export): _export_cleanup() $? always captures 0 — local assignment resets exit code
+0133fd4 2026-03-19 docs: update log.txt with latest commits
 1e3bc85 2026-03-19 release: version 1.0.10
 735e1f4 2026-03-19 fix(core): init_output_dir() leaks umask 077 if disk space or mkdir fails via unhandled exception
 03fd325 2026-03-19 fix: resolve SSRF IPv6/0.0.0.0 bypass & clean up local var scope in export_all_logs()
