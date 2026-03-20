@@ -2120,9 +2120,15 @@ scan_usb_devices() {
     # Table header
     draw_table_begin "Vendor" 10 "Product" 30 "Bus/Dev" 8 "Type" 8
 
+    # Save and set nullglob — restore on RETURN to prevent leak to caller
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
+    shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+
     # Use /sys filesystem directly (lightweight, works without lsusb)
     local count=0
-    shopt -s nullglob
     for dev_path in /sys/bus/usb/devices/*; do
         [[ $count -ge 10 ]] && break
 
@@ -2197,7 +2203,7 @@ scan_usb_devices() {
         draw_table_row "${vendor}:${product_id}" "$product_truncated" "Bus ${bus_id}" "$dev_type"
         count=$((count + 1))
     done
-    shopt -u nullglob
+    # nullglob restored by RETURN trap
 
     draw_table_end
 
@@ -2207,9 +2213,7 @@ scan_usb_devices() {
     local found_storage=0
     draw_table_begin "Device" 8 "Size" 10 "Model" 20 "Mount" 18
 
-    # Use nullglob to handle empty /sys/block/ gracefully
-    # Without nullglob, loop runs once with literal "/sys/block/*" string
-    shopt -s nullglob
+    # nullglob already enabled (set at function entry, restored by RETURN trap)
     for block in /sys/block/*; do
         [[ ! -d "$block" ]] && continue
         local bname
@@ -2247,7 +2251,7 @@ scan_usb_devices() {
         truncate_str "$mount" 17 mount_truncated
         draw_table_row "/dev/${bname}" "$size" "$model_truncated" "$mount_truncated"
     done
-    shopt -u nullglob
+    # nullglob restored by RETURN trap
 
     if [[ $found_storage -eq 0 ]]; then
         printf ' %s✓ No USB storage devices detected%s\n' "$C_GREEN" "$C_RESET"
