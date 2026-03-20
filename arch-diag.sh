@@ -336,7 +336,8 @@ detect_network_status() {
         
         # Block private/internal IP ranges to prevent internal network probing
         # Exclude: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x, 0.0.0.0, localhost, ::1, [::1], [::]
-        if [[ "$test_url" =~ https://(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|169\.254\.|0\.0\.0\.0|localhost|::1|\[::1\]|\[::\]) ]]; then
+        # Exclude IPv6 ULA (fc00::/7) and Link-Local (fe80::/10)
+        if [[ "$test_url" =~ https://(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|169\.254\.|0\.0\.0\.0|localhost|::1|\[::1\]|\[::\]|\[?[fF][cCdD][0-9a-fA-F]*:|\[?[fF][eE][89aAbB][0-9a-fA-F]*:) ]]; then
             warn "ARLOGKN_TEST_URL: blocked private/internal endpoint, using default"
             test_url="https://clients3.google.com/generate_204"
         fi
