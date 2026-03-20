@@ -454,9 +454,11 @@ detect_display() {
     # so nullglob leak here affects ALL subsequent code
     local _ng_was_set=0
     shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
     shopt -s nullglob
     # shellcheck disable=SC2064
-    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
 
     for connector in /sys/class/drm/card*/card*-*/status; do
         [[ ! -f "$connector" ]] && continue
@@ -536,9 +538,11 @@ _detect_drivers_sysclass() {
     # Save nullglob state and restore on RETURN (guards against set -e early exit)
     local _ng_was_set=0
     shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
     shopt -s nullglob
     # shellcheck disable=SC2064
-    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
 
     # GPU from DRM
     if [[ -d /sys/class/drm ]]; then
@@ -667,9 +671,11 @@ _detect_drivers_sysbus() {
     # Save nullglob state and restore on RETURN (guards against set -e early exit)
     local _ng_was_set=0
     shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
     shopt -s nullglob
     # shellcheck disable=SC2064
-    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
 
     # Virtual drivers from /sys/bus/pci/drivers
     if [[ -d /sys/bus/pci/drivers ]]; then
@@ -2123,9 +2129,11 @@ scan_usb_devices() {
     # Save and set nullglob — restore on RETURN to prevent leak to caller
     local _ng_was_set=0
     shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
     shopt -s nullglob
     # shellcheck disable=SC2064
-    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob'; else echo ':'; fi)" RETURN
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
 
     # Use /sys filesystem directly (lightweight, works without lsusb)
     local count=0
@@ -2555,8 +2563,10 @@ init_output_dir() {
     # Use RETURN trap to guarantee restoration even if an exception occurs
     local old_umask
     old_umask="$(umask)"
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
     # shellcheck disable=SC2064
-    trap "umask $old_umask" RETURN
+    trap "umask $old_umask; ${_old_ret_trap:-trap - RETURN}" RETURN
 
     # Set restrictive umask for log export (owner read/write only)
     umask 077
