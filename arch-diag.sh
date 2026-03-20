@@ -4707,6 +4707,12 @@ main() {
         fi
 
         # Clear individual flags to prevent double execution in independent blocks
+        [[ "$SCAN_DRIVER" -eq 1 ]] && warn "Flag --driver is redundant and ignored (included in --all)"
+        [[ "$SCAN_VGA" -eq 1 ]]    && warn "Flag --vga is redundant and ignored (included in --all)"
+        [[ "$SCAN_KERNEL" -eq 1 ]] && warn "Flag --kernel is redundant and ignored (included in --all)"
+        [[ "$SCAN_USER" -eq 1 ]]   && warn "Flag --user is redundant and ignored (included in --all)"
+        [[ "$SCAN_MOUNT" -eq 1 ]]  && warn "Flag --mount is redundant and ignored (included in --all)"
+        [[ "$SCAN_USB" -eq 1 ]]    && warn "Flag --usb is redundant and ignored (included in --all)"
         SCAN_DRIVER=0 SCAN_VGA=0 SCAN_KERNEL=0 SCAN_USER=0 SCAN_MOUNT=0 SCAN_USB=0
 
     elif [[ "$SCAN_SYSTEM" -eq 1 ]]; then
@@ -4743,6 +4749,10 @@ main() {
         # SCAN_SYSTEM calls: scan_vga_info, scan_drivers, scan_mounts, scan_usb_devices
         # SCAN_SYSTEM does NOT call: scan_kernel_logs, scan_user_services (coredumps)
         # So we only clear flags that would cause double execution
+        [[ "$SCAN_DRIVER" -eq 1 ]] && warn "Flag --driver is redundant and ignored (included in --system)"
+        [[ "$SCAN_VGA" -eq 1 ]]    && warn "Flag --vga is redundant and ignored (included in --system)"
+        [[ "$SCAN_MOUNT" -eq 1 ]]  && warn "Flag --mount is redundant and ignored (included in --system)"
+        [[ "$SCAN_USB" -eq 1 ]]    && warn "Flag --usb is redundant and ignored (included in --system)"
         SCAN_DRIVER=0 SCAN_VGA=0 SCAN_MOUNT=0 SCAN_USB=0
     fi
 
