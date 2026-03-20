@@ -368,6 +368,7 @@ check_internet() { detect_network_status "$@" || true; }
 detect_gpu() {
     # GPU detection - try /sys filesystem first
     local gpu_names=()
+    local driver_link=""
     
     # Collect GPU names in subshell - nullglob auto-cleans on subshell exit
     # This avoids trap clobber issue (trap - EXIT destroys caller's trap)
@@ -383,7 +384,6 @@ detect_gpu() {
             driver=""
             if [[ -L "${card_path}/device/driver" ]]; then
                 # Extract basename using bash parameter expansion
-                local driver_link
                 driver_link="$(readlink "${card_path}/device/driver" 2>/dev/null)"
                 [[ -n "$driver_link" ]] && driver="${driver_link##*/}"
             fi
