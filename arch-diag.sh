@@ -2224,17 +2224,29 @@ scan_usb_devices() {
 
         # Check if removable (USB drives are removable)
         local removable="0"
-        [[ -f "$block/removable" ]] && removable="$(< "$block/removable" 2>/dev/null)" || removable="0"
+        if [[ -f "$block/removable" ]]; then
+            removable="$(< "$block/removable" 2>/dev/null)"
+            [[ -z "$removable" ]] && removable="0"
+        fi
         [[ "$removable" != "1" ]] && continue
 
         found_storage=1
         local size="?" model="" mount=""
 
-        [[ -f "$block/size" ]] && size="$(< "$block/size" 2>/dev/null)" || size="?"
+        if [[ -f "$block/size" ]]; then
+            size="$(< "$block/size" 2>/dev/null)"
+            [[ -z "$size" ]] && size="?"
+        fi
         [[ -n "$size" && "$size" != "?" ]] && size="$((size / 2 / 1024 / 1024))Gi"
 
-        [[ -f "$block/device/vendor" ]] && model="$(< "$block/device/vendor" 2>/dev/null)" || model=""
-        [[ -f "$block/device/model" ]] && model="$model $(< "$block/device/model" 2>/dev/null)" || model=""
+        if [[ -f "$block/device/vendor" ]]; then
+            model="$(< "$block/device/vendor" 2>/dev/null)"
+        fi
+        if [[ -f "$block/device/model" ]]; then
+            local dev_model
+            dev_model="$(< "$block/device/model" 2>/dev/null)"
+            [[ -n "$dev_model" ]] && model="$model $dev_model"
+        fi
         [[ -z "$model" ]] && model="USB Storage"
 
         # Check mount point from /proc/mounts
