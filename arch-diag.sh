@@ -1306,7 +1306,7 @@ cluster_errors() {
     # - Hex addresses already normalized to 0xADDR before this step
     # - IPv6 with ports (e.g., [::1]:8080) matched via ]:PORT pattern
     sed -E \
-        -e 's/^[A-Za-z]{3} [0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' \
+        -e 's/^[A-Za-z]{3} [ 0-9][0-9] [0-9]{2}:[0-9]{2}:[0-9]{2} [^ ]+ //' \
         -e 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:?[0-9]{2} [^ ]+ //' \
         -e 's/0x[0-9a-fA-F]+/0xADDR/g' \
         -e 's/\[[0-9]+\]/[PID]/g' \
