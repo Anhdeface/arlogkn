@@ -3288,7 +3288,12 @@ _export_cleanup() {
         rm -f "$_EXPORT_CLEANUP_TEMP_FILE" 2>/dev/null
     fi
 
-    return "$exit_code"
+    # If called manually (success), return. If called via trap (error/interrupt), exit.
+    if [[ "$keep_temp_file" -eq 1 ]]; then
+        return "$exit_code"
+    else
+        exit "$exit_code"
+    fi
 }
 
 export_all_logs() {
