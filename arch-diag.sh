@@ -2910,6 +2910,7 @@ export_drivers() {
     fi
 
     local output_file="${OUTPUT_DIR}/drivers.txt"
+    local driver_link
 
     {
         printf '=============================================================\n'
