@@ -1072,9 +1072,8 @@ visible_len() {
     # Rare C/POSIX locale: ${#var} counts bytes → need awk fallback
     # LC_CTYPE overrides LANG for character classification — must check it too
     # (LC_CTYPE=C with LANG=en_US.UTF-8 → ${#var} counts bytes, not chars)
-    if [[ "${LANG:-C}" != "C" && "${LANG:-C}" != "POSIX" && \
-          "${LC_ALL:-}" != "C" && "${LC_ALL:-}" != "POSIX" && \
-          "${LC_CTYPE:-}" != "C" && "${LC_CTYPE:-}" != "POSIX" ]]; then
+    local active_lc="${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}"
+    if [[ "${active_lc^^}" == *UTF-8* || "${active_lc^^}" == *UTF8* ]]; then
         # Fast path: UTF-8 locale → ${#var} counts characters (not bytes)
         char_count="${#stripped}"
     else
