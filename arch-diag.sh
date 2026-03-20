@@ -1154,11 +1154,6 @@ declare -ga _TBL_NUMCOLS_STACK=()
 # Simple table - minimal borders
 # Usage: tbl_begin "Col1" width1 "Col2" width2 ...
 tbl_begin() {
-    # Runtime check: detect if called from subshell (pipeline, command substitution)
-    # Subshells cannot propagate global state changes back to parent
-    if [[ "${BASHPID:-$$}" -ne "$$" ]]; then
-        printf '[WARN] tbl_begin called from subshell - table state will not propagate\n' >&2
-    fi
 
     # Guard: prevent unbounded _TBL_COLS_STACK growth
     # Each tbl_begin appends (2 * num_cols) entries to global array.
