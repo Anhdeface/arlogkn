@@ -3243,8 +3243,8 @@ declare -g _EXPORT_CLEANUP_OLD_TERM=""
 #   keep_temp_file=0 (default): delete temp file (error/interrupt path)
 #   keep_temp_file=1: preserve temp file (success path, already moved)
 _export_cleanup() {
-    local keep_temp_file="${1:-0}"
     local exit_code=$?
+    local keep_temp_file="${1:-0}"
 
     # Restore caller's traps first (before any other operations)
     if [[ -n "${_EXPORT_CLEANUP_OLD_EXIT:-}" ]]; then
