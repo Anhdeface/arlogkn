@@ -290,16 +290,10 @@ detect_network_status() {
         # Priority: physical interface with IP > virtual interface with IP > link up
         if [[ "$found_physical_ip" -eq 1 ]]; then
             INTERNET_STATUS="ip_assigned"
-            return 0
         elif [[ "$found_virtual_ip" -eq 1 ]]; then
             INTERNET_STATUS="ip_assigned"
-            return 0
-        fi
-
-        # Interface(s) up but no routable IP confirmed
-        if [[ "$has_link_up" -eq 1 ]]; then
+        elif [[ "$has_link_up" -eq 1 ]]; then
             INTERNET_STATUS="link_up"
-            return 0
         fi
     fi
 
@@ -354,7 +348,11 @@ detect_network_status() {
         fi
     fi
 
-    # No connectivity detected
+    # Final decision based on whatever highest state we reached
+    if [[ "$INTERNET_STATUS" == "ip_assigned" || "$INTERNET_STATUS" == "link_up" ]]; then
+        return 0
+    fi
+
     INTERNET_STATUS="disconnected"
     return 1
 }
