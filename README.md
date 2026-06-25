@@ -1,6 +1,6 @@
 # arlogkn
 
-**Version:** 1.0.10 | **Platform:** Linux (Multi-distro with Arch optimizations) | **License:** MIT
+**Version:** 1.1 | **Platform:** Linux (Multi-distro with Arch optimizations) | **License:** MIT
 
 A read-only system diagnostic and log extraction utility for Linux systems.
 
