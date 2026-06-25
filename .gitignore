@@ -1,5 +1,2 @@
-arch-diag-logs/
+build/
 
-QWEN.md
-
-log-updater.sh

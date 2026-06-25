@@ -1,18 +1,42 @@
 # arlogkn
 
-**Version:** 1.0.10 | **Platform:** Arch Linux and derivatives | **License:** MIT
+**Version:** 1.0.10 | **Platform:** Linux (Multi-distro with Arch optimizations) | **License:** MIT
 
-A read-only system diagnostic and log extraction utility for Arch Linux.
+A read-only system diagnostic and log extraction utility for Linux systems.
+
+---
+
+## Architecture & Build System
+
+The project utilizes a plugin-based modular architecture (`src/core/` and `src/plugins/`) that compiles into a single executable bash script. This design ensures developer maintainability while preserving the portability of a single-file deployment.
+
+- **Modular Codebase:** Core functionalities (hardware, logs, utils) are separated from OS-specific plugins (e.g., `pacman`).
+- **Build System:** `build.sh` concatenates the modules and dynamically injects version variables.
+- **Graceful Degradation:** The script verifies the operating system at runtime. If an Arch-targeted build is executed on a non-Arch system (e.g., Ubuntu), it safely disables Arch-specific modules and emits a warning, allowing core scans to continue without errors.
 
 ---
 
 ## Quick Start
 
+### 1. Build the Script
 ```bash
-chmod +x arch-diag.sh
-./arch-diag.sh                    # Full scan
-./arch-diag.sh --kernel --boot=-1 # Previous boot errors
-./arch-diag.sh --save-all         # Export to file
+chmod +x build.sh
+
+# Build with Arch Linux plugins
+./build.sh --target arch
+
+# Or build the universal core only
+./build.sh --target universal
+```
+
+### 2. Run Diagnostics
+The compiled script is generated at `build/output/sys-diag.sh`.
+
+```bash
+cd build/output
+./sys-diag.sh                    # Full scan
+./sys-diag.sh --kernel --boot=-1 # Previous boot errors
+./sys-diag.sh --save-all         # Export to file
 ```
 
 ---
@@ -25,28 +49,10 @@ Extracts diagnostic information from:
 - **System services** — Failed units, journal errors
 - **Hardware state** — GPU, drivers, temperatures, USB, network
 - **Boot performance** — systemd-analyze timing
-- **Package logs** — pacman errors and warnings
+- **Package logs** — pacman errors and warnings (if supported)
 - **Crash dumps** — coredumpctl entries
 
 **Read-Only:** Does not modify system state or configurations.
-
----
-
-## Why Single File?
-
-**Design Decision:** Single bash file (~4600 lines) for portability.
-
-**Rationale:**
-
-1. **Portability** — Copy one file, run anywhere. No installation.
-2. **Recovery** — Works in chroot, rescue mode, minimal installations.
-3. **Speed** — No module loading, starts immediately.
-4. **Audit** — Single file to review end-to-end.
-
-**Trade-offs:**
-
-- Larger file to navigate
-- No modular code reuse
 
 ---
 
@@ -54,23 +60,12 @@ Extracts diagnostic information from:
 
 | Category | Details |
 |----------|---------|
-| **OS** | Arch Linux, CachyOS, Manjaro, EndeavourOS, or systemd-based |
+| **OS** | Linux (Arch, Debian, RHEL, etc.) |
 | **Shell** | bash 5.0+ |
 | **Utilities** | coreutils, util-linux, systemd, awk, sed, grep |
 | **Permissions** | Root recommended for full visibility |
 
 **No External Dependencies** — Does not require inxi, hwinfo, etc.
-
----
-
-## Installation
-
-```bash
-git clone <repository-url>
-cd arlogkn
-chmod +x arch-diag.sh
-./arch-diag.sh
-```
 
 ---
 
@@ -80,25 +75,25 @@ chmod +x arch-diag.sh
 
 | Command | Purpose |
 |---------|---------|
-| `./arch-diag.sh` | Full scan |
-| `./arch-diag.sh --kernel` | Kernel errors |
-| `./arch-diag.sh --kernel --boot=-1` | Previous boot |
-| `./arch-diag.sh --system` | Hardware (no logs) |
-| `./arch-diag.sh --save` | Export separate files |
-| `./arch-diag.sh --save-all` | Export single file |
-| `./arch-diag.sh --wiki` | Wiki reference |
-| `./arch-diag.sh --wiki=sound` | Specific topic |
+| `./sys-diag.sh` | Full scan |
+| `./sys-diag.sh --kernel` | Kernel errors |
+| `./sys-diag.sh --kernel --boot=-1` | Previous boot |
+| `./sys-diag.sh --system` | Hardware (no logs) |
+| `./sys-diag.sh --save` | Export separate files |
+| `./sys-diag.sh --save-all` | Export single file |
+| `./sys-diag.sh --wiki` | Wiki reference |
+| `./sys-diag.sh --wiki=sound` | Specific topic |
 
 ### Scan Modes
 
 ```bash
-./arch-diag.sh --kernel    # Kernel errors
-./arch-diag.sh --user      # Services, coredumps
-./arch-diag.sh --driver    # Driver status
-./arch-diag.sh --vga       # GPU info
-./arch-diag.sh --mount     # Filesystems
-./arch-diag.sh --usb       # USB devices
-./arch-diag.sh --system    # Hardware overview
+./sys-diag.sh --kernel    # Kernel errors
+./sys-diag.sh --user      # Services, coredumps
+./sys-diag.sh --driver    # Driver status
+./sys-diag.sh --vga       # GPU info
+./sys-diag.sh --mount     # Filesystems
+./sys-diag.sh --usb       # USB devices
+./sys-diag.sh --system    # Hardware overview
 ```
 
 ### Export
@@ -115,9 +110,8 @@ chmod +x arch-diag.sh
 Arch Wiki command reference (20 topics, fuzzy matching).
 
 ```bash
-./arch-diag.sh --wiki
-./arch-diag.sh --wiki=sound
-./arch-diag.sh --wiki=graphics
+./sys-diag.sh --wiki
+./sys-diag.sh --wiki=sound
 ```
 
 **Topics:** pacman, aur, system, process, hardware, disk, network, user, logs, arch, performance, backup, troubleshooting, boot, memory, graphics, sound, systemd, file, emergency.
@@ -146,46 +140,19 @@ Arch Wiki command reference (20 topics, fuzzy matching).
 ## FAQ
 
 ### Do I need root?
-
 **Recommended.** Some paths require elevated privileges:
 - /var/log/pacman.log
 - /sys filesystem
 - Full journalctl logs
 
-### Why ~4600 lines?
-
-- 12+ scan modules
-- Offline Arch Wiki (20 topics)
-- Edge case handling
-- Security mitigations
-- No external dependencies
-
 ### Is it safe?
-
 **Yes.** Read-only operations:
 - No writes to system files
 - No configuration changes
 - No state-changing binaries
 
-### Why not inxi/hwinfo?
-
-Designed for broken systems where packages cannot be installed.
-
 ### Non-Arch systems?
-
-**Possible.** Assumes systemd, pacman, Arch log locations.
-
----
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Permission denied | Run with sudo |
-| Incomplete exports | Check disk space |
-| journalctl failed | Try sudo |
-| No temperatures | Some systems lack hwmon |
-| Wiki not found | Use fuzzy matching |
+**Yes.** Due to the Graceful Degradation architecture, the script safely disables Arch-specific modules when running on other distributions, preventing execution errors.
 
 ---
 
@@ -214,7 +181,3 @@ Designed for broken systems where packages cannot be installed.
 ## License
 
 MIT License.
-
----
-
-**arlogkn** — Read-only diagnostic tool for Arch Linux.
