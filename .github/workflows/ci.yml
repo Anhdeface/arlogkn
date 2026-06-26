@@ -19,9 +19,18 @@ jobs:
 
       - name: Run ShellCheck
         run: |
+          # Lint source files and test scripts
           shellcheck -S warning \
             -e SC2034 -e SC2155 -e SC1090 -e SC1091 \
-            arch-diag.sh
+            build.sh src/core/*.sh tests/*.sh
+          
+          # Build the universal artifact
+          bash ./build.sh
+          
+          # Lint the built artifact
+          shellcheck -S warning \
+            -e SC2034 -e SC2155 -e SC1090 -e SC1091 \
+            build/output/sys-diag.sh
 
   unit-tests:
     name: Unit Tests
@@ -47,5 +56,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-failure-logs
-          path: /tmp/arlogkn_test_*
+          path: /tmp/arlogkn_strict_test_*
           retention-days: 7

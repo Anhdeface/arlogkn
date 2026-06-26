@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# tests/test_export.sh — Strict tests for export and disk space (Data Layer)
+
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/framework.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/core/00-header.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/core/01-utils.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/core/04-exports.sh"
+
+suite_begin "04-exports.sh (Disk Space & Export Init)"
+
+# ─── check_disk_space() ───────────────────────────────────────────────────────
+test_disk_space_pass() {
+    mock_command df '
+        echo "Filesystem     1K-blocks    Used Available Use% Mounted on"
+        echo "/dev/sda1        1000000       0   1000000   0% /"
+    '
+    # Require 100KB, should pass
+    check_disk_space "/tmp" 100 || { echo "check_disk_space failed unexpectedly"; exit 1; }
+}
+run_test "check_disk_space passes when sufficient space" test_disk_space_pass
+
+test_disk_space_fail() {
+    mock_command df '
+        echo "Filesystem     1K-blocks    Used Available Use% Mounted on"
+        echo "/dev/sda1        1000000  999000      1000  99% /"
+    '
+    # Require 2000KB, available 1000KB, should fail
+    if ( check_disk_space "/tmp" 2000 ); then
+        echo "check_disk_space passed but should have failed"
+        exit 1
+    fi
+}
+run_test "check_disk_space fails when insufficient space" test_disk_space_fail
+
+test_disk_space_fallback() {
+    # If directory doesn't exist, it checks the parent
+    mock_command df '
+        echo "Filesystem     1K-blocks    Used Available Use% Mounted on"
+        echo "/dev/sda1        1000000       0   1000000   0% /"
+    '
+    local missing_dir="$TEST_TMPDIR/nonexistent_dir_123"
+    check_disk_space "$missing_dir" 100 || { echo "check_disk_space fallback failed"; exit 1; }
+}
+run_test "check_disk_space falls back to parent for missing dirs" test_disk_space_fallback
+
+# ─── init_output_dir() ────────────────────────────────────────────────────────
+test_init_creates_dir() {
+    local original_dir="$PWD"
+    cd "$TEST_TMPDIR"
+    OUTPUT_DIR=""
+    # init_output_dir sets OUTPUT_DIR as side-effect
+    init_output_dir >/dev/null
+    
+    [[ -n "$OUTPUT_DIR" ]] || { echo "OUTPUT_DIR was not set"; cd "$original_dir"; exit 1; }
+    [[ -d "$OUTPUT_DIR" ]] || { echo "Directory $OUTPUT_DIR was not created"; cd "$original_dir"; exit 1; }
+    
+    cd "$original_dir"
+}
+run_test "init_output_dir creates directory and sets OUTPUT_DIR" test_init_creates_dir
+
+test_init_umask_restore() {
+    local original_dir="$PWD"
+    cd "$TEST_TMPDIR"
+    umask 0077
+    local before
+    before="$(umask)"
+    
+    init_output_dir >/dev/null
+    
+    local after
+    after="$(umask)"
+    [[ "$before" == "$after" ]] || { echo "umask changed from $before to $after"; cd "$original_dir"; exit 1; }
+    
+    umask 0022 # Reset
+    cd "$original_dir"
+}
+run_test "init_output_dir restores umask after creation" test_init_umask_restore
+
+# ─── Export Traps ─────────────────────────────────────────────────────────────
+test_export_trap_sigint() {
+    local temp_file
+    temp_file="$(mktemp "$TEST_TMPDIR/trap_test_XXXXXX")"
+
+    bash -c '
+        temp_file="'"$temp_file"'"
+        trap '\''[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null'\'' EXIT INT TERM
+        kill -INT $$
+    ' 2>/dev/null || true
+
+    sleep 0.1
+    if [[ -f "$temp_file" ]]; then
+        echo "SIGINT cleanup failed: $temp_file still exists"
+        rm -f "$temp_file" 2>/dev/null || true
+        exit 1
+    fi
+}
+run_test "export cleanup trap works on SIGINT" test_export_trap_sigint
+
+test_export_trap_sigterm() {
+    local temp_file
+    temp_file="$(mktemp "$TEST_TMPDIR/trap_test_XXXXXX")"
+
+    bash -c '
+        temp_file="'"$temp_file"'"
+        trap '\''[[ -n "$temp_file" && -f "$temp_file" ]] && rm -f "$temp_file" 2>/dev/null'\'' EXIT INT TERM
+        kill -TERM $$
+    ' 2>/dev/null || true
+
+    sleep 0.1
+    if [[ -f "$temp_file" ]]; then
+        echo "SIGTERM cleanup failed: $temp_file still exists"
+        rm -f "$temp_file" 2>/dev/null || true
+        exit 1
+    fi
+}
+run_test "export cleanup trap works on SIGTERM" test_export_trap_sigterm
+
+suite_end

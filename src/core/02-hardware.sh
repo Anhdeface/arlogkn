@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # DISTRO & SYSTEM FINGERPRINTING
 # ─────────────────────────────────────────────────────────────────────────────
 
