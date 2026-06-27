@@ -1,8 +1,13 @@
 # arlogkn Commit Log
 
-Generated: 2026-03-20
+Generated: 2026-06-27
 
 ---
+f2de04e 2026-06-26 test(core): overhaul unit test system for plugin-based architecture
+d4b1b21 2026-06-26 Update version number in README
+ac0252e 2026-06-26 refactor(core): migrate to plugin-based modular architecture and bump version to 1.1
+d71d1af 2026-03-25 fix(detection): detect_network_status early return masks external checks
+5a95a03 2026-03-20 docs: update log.txt with latest commits
 38902b1 2026-03-20 fix(ui): visible_len() miscalculates multibyte characters on legacy encodings
 f0fbd30 2026-03-20 fix(ui): remove false positive subshell warning in tbl_begin
 b2f3eda 2026-03-20 refactor(detection): remove misplaced local variable inside subshell
