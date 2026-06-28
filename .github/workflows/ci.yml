@@ -19,15 +19,18 @@ jobs:
 
       - name: Run ShellCheck
         run: |
-          # Lint source files and test scripts
+          # Lint source files and test scripts (bao gồm cả plugins)
           shellcheck -S warning \
             -e SC2034 -e SC2155 -e SC1090 -e SC1091 \
-            build.sh src/core/*.sh tests/*.sh
+            build.sh src/core/*.sh src/plugins/*/*.sh tests/*.sh
           
-          # Build the universal artifact
+          # Build bản chuẩn (universal)
           bash ./build.sh
           
-          # Lint the built artifact
+          # Build bản HWv2 chuyên sâu
+          bash ./build.sh --hwv2
+          
+          # Lint cả 2 bản build
           shellcheck -S warning \
             -e SC2034 -e SC2155 -e SC1090 -e SC1091 \
             build/output/sys-diag.sh

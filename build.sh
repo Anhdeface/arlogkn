@@ -9,9 +9,23 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 TARGET="universal"
-if [[ "${1:-}" == "--target" && -n "${2:-}" ]]; then
-    TARGET="$2"
-fi
+HW_MODE="basic"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --target)
+            TARGET="$2"
+            shift 2
+            ;;
+        --hwv2)
+            HW_MODE="v2"
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
 OUT_DIR="build/output"
 OUT_FILE="${OUT_DIR}/sys-diag.sh"
@@ -49,7 +63,21 @@ if [[ "$TARGET" != "universal" ]]; then
             cat "$f" >> "$OUT_FILE"
         done < <(find "$PLUGIN_DIR" -maxdepth 1 -name '*.sh' | sort -n)
     else
-        echo "[WARN] Plugin directory $PLUGIN_DIR not found. Building without plugins."
+        echo "[WARN] Plugin directory $PLUGIN_DIR not found. Building without target plugins."
+    fi
+fi
+
+# 3.5. Hardware V2 Plugin (nếu bật --hwv2)
+if [[ "$HW_MODE" == "v2" ]]; then
+    echo "[INFO] Including HWv2 Advanced Module"
+    HW_PLUGIN_DIR="src/plugins/hwv2"
+    if [[ -d "$HW_PLUGIN_DIR" ]]; then
+        while IFS= read -r f; do
+            [[ -e "$f" ]] || continue
+            cat "$f" >> "$OUT_FILE"
+        done < <(find "$HW_PLUGIN_DIR" -maxdepth 1 -name '*.sh' | sort -n)
+    else
+        echo "[WARN] HWv2 plugin directory $HW_PLUGIN_DIR not found."
     fi
 fi
 

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 scan_pacman_logs() {
     draw_section_header "PACMAN / ALPM (Errors & Warnings)"
 

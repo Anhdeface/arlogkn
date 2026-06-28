@@ -20,8 +20,13 @@ _export_components() {
     fi
 
     # Hardware & system details exported by both scans
-    export_mounts || { warn "Export mounts failed"; export_failed=1; }
-    export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
+    if [[ "$(type -t export_storage_v2)" == "function" ]]; then
+        export_storage_v2 || { warn "Export storage v2 failed"; export_failed=1; }
+        export_peripherals_v2 || { warn "Export peripherals v2 failed"; export_failed=1; }
+    else
+        export_mounts || { warn "Export mounts failed"; export_failed=1; }
+        export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }
+    fi
     export_vga_info || { warn "Export VGA info failed"; export_failed=1; }
     export_drivers || { warn "Export drivers failed"; export_failed=1; }
     export_temperatures || { warn "Export temperatures failed"; export_failed=1; }
@@ -125,8 +130,13 @@ main() {
             scan_pacman_logs
         fi
         
-        scan_mounts
-        scan_usb_devices
+        if [[ "$(type -t scan_storage_v2)" == "function" ]]; then
+            scan_storage_v2
+            scan_peripherals_v2
+        else
+            scan_mounts
+            scan_usb_devices
+        fi
         scan_network_interfaces
 
         # Export logs if --save is set (separate files)
@@ -166,8 +176,13 @@ main() {
         scan_vga_info
         scan_drivers
         scan_boot_timing
-        scan_mounts
-        scan_usb_devices
+        if [[ "$(type -t scan_storage_v2)" == "function" ]]; then
+            scan_storage_v2
+            scan_peripherals_v2
+        else
+            scan_mounts
+            scan_usb_devices
+        fi
         scan_network_interfaces
 
         if [[ "$SAVE_LOGS" -eq 1 ]]; then
@@ -215,10 +230,10 @@ main() {
         scan_coredumps
     fi
     if [[ "$SCAN_MOUNT" -eq 1 ]]; then
-        scan_mounts
+        if [[ "$(type -t scan_storage_v2)" == "function" ]]; then scan_storage_v2; else scan_mounts; fi
     fi
     if [[ "$SCAN_USB" -eq 1 ]]; then
-        scan_usb_devices
+        if [[ "$(type -t scan_peripherals_v2)" == "function" ]]; then scan_peripherals_v2; else scan_usb_devices; fi
     fi
 
     # Export logic for individual flag combinations
@@ -235,8 +250,13 @@ main() {
         [[ "$SCAN_KERNEL" -eq 1 ]] && { export_kernel_logs || { warn "Export kernel logs failed"; export_failed=1; }; }
         [[ "$SCAN_USER" -eq 1 ]] && { export_user_services || { warn "Export user services failed"; export_failed=1; }; }
         [[ "$SCAN_USER" -eq 1 ]] && { export_coredumps || { warn "Export coredumps failed"; export_failed=1; }; }
-        [[ "$SCAN_MOUNT" -eq 1 ]] && { export_mounts || { warn "Export mounts failed"; export_failed=1; }; }
-        [[ "$SCAN_USB" -eq 1 ]] && { export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }; }
+        if [[ "$(type -t export_storage_v2)" == "function" ]]; then
+            [[ "$SCAN_MOUNT" -eq 1 ]] && { export_storage_v2 || { warn "Export storage v2 failed"; export_failed=1; }; }
+            [[ "$SCAN_USB" -eq 1 ]] && { export_peripherals_v2 || { warn "Export peripherals v2 failed"; export_failed=1; }; }
+        else
+            [[ "$SCAN_MOUNT" -eq 1 ]] && { export_mounts || { warn "Export mounts failed"; export_failed=1; }; }
+            [[ "$SCAN_USB" -eq 1 ]] && { export_usb_devices || { warn "Export USB devices failed"; export_failed=1; }; }
+        fi
         export_summary || { warn "Export summary failed"; export_failed=1; }
 
         if [[ "$export_failed" -eq 1 ]]; then
