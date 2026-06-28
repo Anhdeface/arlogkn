@@ -48,7 +48,6 @@ echo "" >> "$OUT_FILE"
 # 2. Rest of Core (excluding header and main)
 # Use find and sort to ensure strict numerical ordering
 while IFS= read -r f; do
-    # Bỏ qua header vì đã chèn ở trên
     if [[ "$(basename "$f")" != "00-header.sh" ]]; then
         cat "$f" >> "$OUT_FILE"
     fi
@@ -61,13 +60,13 @@ if [[ "$TARGET" != "universal" ]]; then
         while IFS= read -r f; do
             [[ -e "$f" ]] || continue
             cat "$f" >> "$OUT_FILE"
-        done < <(find "$PLUGIN_DIR" -maxdepth 1 -name '*.sh' | sort -n)
+        done < <(find "$PLUGIN_DIR" -maxdepth 1 -name 'plugin-*.sh' | sort)
     else
         echo "[WARN] Plugin directory $PLUGIN_DIR not found. Building without target plugins."
     fi
 fi
 
-# 3.5. Hardware V2 Plugin (nếu bật --hwv2)
+# 3.5. Hardware V2 Plugin 
 if [[ "$HW_MODE" == "v2" ]]; then
     echo "[INFO] Including HWv2 Advanced Module"
     HW_PLUGIN_DIR="src/plugins/hwv2"
@@ -75,7 +74,7 @@ if [[ "$HW_MODE" == "v2" ]]; then
         while IFS= read -r f; do
             [[ -e "$f" ]] || continue
             cat "$f" >> "$OUT_FILE"
-        done < <(find "$HW_PLUGIN_DIR" -maxdepth 1 -name '*.sh' | sort -n)
+        done < <(find "$HW_PLUGIN_DIR" -maxdepth 1 -name 'plugin-*.sh' | sort)
     else
         echo "[WARN] HWv2 plugin directory $HW_PLUGIN_DIR not found."
     fi

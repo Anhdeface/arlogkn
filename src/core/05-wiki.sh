@@ -4,8 +4,6 @@
 
 # Group keywords for matching (lowercase, space-separated)
 declare -ga WIKI_GROUP_NAMES=(
-    "pacman package management"
-    "aur helpers yay paru"
     "system information"
     "process service management systemctl"
     "hardware detection lspci lsusb"
@@ -13,7 +11,6 @@ declare -ga WIKI_GROUP_NAMES=(
     "network diagnostics"
     "user permissions"
     "logs debugging journal"
-    "arch utilities"
     "performance monitoring"
     "backup recovery"
     "troubleshooting diagnostics"
@@ -26,11 +23,31 @@ declare -ga WIKI_GROUP_NAMES=(
     "emergency recovery"
 )
 
+# Keys for dynamic routing
+declare -ga WIKI_GROUP_KEYS=(
+    "sysinfo"
+    "process"
+    "hardware"
+    "disk"
+    "network"
+    "userperms"
+    "logs"
+    "perf"
+    "backup"
+    "trouble"
+    "boot"
+    "memory"
+    "graphics"
+    "sound"
+    "systemd"
+    "filedebug"
+    "emergency"
+)
+
 # Alias mapping for common shorthand/alternative names
 declare -A WIKI_ALIASES=(
     ["gpu"]="graphics"
     ["net"]="network"
-    ["pkg"]="pacman"
     ["mem"]="memory"
     ["sys"]="system"
     ["proc"]="process"
@@ -312,360 +329,22 @@ show_wiki_group() {
     fi
     
     printf '\n'
-    draw_header "ARCH LINUX COMMAND WIKI"
+    draw_header "LINUX SYSTEM WIKI"
     printf '\n'
     
-    case "$group_idx" in
-        0)  # Package Management
-            draw_section_header "1. PACKAGE MANAGEMENT (PACMAN)"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "pacman -Syu" "Full system upgrade"
-            tbl_row "pacman -S <pkg>" "Install package(s)"
-            tbl_row "pacman -R <pkg>" "Remove package(s)"
-            tbl_row "pacman -Rns <pkg>" "Remove pkg + deps + config"
-            tbl_row "pacman -Q" "List installed packages"
-            tbl_row "pacman -Qe" "List explicitly installed"
-            tbl_row "pacman -Qdt" "List orphaned packages"
-            tbl_row "pacman -F <file>" "Find which pkg owns file"
-            tbl_row "pacman -Dk" "Check pkg database integrity"
-            tbl_row "pacman -Sc" "Clean unused pkgs from cache"
-            tbl_row "pacman -Scc" "Clean all cache (dangerous)"
-            tbl_row "pacman -Sl" "List all available packages"
-            tbl_row "pacman -Si <pkg>" "Show package info"
-            tbl_row "pacman -Ql <pkg>" "List files owned by pkg"
-            tbl_row "pacman -Qo <file>" "Find pkg that owns file"
-            tbl_row "pacman -U <file.pkg.tar>" "Install local package file"
-            draw_table_end
-            ;;
-        1)  # AUR Helpers
-            draw_section_header "2. AUR HELPERS (YAY/PARU)"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "yay -S <pkg>" "Install from AUR/official"
-            tbl_row "yay -Syu" "Update all (AUR + official)"
-            tbl_row "yay -Qm" "List AUR packages"
-            tbl_row "yay -Rns <pkg>" "Remove AUR package"
-            tbl_row "yay -Ps" "Show stats"
-            tbl_row "yay -G <pkg>" "Download PKGBUILD only"
-            tbl_row "yay -w <pkg>" "Download sources only"
-            tbl_row "paru -S <pkg>" "Paru equivalent (same syntax)"
-            draw_table_end
-            ;;
-        2)  # System Information
-            draw_section_header "3. SYSTEM INFORMATION"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "uname -r" "Show kernel version"
-            tbl_row "uname -a" "Show all system info"
-            tbl_row "hostnamectl" "Show hostname & boot time"
-            tbl_row "cat /etc/os-release" "Show distribution info"
-            tbl_row "neofetch" "System info with ASCII art"
-            tbl_row "fastfetch" "Faster neofetch alternative"
-            tbl_row "lscpu" "CPU architecture info"
-            tbl_row "nproc" "Number of CPU cores"
-            tbl_row "free -h" "Memory usage (human readable)"
-            tbl_row "df -h" "Disk space (human readable)"
-            tbl_row "lsblk" "List block devices"
-            tbl_row "blkid" "Show block device UUIDs"
-            tbl_row "lsmod" "List loaded kernel modules"
-            tbl_row "modinfo <mod>" "Show module information"
-            tbl_row "inxi -Fza" "Full system info (detailed)"
-            draw_table_end
-            ;;
-        3)  # Process & Service Management
-            draw_section_header "4. PROCESS & SERVICE MANAGEMENT"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "systemctl status" "Show systemd overview"
-            tbl_row "systemctl list-units" "List active units"
-            tbl_row "systemctl list-timers" "List systemd timers"
-            tbl_row "systemctl start <svc>" "Start a service"
-            tbl_row "systemctl stop <svc>" "Stop a service"
-            tbl_row "systemctl restart <svc>" "Restart a service"
-            tbl_row "systemctl enable <svc>" "Enable at boot"
-            tbl_row "systemctl disable <svc>" "Disable at boot"
-            tbl_row "systemctl daemon-reload" "Reload systemd config"
-            tbl_row "journalctl -b" "Logs from current boot"
-            tbl_row "journalctl -b -1" "Logs from previous boot"
-            tbl_row "journalctl -f" "Follow logs (tail -f)"
-            tbl_row "journalctl -u <svc>" "Logs for specific service"
-            tbl_row "journalctl -p 3" "Show priority ≤ ERR"
-            tbl_row "ps aux" "Show all processes"
-            tbl_row "top" "Interactive process viewer"
-            tbl_row "htop" "Enhanced top (if installed)"
-            tbl_row "kill <PID>" "Terminate process"
-            tbl_row "killall <name>" "Kill by process name"
-            tbl_row "pkill <pattern>" "Kill by pattern"
-            draw_table_end
-            ;;
-        4)  # Hardware Detection
-            draw_section_header "5. HARDWARE DETECTION"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "lspci" "List PCI devices"
-            tbl_row "lspci -k" "PCI + kernel drivers"
-            tbl_row "lspci -nn" "PCI with vendor IDs"
-            tbl_row "lspci -v" "PCI verbose output"
-            tbl_row "lsusb" "List USB devices"
-            tbl_row "lsusb -t" "USB tree view"
-            tbl_row "lsusb -v" "USB verbose output"
-            tbl_row "lshw" "Hardware list (needs root)"
-            tbl_row "lshw -short" "Short hardware summary"
-            tbl_row "hwinfo" "Hardware info tool"
-            tbl_row "dmidecode" "DMI/SMBIOS table dump"
-            tbl_row "upower -i /dev" "Power/battery info"
-            tbl_row "iwctl" "Wireless CLI tool"
-            tbl_row "iwconfig" "Wireless config (legacy)"
-            tbl_row "ip addr" "Show IP addresses"
-            tbl_row "ip route" "Show routing table"
-            draw_table_end
-            ;;
-        5)  # Disk & Filesystem
-            draw_section_header "6. DISK & FILESYSTEM"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "fdisk -l" "List partitions"
-            tbl_row "parted -l" "Partition table info"
-            tbl_row "mkfs.<type> <dev>" "Create filesystem"
-            tbl_row "mount <dev> <mnt>" "Mount device"
-            tbl_row "umount <dev|mnt>" "Unmount device"
-            tbl_row "findmnt" "Tree of mounted filesystems"
-            tbl_row "cat /proc/mounts" "Active mounts list"
-            tbl_row "du -sh <dir>" "Directory size"
-            tbl_row "du -h --max-depth=1" "Subdir sizes"
-            tbl_row "ncdu" "NCurses disk usage"
-            tbl_row "btrfs filesystem usage" "Btrfs space info"
-            tbl_row "fsck <dev>" "Filesystem check"
-            tbl_row "smartctl -a <dev>" "SMART disk health"
-            tbl_row "hdparm -Tt <dev>" "Disk speed test"
-            draw_table_end
-            ;;
-        6)  # Network Diagnostics
-            draw_section_header "7. NETWORK DIAGNOSTICS"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "ping <host>" "Test connectivity"
-            tbl_row "ping -6 <host>" "IPv6 ping"
-            tbl_row "traceroute <host>" "Trace network path"
-            tbl_row "tracepath <host>" "Path MTU discovery"
-            tbl_row "mtr <host>" "Ping + traceroute combo"
-            tbl_row "dig <domain>" "DNS lookup"
-            tbl_row "nslookup <domain>" "DNS query (legacy)"
-            tbl_row "host <domain>" "Simple DNS lookup"
-            tbl_row "curl <url>" "Transfer data from URL"
-            tbl_row "wget <url>" "Download files"
-            tbl_row "ss -tulpn" "Show listening ports"
-            tbl_row "netstat -tulpn" "Netstat (legacy)"
-            tbl_row "nmap <host>" "Network scanner"
-            tbl_row "ip link" "Show network interfaces"
-            tbl_row "ip neigh" "Show ARP table"
-            tbl_row "resolvectl status" "DNS resolver status"
-            draw_table_end
-            ;;
-        7)  # User & Permissions
-            draw_section_header "8. USER & PERMISSIONS"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "id" "Show current user ID"
-            tbl_row "whoami" "Show current username"
-            tbl_row "users" "Logged in users"
-            tbl_row "w" "Who + what they're doing"
-            tbl_row "last" "Login history"
-            tbl_row "lastb" "Failed login attempts"
-            tbl_row "sudo -i" "Become root (interactive)"
-            tbl_row "su - <user>" "Switch user"
-            tbl_row "chmod <mode> <file>" "Change permissions"
-            tbl_row "chown <user> <file>" "Change ownership"
-            tbl_row "getfacl <file>" "Show ACL permissions"
-            tbl_row "setfacl -m <rule>" "Set ACL permissions"
-            tbl_row "passwd <user>" "Change password"
-            tbl_row "groups <user>" "Show user groups"
-            draw_table_end
-            ;;
-        8)  # Logs & Debugging
-            draw_section_header "9. LOGS & DEBUGGING"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "journalctl" "View systemd journal"
-            tbl_row "journalctl -xe" "Journal + explanations"
-            tbl_row "journalctl --disk-usage" "Journal disk usage"
-            tbl_row "journalctl --vacuum" "Vacuum old journals"
-            tbl_row "dmesg" "Kernel ring buffer"
-            tbl_row "dmesg -w" "Follow kernel messages"
-            tbl_row "coredumpctl list" "List core dumps"
-            tbl_row "coredumpctl info" "Core dump details"
-            tbl_row "strace <cmd>" "Trace syscalls"
-            tbl_row "ltrace <cmd>" "Trace library calls"
-            tbl_row "gdb <bin>" "GNU debugger"
-            tbl_row "valgrind <cmd>" "Memory debugger"
-            draw_table_end
-            ;;
-        9)  # Arch Utilities
-            draw_section_header "10. ARCH-SPECIFIC UTILITIES"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "archlinux-keyring-wkd" "Update keyring"
-            tbl_row "pacman-key --init" "Init pacman keyring"
-            tbl_row "pacman-key --populate" "Populate keyring"
-            tbl_row "reflector" "Mirrorlist generator"
-            tbl_row "rankmirrors" "Rank mirrors by speed"
-            tbl_row "makepkg -si" "Build PKGBUILD + install"
-            tbl_row "makepkg --clean" "Clean build dir"
-            tbl_row "pkgfile <cmd>" "Find pkg providing cmd"
-            tbl_row "pactree <pkg>" "Show dependency tree"
-            tbl_row "vercmp <v1> <v2>" "Compare versions"
-            tbl_row "namcap <pkg>" "Package analyzer"
-            tbl_row "debuginfod-find" "Find debug symbols (elfutils)"
-            draw_table_end
-            ;;
-        10) # Performance & Monitoring
-            draw_section_header "11. PERFORMANCE & MONITORING"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "vmstat" "Virtual memory stats"
-            tbl_row "iostat" "I/O statistics"
-            tbl_row "mpstat" "CPU stats per core"
-            tbl_row "sar" "System activity report"
-            tbl_row "pidstat" "Per-process stats"
-            tbl_row "iotop" "Disk I/O by process (iotop)"
-            tbl_row "nethogs" "Bandwidth by process (nethogs)"
-            tbl_row "iftop" "Network bandwidth (iftop)"
-            tbl_row "perf top" "CPU profiling"
-            tbl_row "powertop" "Power consumption (powertop)"
-            tbl_row "cpupower frequency-info" "CPU freq info"
-            tbl_row "cpupower frequency-set" "Set CPU governor"
-            draw_table_end
-            ;;
-        11) # Backup & Recovery
-            draw_section_header "12. BACKUP & RECOVERY"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "rsync -av <src> <dst>" "Sync files/dirs"
-            tbl_row "tar -czf <a.tar.gz>" "Create archive"
-            tbl_row "tar -xzf <a.tar.gz>" "Extract archive"
-            tbl_row "dd if=<in> of=<out>" "Block copy (careful!)"
-            tbl_row "timeshift" "System snapshot tool (timeshift)"
-            tbl_row "snapper list" "Btrfs snapshot list (snapper)"
-            tbl_row "fsarchiver" "Filesystem archiver (fsarchiver)"
-            tbl_row "clonezilla" "Disk imaging tool (Live OS)"
-            draw_table_end
-            ;;
-        12) # Troubleshooting & Diagnostics
-            draw_section_header "13. TROUBLESHOOTING & DIAGNOSTICS"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "dmesg -T" "Kernel messages with timestamps"
-            tbl_row "dmesg -l err" "Show only error messages"
-            tbl_row "dmesg -l warn" "Show only warnings"
-            tbl_row "journalctl -p err -b" "Errors from current boot"
-            tbl_row "journalctl -p warning -b" "Warnings from current boot"
-            tbl_row "systemctl --failed" "List failed services"
-            tbl_row "systemctl is-failed <svc>" "Check if service failed"
-            tbl_row "coredumpctl list" "List application crashes"
-            tbl_row "coredumpctl gdb <exe>" "Debug crash with gdb"
-            tbl_row "strace -p <PID>" "Trace running process"
-            tbl_row "lsof -p <PID>" "List open files by PID"
-            tbl_row "lsof -i :<port>" "Find process on port"
-            tbl_row "fuser -v <file>" "Find processes using file"
-            tbl_row "inxi -Fxxxz" "Full hardware info (inxi)"
-            tbl_row "hwinfo --short" "Hardware summary (hwinfo)"
-            draw_table_end
-            ;;
-        13) # Boot & Startup Repair
-            draw_section_header "14. BOOT & STARTUP REPAIR"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "bootctl status" "Check boot loader status"
-            tbl_row "efibootmgr -v" "List EFI boot entries"
-            tbl_row "grub-mkconfig -o /boot/grub..." "Regenerate GRUB config"
-            tbl_row "mkinitcpio -P" "Regenerate initramfs"
-            tbl_row "mkinitcpio -p linux" "Rebuild for specific kernel"
-            tbl_row "pacman -S linux" "Reinstall kernel"
-            tbl_row "arch-chroot /mnt" "Chroot into installed system"
-            tbl_row "fstab-gen" "Generate fstab file"
-            tbl_row "blkid" "Show block device UUIDs"
-            tbl_row "lsblk -f" "List devices with filesystems"
-            draw_table_end
-            ;;
-        14) # Memory & Swap
-            draw_section_header "15. MEMORY & SWAP"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "free -h" "Memory and swap usage"
-            tbl_row "vmstat -s" "Memory statistics"
-            tbl_row "swapon --show" "Show swap devices"
-            tbl_row "swapon -a" "Enable all swap"
-            tbl_row "swapoff -a" "Disable all swap"
-            tbl_row "mkswap /dev/<part>" "Create swap space"
-            tbl_row "zramctl" "ZRAM compression status"
-            tbl_row "smem -tk" "Memory usage by process (smem)"
-            tbl_row "pmap -x <PID>" "Process memory mapping"
-            draw_table_end
-            ;;
-        15) # Graphics & Display
-            draw_section_header "16. GRAPHICS & DISPLAY"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "glxinfo -B" "OpenGL renderer info (mesa-utils)"
-            tbl_row "glxgears" "OpenGL benchmark (mesa-utils)"
-            tbl_row "vulkaninfo" "Vulkan GPU info (vulkan-tools)"
-            tbl_row "xrandr" "Display configuration"
-            tbl_row "xrandr --query" "List connected displays"
-            tbl_row "nvidia-smi" "NVIDIA GPU status (nvidia-utils)"
-            tbl_row "radeontop" "AMD GPU utilization (AUR)"
-            tbl_row "intel_gpu_top" "Intel GPU util (intel-gpu-tools)"
-            tbl_row "vainfo" "Video acceleration info (libva-utils)"
-            tbl_row "libinput list-devices" "Input devices info"
-            draw_table_end
-            ;;
-        16) # Sound & Audio
-            draw_section_header "17. SOUND & AUDIO"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "pactl list short sinks" "List audio outputs"
-            tbl_row "pactl list short sources" "List audio inputs"
-            tbl_row "pactl info" "PulseAudio server info"
-            tbl_row "pavucontrol" "PulseAudio volume control"
-            tbl_row "alsamixer" "ALSA mixer interface"
-            tbl_row "aplay -l" "List ALSA playback devices"
-            tbl_row "arecord -l" "List ALSA capture devices"
-            tbl_row "speaker-test -c 2" "Test stereo speakers"
-            tbl_row "wireplumber" "PipeWire session manager"
-            draw_table_end
-            ;;
-        17) # Systemd Journal Control
-            draw_section_header "18. SYSTEMD JOURNAL CONTROL"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "journalctl --list-boots" "List boot entries"
-            tbl_row "journalctl -b -1" "Previous boot logs"
-            tbl_row "journalctl -b -2" "Two boots ago logs"
-            tbl_row "journalctl --since today" "Logs from today"
-            tbl_row "journalctl --since 1h ago" "Last hour logs"
-            tbl_row "journalctl -u <svc>" "Service-specific logs"
-            tbl_row "journalctl -t <tag>" "Logs by identifier"
-            tbl_row "journalctl -k" "Kernel-only logs"
-            tbl_row "journalctl -f" "Follow logs (live)"
-            tbl_row "journalctl --vacuum-time=7d" "Keep 7 days of logs"
-            tbl_row "journalctl --disk-usage" "Journal disk usage"
-            tbl_row "journalctl --rotate" "Force log rotation"
-            draw_table_end
-            ;;
-        18) # File & Permission Debug
-            draw_section_header "19. FILE & PERMISSION DEBUG"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "stat <file>" "File metadata"
-            tbl_row "ls -la <dir>" "List files with permissions"
-            tbl_row "getfacl <file>" "Show ACL permissions"
-            tbl_row "namei -l /path" "Trace path permissions"
-            tbl_row "findmnt -D" "Find mount by device"
-            tbl_row "lsof +D <dir>" "Open files in directory"
-            tbl_row "fuser -vm <mount>" "Processes using mount"
-            tbl_row "du -sh /*" "Top-level disk usage"
-            tbl_row "ncdu" "Interactive disk usage (ncdu)"
-            draw_table_end
-            ;;
-        19) # Emergency & Recovery
-            draw_section_header "20. EMERGENCY & RECOVERY"
-            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
-            tbl_row "systemctl emergency" "Enter emergency mode"
-            tbl_row "systemctl rescue" "Enter rescue mode"
-            tbl_row "mount -o remount,rw /" "Remount root as read-write"
-            tbl_row "fsck -y /dev/<part>" "Auto-fix filesystem"
-            tbl_row "test -x /file" "Test if file executable"
-            tbl_row "pacman-key --refresh-keys" "Refresh package keys"
-            tbl_row "pacman -Syyu" "Force full system upgrade"
-            tbl_row "downgrade <pkg>" "Downgrade package (AUR)"
-            draw_table_end
-            ;;
-        *)  # Invalid group index
-            warn "show_wiki_group: invalid group index '$group_idx' (expected 0-$((${#WIKI_GROUP_NAMES[@]} - 1)))"
-            return 1
-            ;;
-    esac
+        local key="${WIKI_GROUP_KEYS[$group_idx]:-}"
+    if [[ -z "$key" ]]; then
+        warn "show_wiki_group: invalid group index '$group_idx' (expected 0-$((${#WIKI_GROUP_NAMES[@]} - 1)))"
+        return 1
+    fi
+
+    local handler="show_wiki_group_$key"
+    if declare -f "$handler" &>/dev/null; then
+        "$handler" "$col1_width"
+    else
+        warn "show_wiki_group: handler '$handler' not implemented for key '$key'"
+        return 1
+    fi
     
     printf '\n'
     draw_box_line "${C_GREEN}✓ For more: https://wiki.archlinux.org${C_RESET}"
@@ -702,7 +381,7 @@ show_wiki() {
         else
             # No match - show suggestions
             printf '\n'
-            draw_header "ARCH LINUX COMMAND WIKI"
+            draw_header "LINUX SYSTEM WIKI"
             printf '\n'
             draw_box_line "${C_RED}✗ Group not found: '${C_BOLD}$normalized_group${C_RED}'${C_RESET}"
             printf '\n'
@@ -818,3 +497,368 @@ EOF
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+# --- WIKI GROUP HANDLERS ---
+
+show_wiki_group_sysinfo() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    System Information
+            draw_section_header "3. SYSTEM INFORMATION"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "uname -r" "Show kernel version"
+            tbl_row "uname -a" "Show all system info"
+            tbl_row "hostnamectl" "Show hostname & boot time"
+            tbl_row "cat /etc/os-release" "Show distribution info"
+            tbl_row "neofetch" "System info with ASCII art"
+            tbl_row "fastfetch" "Faster neofetch alternative"
+            tbl_row "lscpu" "CPU architecture info"
+            tbl_row "nproc" "Number of CPU cores"
+            tbl_row "free -h" "Memory usage (human readable)"
+            tbl_row "df -h" "Disk space (human readable)"
+            tbl_row "lsblk" "List block devices"
+            tbl_row "blkid" "Show block device UUIDs"
+            tbl_row "lsmod" "List loaded kernel modules"
+            tbl_row "modinfo <mod>" "Show module information"
+            tbl_row "inxi -Fza" "Full system info (detailed)"
+            draw_table_end
+}
+
+show_wiki_group_process() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Process & Service Management
+            draw_section_header "4. PROCESS & SERVICE MANAGEMENT"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "systemctl status" "Show systemd overview"
+            tbl_row "systemctl list-units" "List active units"
+            tbl_row "systemctl list-timers" "List systemd timers"
+            tbl_row "systemctl start <svc>" "Start a service"
+            tbl_row "systemctl stop <svc>" "Stop a service"
+            tbl_row "systemctl restart <svc>" "Restart a service"
+            tbl_row "systemctl enable <svc>" "Enable at boot"
+            tbl_row "systemctl disable <svc>" "Disable at boot"
+            tbl_row "systemctl daemon-reload" "Reload systemd config"
+            tbl_row "journalctl -b" "Logs from current boot"
+            tbl_row "journalctl -b -1" "Logs from previous boot"
+            tbl_row "journalctl -f" "Follow logs (tail -f)"
+            tbl_row "journalctl -u <svc>" "Logs for specific service"
+            tbl_row "journalctl -p 3" "Show priority ≤ ERR"
+            tbl_row "ps aux" "Show all processes"
+            tbl_row "top" "Interactive process viewer"
+            tbl_row "htop" "Enhanced top (if installed)"
+            tbl_row "kill <PID>" "Terminate process"
+            tbl_row "killall <name>" "Kill by process name"
+            tbl_row "pkill <pattern>" "Kill by pattern"
+            draw_table_end
+}
+
+show_wiki_group_hardware() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Hardware Detection
+            draw_section_header "5. HARDWARE DETECTION"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "lspci" "List PCI devices"
+            tbl_row "lspci -k" "PCI + kernel drivers"
+            tbl_row "lspci -nn" "PCI with vendor IDs"
+            tbl_row "lspci -v" "PCI verbose output"
+            tbl_row "lsusb" "List USB devices"
+            tbl_row "lsusb -t" "USB tree view"
+            tbl_row "lsusb -v" "USB verbose output"
+            tbl_row "lshw" "Hardware list (needs root)"
+            tbl_row "lshw -short" "Short hardware summary"
+            tbl_row "hwinfo" "Hardware info tool"
+            tbl_row "dmidecode" "DMI/SMBIOS table dump"
+            tbl_row "upower -i /dev" "Power/battery info"
+            tbl_row "iwctl" "Wireless CLI tool"
+            tbl_row "iwconfig" "Wireless config (legacy)"
+            tbl_row "ip addr" "Show IP addresses"
+            tbl_row "ip route" "Show routing table"
+            draw_table_end
+}
+
+show_wiki_group_disk() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Disk & Filesystem
+            draw_section_header "6. DISK & FILESYSTEM"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "fdisk -l" "List partitions"
+            tbl_row "parted -l" "Partition table info"
+            tbl_row "mkfs.<type> <dev>" "Create filesystem"
+            tbl_row "mount <dev> <mnt>" "Mount device"
+            tbl_row "umount <dev|mnt>" "Unmount device"
+            tbl_row "findmnt" "Tree of mounted filesystems"
+            tbl_row "cat /proc/mounts" "Active mounts list"
+            tbl_row "du -sh <dir>" "Directory size"
+            tbl_row "du -h --max-depth=1" "Subdir sizes"
+            tbl_row "ncdu" "NCurses disk usage"
+            tbl_row "btrfs filesystem usage" "Btrfs space info"
+            tbl_row "fsck <dev>" "Filesystem check"
+            tbl_row "smartctl -a <dev>" "SMART disk health"
+            tbl_row "hdparm -Tt <dev>" "Disk speed test"
+            draw_table_end
+}
+
+show_wiki_group_network() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Network Diagnostics
+            draw_section_header "7. NETWORK DIAGNOSTICS"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "ping <host>" "Test connectivity"
+            tbl_row "ping -6 <host>" "IPv6 ping"
+            tbl_row "traceroute <host>" "Trace network path"
+            tbl_row "tracepath <host>" "Path MTU discovery"
+            tbl_row "mtr <host>" "Ping + traceroute combo"
+            tbl_row "dig <domain>" "DNS lookup"
+            tbl_row "nslookup <domain>" "DNS query (legacy)"
+            tbl_row "host <domain>" "Simple DNS lookup"
+            tbl_row "curl <url>" "Transfer data from URL"
+            tbl_row "wget <url>" "Download files"
+            tbl_row "ss -tulpn" "Show listening ports"
+            tbl_row "netstat -tulpn" "Netstat (legacy)"
+            tbl_row "nmap <host>" "Network scanner"
+            tbl_row "ip link" "Show network interfaces"
+            tbl_row "ip neigh" "Show ARP table"
+            tbl_row "resolvectl status" "DNS resolver status"
+            draw_table_end
+}
+
+show_wiki_group_userperms() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    User & Permissions
+            draw_section_header "8. USER & PERMISSIONS"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "id" "Show current user ID"
+            tbl_row "whoami" "Show current username"
+            tbl_row "users" "Logged in users"
+            tbl_row "w" "Who + what they're doing"
+            tbl_row "last" "Login history"
+            tbl_row "lastb" "Failed login attempts"
+            tbl_row "sudo -i" "Become root (interactive)"
+            tbl_row "su - <user>" "Switch user"
+            tbl_row "chmod <mode> <file>" "Change permissions"
+            tbl_row "chown <user> <file>" "Change ownership"
+            tbl_row "getfacl <file>" "Show ACL permissions"
+            tbl_row "setfacl -m <rule>" "Set ACL permissions"
+            tbl_row "passwd <user>" "Change password"
+            tbl_row "groups <user>" "Show user groups"
+            draw_table_end
+}
+
+show_wiki_group_logs() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Logs & Debugging
+            draw_section_header "9. LOGS & DEBUGGING"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "journalctl" "View systemd journal"
+            tbl_row "journalctl -xe" "Journal + explanations"
+            tbl_row "journalctl --disk-usage" "Journal disk usage"
+            tbl_row "journalctl --vacuum" "Vacuum old journals"
+            tbl_row "dmesg" "Kernel ring buffer"
+            tbl_row "dmesg -w" "Follow kernel messages"
+            tbl_row "coredumpctl list" "List core dumps"
+            tbl_row "coredumpctl info" "Core dump details"
+            tbl_row "strace <cmd>" "Trace syscalls"
+            tbl_row "ltrace <cmd>" "Trace library calls"
+            tbl_row "gdb <bin>" "GNU debugger"
+            tbl_row "valgrind <cmd>" "Memory debugger"
+            draw_table_end
+}
+
+show_wiki_group_perf() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Performance & Monitoring
+            draw_section_header "11. PERFORMANCE & MONITORING"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "vmstat" "Virtual memory stats"
+            tbl_row "iostat" "I/O statistics"
+            tbl_row "mpstat" "CPU stats per core"
+            tbl_row "sar" "System activity report"
+            tbl_row "pidstat" "Per-process stats"
+            tbl_row "iotop" "Disk I/O by process (iotop)"
+            tbl_row "nethogs" "Bandwidth by process (nethogs)"
+            tbl_row "iftop" "Network bandwidth (iftop)"
+            tbl_row "perf top" "CPU profiling"
+            tbl_row "powertop" "Power consumption (powertop)"
+            tbl_row "cpupower frequency-info" "CPU freq info"
+            tbl_row "cpupower frequency-set" "Set CPU governor"
+            draw_table_end
+}
+
+show_wiki_group_backup() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Backup & Recovery
+            draw_section_header "12. BACKUP & RECOVERY"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "rsync -av <src> <dst>" "Sync files/dirs"
+            tbl_row "tar -czf <a.tar.gz>" "Create archive"
+            tbl_row "tar -xzf <a.tar.gz>" "Extract archive"
+            tbl_row "dd if=<in> of=<out>" "Block copy (careful!)"
+            tbl_row "timeshift" "System snapshot tool (timeshift)"
+            tbl_row "snapper list" "Btrfs snapshot list (snapper)"
+            tbl_row "fsarchiver" "Filesystem archiver (fsarchiver)"
+            tbl_row "clonezilla" "Disk imaging tool (Live OS)"
+            draw_table_end
+}
+
+show_wiki_group_trouble() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Troubleshooting & Diagnostics
+            draw_section_header "13. TROUBLESHOOTING & DIAGNOSTICS"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "dmesg -T" "Kernel messages with timestamps"
+            tbl_row "dmesg -l err" "Show only error messages"
+            tbl_row "dmesg -l warn" "Show only warnings"
+            tbl_row "journalctl -p err -b" "Errors from current boot"
+            tbl_row "journalctl -p warning -b" "Warnings from current boot"
+            tbl_row "systemctl --failed" "List failed services"
+            tbl_row "systemctl is-failed <svc>" "Check if service failed"
+            tbl_row "coredumpctl list" "List application crashes"
+            tbl_row "coredumpctl gdb <exe>" "Debug crash with gdb"
+            tbl_row "strace -p <PID>" "Trace running process"
+            tbl_row "lsof -p <PID>" "List open files by PID"
+            tbl_row "lsof -i :<port>" "Find process on port"
+            tbl_row "fuser -v <file>" "Find processes using file"
+            tbl_row "inxi -Fxxxz" "Full hardware info (inxi)"
+            tbl_row "hwinfo --short" "Hardware summary (hwinfo)"
+            draw_table_end
+}
+
+show_wiki_group_boot() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Boot & Startup Repair
+            draw_section_header "14. BOOT & STARTUP REPAIR"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "bootctl status" "Check boot loader status"
+            tbl_row "efibootmgr -v" "List EFI boot entries"
+            tbl_row "grub-mkconfig -o /boot/grub..." "Regenerate GRUB config"
+            tbl_row "mkinitcpio -P" "Regenerate initramfs"
+            tbl_row "mkinitcpio -p linux" "Rebuild for specific kernel"
+            tbl_row "pacman -S linux" "Reinstall kernel"
+            tbl_row "arch-chroot /mnt" "Chroot into installed system"
+            tbl_row "fstab-gen" "Generate fstab file"
+            tbl_row "blkid" "Show block device UUIDs"
+            tbl_row "lsblk -f" "List devices with filesystems"
+            draw_table_end
+}
+
+show_wiki_group_memory() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Memory & Swap
+            draw_section_header "15. MEMORY & SWAP"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "free -h" "Memory and swap usage"
+            tbl_row "vmstat -s" "Memory statistics"
+            tbl_row "swapon --show" "Show swap devices"
+            tbl_row "swapon -a" "Enable all swap"
+            tbl_row "swapoff -a" "Disable all swap"
+            tbl_row "mkswap /dev/<part>" "Create swap space"
+            tbl_row "zramctl" "ZRAM compression status"
+            tbl_row "smem -tk" "Memory usage by process (smem)"
+            tbl_row "pmap -x <PID>" "Process memory mapping"
+            draw_table_end
+}
+
+show_wiki_group_graphics() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Graphics & Display
+            draw_section_header "16. GRAPHICS & DISPLAY"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "glxinfo -B" "OpenGL renderer info (mesa-utils)"
+            tbl_row "glxgears" "OpenGL benchmark (mesa-utils)"
+            tbl_row "vulkaninfo" "Vulkan GPU info (vulkan-tools)"
+            tbl_row "xrandr" "Display configuration"
+            tbl_row "xrandr --query" "List connected displays"
+            tbl_row "nvidia-smi" "NVIDIA GPU status (nvidia-utils)"
+            tbl_row "radeontop" "AMD GPU utilization (AUR)"
+            tbl_row "intel_gpu_top" "Intel GPU util (intel-gpu-tools)"
+            tbl_row "vainfo" "Video acceleration info (libva-utils)"
+            tbl_row "libinput list-devices" "Input devices info"
+            draw_table_end
+}
+
+show_wiki_group_sound() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Sound & Audio
+            draw_section_header "17. SOUND & AUDIO"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "pactl list short sinks" "List audio outputs"
+            tbl_row "pactl list short sources" "List audio inputs"
+            tbl_row "pactl info" "PulseAudio server info"
+            tbl_row "pavucontrol" "PulseAudio volume control"
+            tbl_row "alsamixer" "ALSA mixer interface"
+            tbl_row "aplay -l" "List ALSA playback devices"
+            tbl_row "arecord -l" "List ALSA capture devices"
+            tbl_row "speaker-test -c 2" "Test stereo speakers"
+            tbl_row "wireplumber" "PipeWire session manager"
+            draw_table_end
+}
+
+show_wiki_group_systemd() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Systemd Journal Control
+            draw_section_header "18. SYSTEMD JOURNAL CONTROL"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "journalctl --list-boots" "List boot entries"
+            tbl_row "journalctl -b -1" "Previous boot logs"
+            tbl_row "journalctl -b -2" "Two boots ago logs"
+            tbl_row "journalctl --since today" "Logs from today"
+            tbl_row "journalctl --since 1h ago" "Last hour logs"
+            tbl_row "journalctl -u <svc>" "Service-specific logs"
+            tbl_row "journalctl -t <tag>" "Logs by identifier"
+            tbl_row "journalctl -k" "Kernel-only logs"
+            tbl_row "journalctl -f" "Follow logs (live)"
+            tbl_row "journalctl --vacuum-time=7d" "Keep 7 days of logs"
+            tbl_row "journalctl --disk-usage" "Journal disk usage"
+            tbl_row "journalctl --rotate" "Force log rotation"
+            draw_table_end
+}
+
+show_wiki_group_filedebug() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    File & Permission Debug
+            draw_section_header "19. FILE & PERMISSION DEBUG"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "stat <file>" "File metadata"
+            tbl_row "ls -la <dir>" "List files with permissions"
+            tbl_row "getfacl <file>" "Show ACL permissions"
+            tbl_row "namei -l /path" "Trace path permissions"
+            tbl_row "findmnt -D" "Find mount by device"
+            tbl_row "lsof +D <dir>" "Open files in directory"
+            tbl_row "fuser -vm <mount>" "Processes using mount"
+            tbl_row "du -sh /*" "Top-level disk usage"
+            tbl_row "ncdu" "Interactive disk usage (ncdu)"
+            draw_table_end
+}
+
+show_wiki_group_emergency() {
+    local col1_width="${1:-35}"
+    local col2_width=$(( col1_width - 5 ))
+    Emergency & Recovery
+            draw_section_header "20. EMERGENCY & RECOVERY"
+            draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
+            tbl_row "systemctl emergency" "Enter emergency mode"
+            tbl_row "systemctl rescue" "Enter rescue mode"
+            tbl_row "mount -o remount,rw /" "Remount root as read-write"
+            tbl_row "fsck -y /dev/<part>" "Auto-fix filesystem"
+            tbl_row "test -x /file" "Test if file executable"
+            tbl_row "pacman-key --refresh-keys" "Refresh package keys"
+            tbl_row "pacman -Syyu" "Force full system upgrade"
+            tbl_row "downgrade <pkg>" "Downgrade package (AUR)"
+            draw_table_end
+}

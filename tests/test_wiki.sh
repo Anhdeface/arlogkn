@@ -71,16 +71,16 @@ run_test "awk_fuzzy_match blocks system() call injection" test_awk_injection_sys
 test_find_group_alias() {
     local result
     result="$(find_wiki_group_awk "gpu")"
-    # "gpu" → alias "graphics" → should match index 15 (graphics display gpu)
-    [[ "$result" == "15" ]] || { echo "Expected 15, got $result"; exit 1; }
+    # "gpu" → alias "graphics" → should match index 12 (graphics display gpu)
+    [[ "$result" == "12" ]] || { echo "Expected 12, got $result"; exit 1; }
 }
 run_test "find_wiki_group_awk resolves aliases" test_find_group_alias
 
 test_find_group_exact() {
     local result
     result="$(find_wiki_group_awk "sound")"
-    # "sound" → exact match in group 16 (sound audio pulseaudio)
-    [[ "$result" == "16" ]] || { echo "Expected 16, got $result"; exit 1; }
+    # "sound" → exact match in group 13 (sound audio pulseaudio)
+    [[ "$result" == "13" ]] || { echo "Expected 13, got $result"; exit 1; }
 }
 run_test "find_wiki_group_awk finds exact matches" test_find_group_exact
 
