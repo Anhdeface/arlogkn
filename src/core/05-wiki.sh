@@ -504,7 +504,6 @@ EOF
 show_wiki_group_sysinfo() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    System Information
             draw_section_header "3. SYSTEM INFORMATION"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "uname -r" "Show kernel version"
@@ -528,7 +527,6 @@ show_wiki_group_sysinfo() {
 show_wiki_group_process() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Process & Service Management
             draw_section_header "4. PROCESS & SERVICE MANAGEMENT"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "systemctl status" "Show systemd overview"
@@ -557,7 +555,6 @@ show_wiki_group_process() {
 show_wiki_group_hardware() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Hardware Detection
             draw_section_header "5. HARDWARE DETECTION"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "lspci" "List PCI devices"
@@ -582,7 +579,6 @@ show_wiki_group_hardware() {
 show_wiki_group_disk() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Disk & Filesystem
             draw_section_header "6. DISK & FILESYSTEM"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "fdisk -l" "List partitions"
@@ -605,7 +601,6 @@ show_wiki_group_disk() {
 show_wiki_group_network() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Network Diagnostics
             draw_section_header "7. NETWORK DIAGNOSTICS"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "ping <host>" "Test connectivity"
@@ -630,7 +625,6 @@ show_wiki_group_network() {
 show_wiki_group_userperms() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    User & Permissions
             draw_section_header "8. USER & PERMISSIONS"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "id" "Show current user ID"
@@ -653,7 +647,6 @@ show_wiki_group_userperms() {
 show_wiki_group_logs() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Logs & Debugging
             draw_section_header "9. LOGS & DEBUGGING"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "journalctl" "View systemd journal"
@@ -674,7 +667,6 @@ show_wiki_group_logs() {
 show_wiki_group_perf() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Performance & Monitoring
             draw_section_header "11. PERFORMANCE & MONITORING"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "vmstat" "Virtual memory stats"
@@ -695,7 +687,6 @@ show_wiki_group_perf() {
 show_wiki_group_backup() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Backup & Recovery
             draw_section_header "12. BACKUP & RECOVERY"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "rsync -av <src> <dst>" "Sync files/dirs"
@@ -712,7 +703,6 @@ show_wiki_group_backup() {
 show_wiki_group_trouble() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Troubleshooting & Diagnostics
             draw_section_header "13. TROUBLESHOOTING & DIAGNOSTICS"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "dmesg -T" "Kernel messages with timestamps"
@@ -736,7 +726,6 @@ show_wiki_group_trouble() {
 show_wiki_group_boot() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Boot & Startup Repair
             draw_section_header "14. BOOT & STARTUP REPAIR"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "bootctl status" "Check boot loader status"
@@ -755,7 +744,6 @@ show_wiki_group_boot() {
 show_wiki_group_memory() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Memory & Swap
             draw_section_header "15. MEMORY & SWAP"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "free -h" "Memory and swap usage"
@@ -773,7 +761,6 @@ show_wiki_group_memory() {
 show_wiki_group_graphics() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Graphics & Display
             draw_section_header "16. GRAPHICS & DISPLAY"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "glxinfo -B" "OpenGL renderer info (mesa-utils)"
@@ -792,7 +779,6 @@ show_wiki_group_graphics() {
 show_wiki_group_sound() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Sound & Audio
             draw_section_header "17. SOUND & AUDIO"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "pactl list short sinks" "List audio outputs"
@@ -810,7 +796,6 @@ show_wiki_group_sound() {
 show_wiki_group_systemd() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Systemd Journal Control
             draw_section_header "18. SYSTEMD JOURNAL CONTROL"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "journalctl --list-boots" "List boot entries"
@@ -831,7 +816,6 @@ show_wiki_group_systemd() {
 show_wiki_group_filedebug() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    File & Permission Debug
             draw_section_header "19. FILE & PERMISSION DEBUG"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "stat <file>" "File metadata"
@@ -849,7 +833,6 @@ show_wiki_group_filedebug() {
 show_wiki_group_emergency() {
     local col1_width="${1:-35}"
     local col2_width=$(( col1_width - 5 ))
-    Emergency & Recovery
             draw_section_header "20. EMERGENCY & RECOVERY"
             draw_table_begin "Command" "$col1_width" "Description" "$col2_width"
             tbl_row "systemctl emergency" "Enter emergency mode"

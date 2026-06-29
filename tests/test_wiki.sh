@@ -3,6 +3,9 @@
 
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/framework.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/core/00-header.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/core/01-utils.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../src/core/02-hardware.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../src/core/05-wiki.sh"
 
 # Note: The wiki logic needs WIKI_GROUP_NAMES array to be exported/defined
@@ -108,5 +111,29 @@ test_suggest_max_three() {
     [[ "$count" -le 3 ]] || { echo "Expected max 3 results, got $count"; exit 1; }
 }
 run_test "suggest_wiki_groups_awk limits results to 3" test_suggest_max_three
+
+# ─── Wiki group rendering ────────────────────────────────────────────────────
+test_show_wiki_group_sound_renders() {
+    local output
+    output="$(show_wiki_group 13)"
+    [[ "$output" == *"SOUND & AUDIO"* ]] || { echo "Missing sound header"; exit 1; }
+    [[ "$output" == *"pactl info"* ]] || { echo "Missing sound command row"; exit 1; }
+}
+run_test "show_wiki_group renders sound group without executing title text" test_show_wiki_group_sound_renders
+
+test_show_wiki_group_all_core_handlers_render() {
+    local i output
+    for ((i = 0; i < ${#WIKI_GROUP_NAMES[@]}; i++)); do
+        output="$(show_wiki_group "$i" 80)" || {
+            echo "show_wiki_group failed for index $i (${WIKI_GROUP_KEYS[$i]})"
+            exit 1
+        }
+        [[ "$output" == *"Command"* ]] || {
+            echo "Missing command table for index $i (${WIKI_GROUP_KEYS[$i]})"
+            exit 1
+        }
+    done
+}
+run_test "show_wiki_group renders every core wiki handler" test_show_wiki_group_all_core_handlers_render
 
 suite_end
