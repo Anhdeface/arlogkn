@@ -237,7 +237,12 @@ scan_peripherals_v2() {
 }
 
 export_storage_v2() {
-    export_start "storage_v2.txt"
+    if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
+        warn "export_storage_v2: OUTPUT_DIR not set or invalid"
+        return 1
+    fi
+
+    local output_file="${OUTPUT_DIR}/storage_v2.txt"
     local _ng_was_set=0
     shopt -q nullglob && _ng_was_set=1
     local _old_ret_trap
@@ -246,34 +251,49 @@ export_storage_v2() {
     # shellcheck disable=SC2064
     trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
 
-    for d in /sys/block/*; do
-        [[ -d "$d" ]] || continue
-        echo "Device: ${d##*/}" >> "$EXPORT_FILE"
-        if [[ -f "$d/size" ]]; then
-            local s
-            s="$(cat "$d/size" 2>/dev/null || true)"
-            [[ -n "$s" ]] && echo "  Size: $s sectors" >> "$EXPORT_FILE"
-        fi
-        if [[ -f "$d/device/model" ]]; then
-            local m
-            m="$(cat "$d/device/model" 2>/dev/null || true)"
-            [[ -n "$m" ]] && echo "  Model: $m" >> "$EXPORT_FILE"
-        fi
-        for p in "$d"/${d##*/}*; do
-            [[ -d "$p" ]] || continue
-            echo "  Partition: ${p##*/}" >> "$EXPORT_FILE"
-            if [[ -f "$p/size" ]]; then
-                local ps
-                ps="$(cat "$p/size" 2>/dev/null || true)"
-                [[ -n "$ps" ]] && echo "    Size: $ps sectors" >> "$EXPORT_FILE"
+    {
+        printf '=============================================================\n'
+        printf 'STORAGE DEVICES (HWV2)\n'
+        printf '=============================================================\n\n'
+
+        local found=0
+        for d in /sys/block/*; do
+            [[ -d "$d" ]] || continue
+            found=1
+            printf 'Device: %s\n' "${d##*/}"
+            if [[ -f "$d/size" ]]; then
+                local s
+                s="$(< "$d/size" 2>/dev/null)" || s=""
+                [[ -n "$s" ]] && printf '  Size: %s sectors\n' "$s"
             fi
+            if [[ -f "$d/device/model" ]]; then
+                local m
+                m="$(< "$d/device/model" 2>/dev/null)" || m=""
+                [[ -n "$m" ]] && printf '  Model: %s\n' "$m"
+            fi
+            for p in "$d"/${d##*/}*; do
+                [[ -d "$p" ]] || continue
+                printf '  Partition: %s\n' "${p##*/}"
+                if [[ -f "$p/size" ]]; then
+                    local ps
+                    ps="$(< "$p/size" 2>/dev/null)" || ps=""
+                    [[ -n "$ps" ]] && printf '    Size: %s sectors\n' "$ps"
+                fi
+            done
         done
-    done
-    export_end "storage_v2.txt"
+        [[ "$found" -eq 0 ]] && printf 'No storage devices found.\n'
+    } > "$output_file"
+
+    info "Storage v2 exported: storage_v2.txt"
 }
 
 export_peripherals_v2() {
-    export_start "peripherals_v2.txt"
+    if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
+        warn "export_peripherals_v2: OUTPUT_DIR not set or invalid"
+        return 1
+    fi
+
+    local output_file="${OUTPUT_DIR}/peripherals_v2.txt"
     local _ng_was_set=0
     shopt -q nullglob && _ng_was_set=1
     local _old_ret_trap
@@ -282,27 +302,39 @@ export_peripherals_v2() {
     # shellcheck disable=SC2064
     trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
 
-    if [[ -d /sys/bus/usb/devices ]]; then
-        for d in /sys/bus/usb/devices/*; do
-            [[ -d "$d" ]] || continue
-            [[ ! -f "$d/idVendor" ]] && continue
-            echo "USB: ${d##*/}" >> "$EXPORT_FILE"
-            if [[ -f "$d/idVendor" ]]; then
-                local v
-                v="$(cat "$d/idVendor" 2>/dev/null || true)"
-                [[ -n "$v" ]] && echo "  Vendor: $v" >> "$EXPORT_FILE"
-            fi
-            if [[ -f "$d/idProduct" ]]; then
-                local pr
-                pr="$(cat "$d/idProduct" 2>/dev/null || true)"
-                [[ -n "$pr" ]] && echo "  Product: $pr" >> "$EXPORT_FILE"
-            fi
-            if [[ -f "$d/product" ]]; then
-                local nm
-                nm="$(cat "$d/product" 2>/dev/null || true)"
-                [[ -n "$nm" ]] && echo "  Name: $nm" >> "$EXPORT_FILE"
-            fi
-        done
-    fi
-    export_end "peripherals_v2.txt"
+    {
+        printf '=============================================================\n'
+        printf 'PERIPHERALS (HWV2)\n'
+        printf '=============================================================\n\n'
+
+        if [[ -d /sys/bus/usb/devices ]]; then
+            local found=0
+            for d in /sys/bus/usb/devices/*; do
+                [[ -d "$d" ]] || continue
+                [[ ! -f "$d/idVendor" ]] && continue
+                found=1
+                printf 'USB: %s\n' "${d##*/}"
+                if [[ -f "$d/idVendor" ]]; then
+                    local v
+                    v="$(< "$d/idVendor" 2>/dev/null)" || v=""
+                    [[ -n "$v" ]] && printf '  Vendor: %s\n' "$v"
+                fi
+                if [[ -f "$d/idProduct" ]]; then
+                    local pr
+                    pr="$(< "$d/idProduct" 2>/dev/null)" || pr=""
+                    [[ -n "$pr" ]] && printf '  Product: %s\n' "$pr"
+                fi
+                if [[ -f "$d/product" ]]; then
+                    local nm
+                    nm="$(< "$d/product" 2>/dev/null)" || nm=""
+                    [[ -n "$nm" ]] && printf '  Name: %s\n' "$nm"
+                fi
+            done
+            [[ "$found" -eq 0 ]] && printf 'No USB peripherals found.\n'
+        else
+            printf 'USB subsystem not available.\n'
+        fi
+    } > "$output_file"
+
+    info "Peripherals v2 exported: peripherals_v2.txt"
 }
