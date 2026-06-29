@@ -274,6 +274,7 @@ tbl_begin() {
         local vlen pad
         visible_len "$name" vlen
         pad=$((width - vlen))
+        [[ $pad -lt 0 ]] && pad=0
         printf ' %s%*s' "$name" "$pad" ""
     done
     printf '%s\n' "$C_RESET"
@@ -304,11 +305,12 @@ tbl_row() {
 
         # Truncate if too long (strip ANSI for truncation, but lose color)
         # Use truncate_str() for character-aware truncation (handles UTF-8 correctly)
-        # ${var:0:N} is byte-index and will corrupt multibyte UTF-8 (box-drawing, emoji, CJK)
         if [[ $vlen -gt $width ]]; then
             local clean truncated
             strip_ansi "$val" clean
-            truncate_str "$clean" $((width-3)) truncated
+            local trunc_len=$((width - 3))
+            [[ $trunc_len -lt 0 ]] && trunc_len=0
+            truncate_str "$clean" $trunc_len truncated
             display_val="${truncated}..."
             vlen=$width
         fi
