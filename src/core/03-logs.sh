@@ -315,11 +315,24 @@ scan_coredumps() {
             # Extract fields relative to PID
             pid = $pid_field
             sig = $(pid_field + 3)
-            exe_field = pid_field + 4
-            if ($(exe_field) ~ /^\/|^\.\/|^[a-zA-Z]/) {
-                exe = $(exe_field)
-            } else {
-                exe = $(exe_field + 1)
+
+            # Find the exe field (it usually starts with / or ./)
+            exe = ""
+            for(k=pid_field+4; k<=NF; k++) {
+                if ($k ~ /^\// || $k ~ /^\.\//) {
+                    exe = $k
+                    break
+                }
+            }
+
+            # Fallback if no absolute path found
+            if (exe == "") {
+                # If the last field is a size (e.g., 1.2M), exe is the second to last
+                if ($NF ~ /^[0-9]+(\.[0-9]+)?[KMGTP]?$/) {
+                    exe = $(NF-1)
+                } else {
+                    exe = $NF
+                }
             }
 
             # Build time from all fields before PID
