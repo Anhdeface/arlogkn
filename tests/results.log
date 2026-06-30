@@ -1,7 +1,7 @@
 9 9 0 04-exports.sh (CLI Arguments)
 6 6 0 02-hardware.sh (Driver Sub-modules)
 11 11 0 04-exports.sh (Disk Space & Export Init)
-7 7 0 02-hardware.sh (Data Accuracy & Mocking)
+11 11 0 02-hardware.sh (Data Accuracy & Mocking)
 4 4 0 plugin-hw-deep.sh (HWV2 Exports)
 12 12 0 03-logs.sh (Log Parsing & Clustering)
 7 7 0 01-utils.sh (Table Drawing)

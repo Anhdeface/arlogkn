@@ -87,6 +87,163 @@ detect_system_info() {
 # - True internet check requires ARLOGKN_CHECK_EXTERNAL=1 (opt-in)
 #
 # Better name would be detect_network_status(), but keeping for backward compat.
+_is_private_ipv4() {
+    local ip="$1"
+
+    [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
+
+    local o1=$((10#${BASH_REMATCH[1]}))
+    local o2=$((10#${BASH_REMATCH[2]}))
+    local o3=$((10#${BASH_REMATCH[3]}))
+    local o4=$((10#${BASH_REMATCH[4]}))
+
+    if (( o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255 )); then
+        return 0
+    fi
+
+    (( o1 == 0 )) && return 0
+    (( o1 == 10 )) && return 0
+    (( o1 == 127 )) && return 0
+    (( o1 == 169 && o2 == 254 )) && return 0
+    (( o1 == 172 && o2 >= 16 && o2 <= 31 )) && return 0
+    (( o1 == 192 && o2 == 168 )) && return 0
+    (( o1 == 100 && o2 >= 64 && o2 <= 127 )) && return 0
+    (( o1 == 198 && (o2 == 18 || o2 == 19) )) && return 0
+    (( o1 >= 224 )) && return 0
+
+    return 1
+}
+
+_is_private_ipv6() {
+    local ip="${1#[}"
+    ip="${ip%]}"
+    ip="${ip,,}"
+
+    [[ "$ip" == "::" || "$ip" == "::1" ]] && return 0
+    [[ "$ip" == fc* || "$ip" == fd* ]] && return 0
+    [[ "$ip" =~ ^fe[89ab] ]] && return 0
+    [[ "$ip" == ::ffff:* ]] && _is_private_ipv4 "${ip##*:}" && return 0
+
+    return 1
+}
+
+_warn_if_available() {
+    if [[ "$(type -t warn)" == "function" ]]; then
+        warn "$1"
+    fi
+}
+
+_validate_external_test_url() {
+    local requested_url="$1"
+    local url_var="$2"
+    local resolve_var="$3"
+    local default_url="https://clients3.google.com/generate_204"
+
+    printf -v "$url_var" '%s' "$default_url"
+    printf -v "$resolve_var" ''
+
+    if [[ -z "$requested_url" ]]; then
+        return 1
+    fi
+
+    if [[ ! "$requested_url" == https://* ]]; then
+        _warn_if_available "ARLOGKN_TEST_URL: invalid scheme (must be https://), using default"
+        return 1
+    fi
+
+    local rest="${requested_url#https://}"
+    local authority="${rest%%[/?#]*}"
+    if [[ -z "$authority" || "$authority" == *"@"* ]]; then
+        _warn_if_available "ARLOGKN_TEST_URL: invalid host, using default"
+        return 1
+    fi
+
+    local host port="443"
+    if [[ "$authority" == \[*\]* ]]; then
+        host="${authority%%]*}"
+        host="${host#[}"
+        local after_bracket="${authority#*\]}"
+        if [[ -n "$after_bracket" ]]; then
+            [[ "$after_bracket" == :* ]] || {
+                _warn_if_available "ARLOGKN_TEST_URL: invalid IPv6 host syntax, using default"
+                return 1
+            }
+            port="${after_bracket#:}"
+        fi
+    else
+        if [[ "$authority" == *:*:* ]]; then
+            _warn_if_available "ARLOGKN_TEST_URL: invalid IPv6 host syntax, using default"
+            return 1
+        elif [[ "$authority" == *:* ]]; then
+            host="${authority%%:*}"
+            port="${authority##*:}"
+        else
+            host="$authority"
+        fi
+    fi
+
+    host="${host%.}"
+    local host_lc="${host,,}"
+    if [[ -z "$host_lc" || ! "$port" =~ ^[0-9]+$ || "$port" -lt 1 || "$port" -gt 65535 ]]; then
+        _warn_if_available "ARLOGKN_TEST_URL: invalid host or port, using default"
+        return 1
+    fi
+
+    case "$host_lc" in
+        localhost|*.localhost|*.local)
+            _warn_if_available "ARLOGKN_TEST_URL: blocked local hostname, using default"
+            return 1
+            ;;
+    esac
+
+    if [[ "$host_lc" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        if _is_private_ipv4 "$host_lc"; then
+            _warn_if_available "ARLOGKN_TEST_URL: blocked private/internal endpoint, using default"
+            return 1
+        fi
+        printf -v "$url_var" '%s' "$requested_url"
+        return 0
+    fi
+
+    if [[ "$host_lc" == *:* ]]; then
+        if _is_private_ipv6 "$host_lc"; then
+            _warn_if_available "ARLOGKN_TEST_URL: blocked private/internal endpoint, using default"
+            return 1
+        fi
+        printf -v "$url_var" '%s' "$requested_url"
+        return 0
+    fi
+
+    if ! command -v getent &>/dev/null; then
+        _warn_if_available "ARLOGKN_TEST_URL: cannot validate hostname without getent, using default"
+        return 1
+    fi
+
+    local -a resolved_ips=()
+    mapfile -t resolved_ips < <(getent ahosts "$host_lc" 2>/dev/null | awk '!seen[$1]++ {print $1}')
+    if [[ ${#resolved_ips[@]} -eq 0 ]]; then
+        _warn_if_available "ARLOGKN_TEST_URL: hostname did not resolve, using default"
+        return 1
+    fi
+
+    local ip first_public_ip=""
+    for ip in "${resolved_ips[@]}"; do
+        if _is_private_ipv4 "$ip" || _is_private_ipv6 "$ip"; then
+            _warn_if_available "ARLOGKN_TEST_URL: hostname resolves to private/internal address, using default"
+            return 1
+        fi
+        [[ -z "$first_public_ip" ]] && first_public_ip="$ip"
+    done
+
+    printf -v "$url_var" '%s' "$requested_url"
+    if [[ "$first_public_ip" == *:* ]]; then
+        printf -v "$resolve_var" '%s:%s:[%s]' "$host_lc" "$port" "$first_public_ip"
+    else
+        printf -v "$resolve_var" '%s:%s:%s' "$host_lc" "$port" "$first_public_ip"
+    fi
+    return 0
+}
+
 detect_network_status() {
     # Network status check — local methods first, external only if enabled
     # routable IP ≠ internet connectivity (VPN, isolated namespace, etc.)
@@ -179,30 +336,17 @@ detect_network_status() {
             fi
         fi
 
-        # Fallback to HTTP check with configurable endpoint
-        # Security: Validate URL scheme and host to prevent SSRF attacks
-        # Only allow https:// scheme with safe, public endpoints
+        # Fallback to HTTP check with configurable endpoint.
+        # Security: validate and DNS-pin custom endpoints to prevent SSRF.
         local test_url="${ARLOGKN_TEST_URL:-https://clients3.google.com/generate_204}"
-        
-        # Validate URL format: must start with https:// (no file://, gopher://, http://, etc.)
-        # Prevents: SSRF via malicious ARLOGKN_TEST_URL, internal network probing
-        if [[ ! "$test_url" =~ ^https:// ]]; then
-            warn "ARLOGKN_TEST_URL: invalid scheme (must be https://), using default"
-            test_url="https://clients3.google.com/generate_204"
-        fi
-        
-        # Block private/internal IP ranges to prevent internal network probing
-        # Exclude: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x, 0.0.0.0, localhost, ::1, [::1], [::]
-        # Exclude IPv6 ULA (fc00::/7) and Link-Local (fe80::/10)
-        if [[ "$test_url" =~ https://(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|169\.254\.|0\.0\.0\.0|localhost|::1|\[::1\]|\[::\]|\[?[fF][cCdD][0-9a-fA-F]*:|\[?[fF][eE][89aAbB][0-9a-fA-F]*:) ]]; then
-            warn "ARLOGKN_TEST_URL: blocked private/internal endpoint, using default"
-            test_url="https://clients3.google.com/generate_204"
-        fi
+        local curl_resolve=""
+        _validate_external_test_url "$test_url" test_url curl_resolve || true
 
         if command -v curl &>/dev/null; then
             local http_code
-            http_code="$(curl -s --head --connect-timeout 2 --max-time 3 \
-                 -o /dev/null -w '%{http_code}' "$test_url" 2>/dev/null)"
+            local -a curl_args=(-s --head --connect-timeout 2 --max-time 3 -o /dev/null -w '%{http_code}')
+            [[ -n "$curl_resolve" ]] && curl_args+=(--resolve "$curl_resolve")
+            http_code="$(curl "${curl_args[@]}" "$test_url" 2>/dev/null)"
             # Accept 2xx (success) or 204 (captive portal check)
             if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
                 INTERNET_STATUS="connected"
