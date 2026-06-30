@@ -9,8 +9,8 @@ detect_distro() {
         # Parse ID and ID_LIKE from os-release
         # -m1: only first match (avoid multi-line edge case)
         # -f2-: keep rest of line if value contains '='
-        id="$(grep -m1 '^ID=' /etc/os-release | cut -d'=' -f2- | tr -d '"')"
-        variant="$(grep -m1 '^ID_LIKE=' /etc/os-release | cut -d'=' -f2- | tr -d '"')"
+        id="$(grep -m1 '^ID=' /etc/os-release | cut -d'=' -f2- | tr -d '"')" || id="unknown"
+        variant="$(grep -m1 '^ID_LIKE=' /etc/os-release | cut -d'=' -f2- | tr -d '"')" || variant=""
     elif [[ -f /etc/arch-release ]]; then
         id="arch"
     else

@@ -39,6 +39,22 @@ test_detect_distro_arch() {
 }
 run_test "detect_distro identifies Arch Linux via grep mock" test_detect_distro_arch
 
+test_detect_distro_missing_id_like() {
+    mock_command grep '
+        if [[ "$*" == *"^ID="* ]]; then echo "ID=arch"; return 0; fi
+        if [[ "$*" == *"^ID_LIKE="* ]]; then return 1; fi
+        command grep "$@"
+    '
+
+    detect_distro
+
+    if [[ -f /etc/os-release ]]; then
+        [[ "$DISTRO_NAME" == "Arch Linux" ]] || { echo "Expected Arch Linux, got $DISTRO_NAME"; exit 1; }
+        [[ "$DISTRO_TYPE" == "Pure Arch" ]] || { echo "Expected Pure Arch, got $DISTRO_TYPE"; exit 1; }
+    fi
+}
+run_test "detect_distro treats missing ID_LIKE as optional" test_detect_distro_missing_id_like
+
 test_detect_distro_cachyos() {
     mock_command grep '
         if [[ "$*" == *"^ID="* ]]; then echo "ID=cachyos"; return 0; fi
