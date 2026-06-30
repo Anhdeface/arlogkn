@@ -226,6 +226,19 @@ detect_network_status() {
 # Callers should check $INTERNET_STATUS instead of return code.
 check_internet() { detect_network_status "$@" || true; }
 
+_detect_gpu_lspci() {
+    local lspci_output="$1"
+
+    printf '%s\n' "$lspci_output" | awk '
+        tolower($0) ~ /vga|3d|display/ {
+            sub(/^[^:]*:[^:]*:/, "")
+            sub(/^[[:space:]]+/, "")
+            print
+            exit
+        }
+    '
+}
+
 detect_gpu() {
     # GPU detection - try /sys filesystem first
     local gpu_names=()
@@ -295,7 +308,7 @@ detect_gpu() {
     if [[ -z "$GPU_INFO" ]] && command -v lspci &>/dev/null; then
         local lspci_output
         lspci_output="$(_get_lspci)"
-        GPU_INFO="$(printf '%s\n' "$lspci_output" | grep -iE 'vga|3d|display' | head -1 | cut -d':' -f3- | sed 's/^ *//')"
+        GPU_INFO="$(_detect_gpu_lspci "$lspci_output")"
     fi
 
     # Final fallback to lshw (with timeout to prevent hang)
@@ -1498,8 +1511,8 @@ scan_vga_info() {
         # Use -B (brief) flag: -s does not exist and causes silent failure
         local glx_output glx_vendor glx_renderer
         glx_output="$(glxinfo -B 2>/dev/null)" || glx_output=""
-        glx_vendor="$(printf '%s\n' "$glx_output" | grep 'OpenGL vendor' | cut -d':' -f2 | sed 's/^ *//')"
-        glx_renderer="$(printf '%s\n' "$glx_output" | grep 'OpenGL renderer' | cut -d':' -f2 | sed 's/^ *//')"
+        glx_vendor="$(printf '%s\n' "$glx_output" | awk -F': *' '/OpenGL vendor/ {print $2; exit}')"
+        glx_renderer="$(printf '%s\n' "$glx_output" | awk -F': *' '/OpenGL renderer/ {print $2; exit}')"
         
         [[ -n "$glx_vendor" ]] && draw_box_line "${C_BOLD}OpenGL Vendor:${C_RESET} ${C_CYAN}${glx_vendor}${C_RESET}"
         [[ -n "$glx_renderer" ]] && draw_box_line "${C_BOLD}OpenGL Renderer:${C_RESET} ${C_CYAN}${glx_renderer}${C_RESET}"

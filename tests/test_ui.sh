@@ -68,4 +68,14 @@ test_draw_info_box_format() {
 }
 run_test "draw_info_box correctly formats key-value pair" test_draw_info_box_format
 
+# ─── scan_vga_info() ──────────────────────────────────────────────────────────
+test_scan_vga_info_missing_glx_fields() {
+    GPU_INFO="Unknown"
+    DISPLAY_INFO="No display detected"
+    mock_command glxinfo 'printf "%s\n" "name of display: :0"'
+
+    scan_vga_info >/dev/null
+}
+run_test "scan_vga_info tolerates glxinfo output without OpenGL fields" test_scan_vga_info_missing_glx_fields
+
 suite_end

@@ -19,6 +19,15 @@ test_detect_system_info() {
 }
 run_test "detect_system_info parses kernel and governor" test_detect_system_info
 
+# ─── _detect_gpu_lspci() ─────────────────────────────────────────────────────
+test_detect_gpu_lspci_empty_output() {
+    local result
+    result="$(_detect_gpu_lspci "")"
+
+    [[ -z "$result" ]] || { echo "Expected empty result, got $result"; exit 1; }
+}
+run_test "_detect_gpu_lspci handles empty lspci output without aborting" test_detect_gpu_lspci_empty_output
+
 # ─── detect_distro() ──────────────────────────────────────────────────────────
 test_detect_distro_arch() {
     # If /etc/os-release exists on host, it will use grep. We mock grep.
