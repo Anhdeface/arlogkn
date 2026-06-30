@@ -1,8 +1,19 @@
 # arlogkn Commit Log
 
-Generated: 2026-06-27
+Generated: 2026-06-30
 
 ---
+7a5e48c 2026-06-30 fix(core): preserve nullglob state in scan and export paths
+76d12db 2026-06-30 fix(export): restore traps on export_all_logs early failures
+cd3dbf5 2026-06-30 fix(gpu): tolerate missing optional display fields
+78d63a3 2026-06-30 fix(detection): treat missing os-release ID_LIKE as optional
+4ea7389 2026-06-29 fix(export): align hwv2 export path with core writer pattern
+1fb7d7c 2026-06-29 fix(wiki): remove executable title text from wiki handlers
+beb8617 2026-06-29 fix(logs): rewrite coredump parsing heuristic for legacy systemd fallback
+509245c 2026-06-29 Fix(utils): Prevent negative padding and truncation overflows in table builder
+ee5585b 2026-06-28 Refactor: Modularize Wiki architecture via Key-based Routing
+c03f2c1 2026-06-28 feat(core): implement robust modular HWv2 detection with sysfs parsing
+9c19775 2026-06-27 docs: update log.txt with latest commits
 f2de04e 2026-06-26 test(core): overhaul unit test system for plugin-based architecture
 d4b1b21 2026-06-26 Update version number in README
 ac0252e 2026-06-26 refactor(core): migrate to plugin-based modular architecture and bump version to 1.1
