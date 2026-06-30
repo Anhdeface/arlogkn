@@ -51,6 +51,16 @@ test_tbl_row_truncation() {
 }
 run_test "tbl_row truncates extremely long values" test_tbl_row_truncation
 
+test_tbl_row_rejects_missing_tbl_begin() {
+    _TBL_DEPTH=-1; _TBL_WIDTH_STACK=(); _TBL_COLS_STACK=(); _TBL_COLS_PTR_STACK=(); _TBL_NUMCOLS_STACK=()
+
+    if tbl_row "orphan" >/dev/null 2>/dev/null; then
+        echo "tbl_row should reject calls without an active table"
+        exit 1
+    fi
+}
+run_test "tbl_row rejects calls without an active table" test_tbl_row_rejects_missing_tbl_begin
+
 # ─── tbl_end() ────────────────────────────────────────────────────────────────
 test_tbl_end_runs() {
     _TBL_DEPTH=0; _TBL_WIDTH_STACK=(50); _TBL_COLS_PTR_STACK=(0); _TBL_NUMCOLS_STACK=(1)

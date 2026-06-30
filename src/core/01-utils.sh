@@ -288,6 +288,18 @@ tbl_begin() {
 # Draw a table row
 # Usage: tbl_row "val1" "val2" "val3" ...
 tbl_row() {
+    # Guard: prevent bad array subscripts under set -u if callers emit rows
+    # without first opening a table.
+    if (( _TBL_DEPTH < 0 )); then
+        warn "tbl_row() called without matching tbl_begin() — table stack underflow prevented"
+        return 1
+    fi
+
+    if [[ -z "${_TBL_COLS_PTR_STACK[$_TBL_DEPTH]+x}" || -z "${_TBL_NUMCOLS_STACK[$_TBL_DEPTH]+x}" ]]; then
+        warn "tbl_row() called with corrupt table stack state"
+        return 1
+    fi
+
     local -a vals=("$@")
     local start_idx=${_TBL_COLS_PTR_STACK[$_TBL_DEPTH]}
     local num_cols=${_TBL_NUMCOLS_STACK[$_TBL_DEPTH]}
