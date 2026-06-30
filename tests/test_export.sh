@@ -116,4 +116,27 @@ test_export_trap_sigterm() {
 }
 run_test "export cleanup trap works on SIGTERM" test_export_trap_sigterm
 
+test_export_all_logs_restores_trap_on_mktemp_failure() {
+    OUTPUT_DIR="$TEST_TMPDIR/export_all_failure"
+    mkdir -p "$OUTPUT_DIR"
+
+    trap 'printf caller_exit >/dev/null' EXIT
+    mktemp() { return 1; }
+
+    if ( export_all_logs >/dev/null 2>&1 ); then
+        echo "export_all_logs should fail when mktemp fails"
+        exit 1
+    fi
+
+    local trap_after
+    trap_after="$(trap -p EXIT)"
+    [[ "$trap_after" == *"caller_exit"* ]] || {
+        echo "EXIT trap was not restored: $trap_after"
+        exit 1
+    }
+
+    trap - EXIT
+}
+run_test "export_all_logs restores caller trap when mktemp fails" test_export_all_logs_restores_trap_on_mktemp_failure
+
 suite_end

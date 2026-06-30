@@ -718,14 +718,11 @@ declare -g _EXPORT_CLEANUP_OLD_EXIT=""
 declare -g _EXPORT_CLEANUP_OLD_INT=""
 declare -g _EXPORT_CLEANUP_OLD_TERM=""
 
-# Cleanup handler for export_all_logs
-# Restores caller's traps and cleans up temp file
-# Called via EXIT/INT/TERM traps OR directly on success
-# Usage: _export_cleanup [keep_temp_file]
+# Restore caller's traps and clean up export temp file.
+# Usage: _export_restore_cleanup_state [keep_temp_file]
 #   keep_temp_file=0 (default): delete temp file (error/interrupt path)
 #   keep_temp_file=1: preserve temp file (success path, already moved)
-_export_cleanup() {
-    local exit_code=$?
+_export_restore_cleanup_state() {
     local keep_temp_file="${1:-0}"
 
     # Restore caller's traps first (before any other operations)
@@ -752,13 +749,13 @@ _export_cleanup() {
     if [[ "$keep_temp_file" -eq 0 && -n "${_EXPORT_CLEANUP_TEMP_FILE:-}" && -f "${_EXPORT_CLEANUP_TEMP_FILE}" ]]; then
         rm -f "$_EXPORT_CLEANUP_TEMP_FILE" 2>/dev/null
     fi
+}
 
-    # If called manually (success), return. If called via trap (error/interrupt), exit.
-    if [[ "$keep_temp_file" -eq 1 ]]; then
-        return "$exit_code"
-    else
-        exit "$exit_code"
-    fi
+# Cleanup handler for export_all_logs when invoked by EXIT/INT/TERM traps.
+_export_cleanup() {
+    local exit_code=$?
+    _export_restore_cleanup_state 0
+    exit "$exit_code"
 }
 
 export_all_logs() {
@@ -787,6 +784,7 @@ export_all_logs() {
     # Create temp file and store in global variable for cleanup handler
     _EXPORT_CLEANUP_TEMP_FILE="$(mktemp)" || {
         warn "Failed to create temp file (disk full or /tmp unavailable)"
+        _export_restore_cleanup_state 0
         return 1
     }
 
@@ -1056,19 +1054,19 @@ export_all_logs() {
     # Validate temp file before moving (detect partial writes)
     if [[ ! -s "$_EXPORT_CLEANUP_TEMP_FILE" ]]; then
         warn "Temp file is empty (possible write failure): $_EXPORT_CLEANUP_TEMP_FILE"
-        # _export_cleanup EXIT trap will restore traps and clean up temp_file
+        _export_restore_cleanup_state 0
         return 1
     fi
 
     # Move temp file to final location
     if ! mv "$_EXPORT_CLEANUP_TEMP_FILE" "$output_file"; then
         warn "Failed to move temp file to $output_file"
-        # _export_cleanup EXIT trap will restore traps and clean up temp_file
+        _export_restore_cleanup_state 0
         return 1
     fi
 
-    # SUCCESS: Call _export_cleanup to restore traps (preserve temp file since it was moved)
-    _export_cleanup 1
+    # SUCCESS: Restore caller traps (temp file was moved to final output path)
+    _export_restore_cleanup_state 1
 
     info "All logs exported to: ${output_file}"
 }
