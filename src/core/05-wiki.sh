@@ -310,6 +310,70 @@ suggest_wiki_groups() {
     suggest_wiki_groups_awk "$1"
 }
 
+_wiki_group_label_for_index() {
+    local group_idx="$1"
+    local group_name="${WIKI_GROUP_NAMES[$group_idx]:-}"
+
+    if [[ -n "$group_name" ]]; then
+        printf '%s' "${group_name%% *}"
+    else
+        printf '%s' "${WIKI_GROUP_KEYS[$group_idx]:-}"
+    fi
+}
+
+_wiki_group_description_for_index() {
+    local group_idx="$1"
+    printf '%s' "${WIKI_GROUP_NAMES[$group_idx]:-}"
+}
+# shellcheck disable=SC2120
+_wiki_keyword_examples() {
+    local max_items="${1:-4}"
+    local i count=0 label examples=""
+
+    for ((i = 0; i < ${#WIKI_GROUP_NAMES[@]} && count < max_items; i++)); do
+        label="$(_wiki_group_label_for_index "$i")"
+        [[ -z "$label" ]] && continue
+
+        if [[ -z "$examples" ]]; then
+            examples="'$label'"
+        else
+            examples+=", '$label'"
+        fi
+        count=$((count + 1))
+    done
+
+    printf '%s' "$examples"
+}
+# shellcheck disable=SC2120
+_wiki_format_group_list() {
+    local max_width="${1:-76}"
+    local indent="    "
+    local line="" chunk label i
+    local group_count="${#WIKI_GROUP_NAMES[@]}"
+
+    for ((i = 0; i < group_count; i++)); do
+        label="$(_wiki_group_label_for_index "$i")"
+        [[ -z "$label" ]] && continue
+
+        if (( i < group_count - 1 )); then
+            chunk="${label},"
+        else
+            chunk="$label"
+        fi
+
+        if [[ -z "$line" ]]; then
+            line="${indent}${chunk}"
+        elif (( ${#line} + 1 + ${#chunk} > max_width )); then
+            printf '%s\n' "$line"
+            line="${indent}${chunk}"
+        else
+            line+=" ${chunk}"
+        fi
+    done
+
+    [[ -n "$line" ]] && printf '%s\n' "$line"
+}
+
 # Display a single wiki group by index (0-based)
 show_wiki_group() {
     local group_idx="$1"
@@ -360,7 +424,7 @@ show_wiki() {
         local normalized_group
         normalized_group="$(printf '%s\n' "$WIKI_GROUP" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
-        # Check if numeric index (1-20) - direct lookup
+        # Check if numeric index - direct lookup
         if [[ "$normalized_group" =~ ^[0-9]+$ ]]; then
             local group_idx=$((normalized_group - 1))
             if [[ "$group_idx" -ge 0 && "$group_idx" -lt "${#WIKI_GROUP_NAMES[@]}" ]]; then
@@ -399,25 +463,17 @@ show_wiki() {
                     draw_box_line "  ${C_CYAN}--wiki ${cmd}${C_RESET} - Matches: ${desc}"
                 done
                 printf '\n'
-                draw_box_line "${C_CYAN}Tip: Use keywords like 'pacman', 'sound', 'gpu', 'boot', etc.${C_RESET}"
+                draw_box_line "${C_CYAN}Tip: Use keywords like $(_wiki_keyword_examples), etc.${C_RESET}"
             else
-                draw_box_line "${C_CYAN}Available groups: 1-20 or keywords${C_RESET}"
+                draw_box_line "${C_CYAN}Available groups: 1-${#WIKI_GROUP_NAMES[@]} or keywords${C_RESET}"
                 draw_box_line "${C_CYAN}Examples:${C_RESET}"
                 printf '\n'
-                draw_box_line "  ${C_BOLD}--wiki pacman${C_RESET}           - Package management"
-                draw_box_line "  ${C_BOLD}--wiki aur${C_RESET}              - AUR helpers"
-                draw_box_line "  ${C_BOLD}--wiki system${C_RESET}           - System information"
-                draw_box_line "  ${C_BOLD}--wiki process${C_RESET}          - Process & services"
-                draw_box_line "  ${C_BOLD}--wiki hardware${C_RESET}         - Hardware detection"
-                draw_box_line "  ${C_BOLD}--wiki disk${C_RESET}             - Disk & filesystem"
-                draw_box_line "  ${C_BOLD}--wiki network${C_RESET}          - Network diagnostics"
-                draw_box_line "  ${C_BOLD}--wiki sound${C_RESET}            - Sound & audio"
-                draw_box_line "  ${C_BOLD}--wiki graphics${C_RESET}         - Graphics & display"
-                draw_box_line "  ${C_BOLD}--wiki boot${C_RESET}             - Boot & startup"
-                draw_box_line "  ${C_BOLD}--wiki memory${C_RESET}           - Memory & swap"
-                draw_box_line "  ${C_BOLD}--wiki systemd${C_RESET}          - Systemd journal"
-                draw_box_line "  ${C_BOLD}--wiki troubleshooting${C_RESET}  - Troubleshooting"
-                draw_box_line "  ${C_BOLD}--wiki emergency${C_RESET}        - Emergency & recovery"
+                local i label desc
+                for ((i = 0; i < ${#WIKI_GROUP_NAMES[@]}; i++)); do
+                    label="$(_wiki_group_label_for_index "$i")"
+                    desc="$(_wiki_group_description_for_index "$i")"
+                    draw_box_line "  ${C_BOLD}--wiki ${label}${C_RESET} - ${desc}"
+                done
             fi
 
             printf '\n'
@@ -425,8 +481,8 @@ show_wiki() {
         fi
     fi
 
-    # No group specified - show all 20 groups by calling show_wiki_group for each
-    # Cache terminal width once to avoid 20 tput forks
+    # No group specified - show all registered groups by calling show_wiki_group for each.
+    # Cache terminal width once to avoid repeated tput forks.
     local cached_width i
     cached_width="$(tput cols 2>/dev/null)" || cached_width=80
     for ((i = 0; i < ${#WIKI_GROUP_NAMES[@]}; i++)); do
@@ -478,9 +534,7 @@ ${C_CYAN}EXAMPLES:${C_RESET}
     ${SCRIPT_NAME} --save-all --system # System scan + export to single file
 
 ${C_CYAN}WIKI GROUPS:${C_RESET}
-    pacman, aur, system, process, hardware, disk, network, user, logs,
-    arch, performance, backup, troubleshooting, boot, memory, graphics,
-    sound, systemd, file, emergency
+$(_wiki_format_group_list)
 
 ${C_CYAN}NOTES:${C_RESET}
     - Read-only: No system modifications

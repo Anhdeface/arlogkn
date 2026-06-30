@@ -9,6 +9,22 @@ source "$(dirname "${BASH_SOURCE[0]}")/../src/core/04-exports.sh"
 
 suite_begin "04-exports.sh (Disk Space & Export Init)"
 
+setup_export_all_context() {
+    trap - EXIT
+
+    OUTPUT_DIR="$TEST_TMPDIR/$1"
+    mkdir -p "$OUTPUT_DIR"
+
+    DISTRO_NAME="TestOS"
+    DISTRO_TYPE="Generic"
+    KERNEL_VER="test-kernel"
+    CPU_GOVERNOR="test"
+    BOOT_OFFSET=0
+    GPU_INFO="Test GPU"
+    DISPLAY_INFO="Test display"
+    INTERNET_STATUS="unknown"
+}
+
 # ─── check_disk_space() ───────────────────────────────────────────────────────
 test_disk_space_pass() {
     mock_command df '
@@ -138,6 +154,53 @@ test_export_all_logs_restores_trap_on_mktemp_failure() {
     trap - EXIT
 }
 run_test "export_all_logs restores caller trap when mktemp fails" test_export_all_logs_restores_trap_on_mktemp_failure
+
+test_export_all_logs_omits_pacman_without_plugin_hook() {
+    setup_export_all_context "export_all_no_pacman"
+
+    export_all_logs >/dev/null
+
+    local output_file="${OUTPUT_DIR}/arch-log-inspector-all.txt"
+    [[ -f "$output_file" ]] || { echo "Missing export file: $output_file"; exit 1; }
+
+    ! grep -q "PACMAN LOGS" "$output_file" || { echo "Unexpected pacman section without plugin hook"; exit 1; }
+    grep -q "\[6\] MOUNTED FILESYSTEMS" "$output_file" || { echo "Mounted filesystems section was not renumbered"; exit 1; }
+}
+run_test "export_all_logs omits pacman section without plugin hook" test_export_all_logs_omits_pacman_without_plugin_hook
+
+test_export_all_logs_includes_pacman_plugin_hook() {
+    setup_export_all_context "export_all_with_pacman"
+
+    export_pacman_logs_content() {
+        printf 'plugin pacman content\n'
+    }
+
+    export_all_logs >/dev/null
+
+    local output_file="${OUTPUT_DIR}/arch-log-inspector-all.txt"
+    [[ -f "$output_file" ]] || { echo "Missing export file: $output_file"; exit 1; }
+
+    grep -q "\[6\] PACMAN LOGS" "$output_file" || { echo "Missing pacman section from plugin hook"; exit 1; }
+    grep -q "plugin pacman content" "$output_file" || { echo "Missing plugin pacman content"; exit 1; }
+    grep -q "\[7\] MOUNTED FILESYSTEMS" "$output_file" || { echo "Mounted filesystems section was not shifted after pacman"; exit 1; }
+}
+run_test "export_all_logs includes pacman section from plugin hook" test_export_all_logs_includes_pacman_plugin_hook
+
+test_plugin_pacman_content_skips_non_arch() {
+    source "$(dirname "${BASH_SOURCE[0]}")/../src/plugins/arch/plugin-pacman.sh"
+
+    DISTRO_NAME="Ubuntu"
+    DISTRO_TYPE="Generic"
+
+    local output
+    output="$(export_pacman_logs_content)"
+
+    [[ "$output" == *"Skipping pacman export (non-Arch system)"* ]] || {
+        echo "Expected non-Arch pacman export to skip, got: $output"
+        exit 1
+    }
+}
+run_test "plugin pacman content skips non-Arch systems" test_plugin_pacman_content_skips_non_arch
 
 test_export_network_content_preserves_nullglob() {
     shopt -s nullglob

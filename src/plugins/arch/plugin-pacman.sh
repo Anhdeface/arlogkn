@@ -4,8 +4,7 @@ scan_pacman_logs() {
 
     # Early check: pacman is Arch-specific. Skip gracefully on non-Arch systems.
     # This prevents confusing "log not found" messages on Ubuntu, Fedora, etc.
-    if [[ "$DISTRO_TYPE" != "Arch-based" && "$DISTRO_TYPE" != "Performance Tuned" && \
-          "$DISTRO_NAME" != *"Arch"* && "$DISTRO_NAME" != *"CachyOS"* ]]; then
+    if ! _pacman_is_arch_like; then
         draw_box_line "${C_YELLOW}Skipping pacman scan (non-Arch system)${C_RESET}"
         draw_box_line "${C_BLUE}Note: pacman is the package manager for Arch Linux${C_RESET}"
         return 0
@@ -54,26 +53,23 @@ scan_pacman_logs() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-export_pacman_logs() {
-    # Guard: validate OUTPUT_DIR
-    if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
-        warn "export_pacman_logs: OUTPUT_DIR not set or invalid"
-        return 1
-    fi
+_pacman_is_arch_like() {
+    [[ "$DISTRO_TYPE" == "Arch-based" || "$DISTRO_TYPE" == "Performance Tuned" || \
+       "$DISTRO_NAME" == *"Arch"* || "$DISTRO_NAME" == *"CachyOS"* ]]
+}
 
+export_pacman_logs_content() {
     # Early check: pacman is Arch-specific. Skip gracefully on non-Arch systems.
-    if [[ "$DISTRO_TYPE" != "Arch-based" && "$DISTRO_TYPE" != "Performance Tuned" && \
-          "$DISTRO_NAME" != *"Arch"* && "$DISTRO_NAME" != *"CachyOS"* ]]; then
-        printf 'Skipping pacman export (non-Arch system)\n' > "${OUTPUT_DIR}/pacman_errors.txt"
-        info "Pacman export skipped (non-Arch system)"
+    if ! _pacman_is_arch_like; then
+        printf 'Skipping pacman export (non-Arch system)\n'
+        printf 'Note: pacman is the package manager for Arch Linux\n'
         return 0
     fi
 
-    local output_file="${OUTPUT_DIR}/pacman_errors.txt"
     local pacman_log="/var/log/pacman.log"
 
     if [[ ! -f "$pacman_log" ]]; then
-        printf 'Pacman log not found (may require root)\n' > "$output_file"
+        printf 'Pacman log not found (may require root)\n'
         return 0
     fi
 
@@ -81,11 +77,38 @@ export_pacman_logs() {
     issues="$(tail -100 "$pacman_log" 2>/dev/null | grep -iE '(error|warning)' | grep -v '^#')" || true
 
     if [[ -z "$issues" ]]; then
-        printf 'No pacman errors or warnings found in last 100 lines\n' > "$output_file"
+        printf 'No pacman errors or warnings found in last 100 lines\n'
         return 0
     fi
 
-    printf '%s\n' "$issues" > "$output_file"
-    info "Pacman logs exported: pacman_errors.txt"
+    printf '%s\n' "$issues"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+export_pacman_logs() {
+    # Guard: validate OUTPUT_DIR
+    if [[ -z "$OUTPUT_DIR" || ! -d "$OUTPUT_DIR" ]]; then
+        warn "export_pacman_logs: OUTPUT_DIR not set or invalid"
+        return 1
+    fi
+
+    local output_file="${OUTPUT_DIR}/pacman_errors.txt"
+
+    if ! export_pacman_logs_content > "$output_file"; then
+        warn "export_pacman_logs: failed to write pacman_errors.txt"
+        return 1
+    fi
+
+    if ! _pacman_is_arch_like; then
+        info "Pacman export skipped (non-Arch system)"
+        return 0
+    fi
+
+    case "$(<"$output_file")" in
+        "Pacman log not found"*|"No pacman errors or warnings found"*)
+            return 0
+            ;;
+    esac
+
+    info "Pacman logs exported: pacman_errors.txt"
+}

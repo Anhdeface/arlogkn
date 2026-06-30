@@ -136,4 +136,43 @@ test_show_wiki_group_all_core_handlers_render() {
 }
 run_test "show_wiki_group renders every core wiki handler" test_show_wiki_group_all_core_handlers_render
 
+test_show_help_omits_plugin_groups_until_loaded() {
+    local output
+    output="$(show_help)"
+
+    [[ "$output" == *"system, process, hardware"* ]] || { echo "Core wiki groups missing from help"; exit 1; }
+    [[ "$output" != *"pacman"* ]] || { echo "Help exposed pacman without Arch wiki plugin"; exit 1; }
+    [[ "$output" != *"aur"* ]] || { echo "Help exposed AUR without Arch wiki plugin"; exit 1; }
+}
+run_test "show_help omits plugin wiki groups until loaded" test_show_help_omits_plugin_groups_until_loaded
+
+test_show_help_includes_plugin_groups_when_loaded() {
+    source "$(dirname "${BASH_SOURCE[0]}")/../src/plugins/arch/plugin-wiki.sh"
+
+    local output
+    output="$(show_help)"
+
+    [[ "$output" == *"pacman"* ]] || { echo "Help missing pacman group after plugin load"; exit 1; }
+    [[ "$output" == *"aur"* ]] || { echo "Help missing AUR group after plugin load"; exit 1; }
+    [[ "$output" == *"arch"* ]] || { echo "Help missing arch group after plugin load"; exit 1; }
+}
+run_test "show_help includes plugin wiki groups when loaded" test_show_help_includes_plugin_groups_when_loaded
+
+test_show_wiki_unknown_uses_dynamic_group_count() {
+    WIKI_GROUP="zzzzzzzzz"
+
+    local output
+    output="$(show_wiki)" || true
+
+    [[ "$output" == *"Available groups: 1-${#WIKI_GROUP_NAMES[@]} or keywords"* ]] || {
+        echo "Invalid group help did not use dynamic group count"
+        exit 1
+    }
+    [[ "$output" != *"--wiki pacman"* ]] || {
+        echo "Invalid group help exposed pacman without Arch wiki plugin"
+        exit 1
+    }
+}
+run_test "show_wiki invalid-group help uses dynamic core groups" test_show_wiki_unknown_uses_dynamic_group_count
+
 suite_end

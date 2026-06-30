@@ -767,6 +767,15 @@ _export_cleanup() {
     exit "$exit_code"
 }
 
+_export_all_section_header() {
+    local section_no="$1"
+    local title="$2"
+
+    printf '=============================================================\n'
+    printf '[%d] %s\n' "$section_no" "$title"
+    printf '=============================================================\n'
+}
+
 export_all_logs() {
     local -a boot_args=(-b "$BOOT_OFFSET")
     local driver_link=""
@@ -815,13 +824,13 @@ export_all_logs() {
            journalctl --no-pager -n 0 &>/dev/null; then
             journald_available=1
         fi
+        local section_no=1
 
         # ─────────────────────────────────────────────────────────────────────
         # KERNEL LOGS
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[1] KERNEL LOGS (Priority ≤3 - Errors)\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "KERNEL LOGS (Priority ≤3 - Errors)"
+        section_no=$((section_no + 1))
         local kernel_output
         if [[ "$journald_available" -eq 1 ]]; then
             kernel_output="$(timeout 5 journalctl -k -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -836,9 +845,8 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # BOOT TIMING
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[2] BOOT TIMING (systemd-analyze)\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "BOOT TIMING (systemd-analyze)"
+        section_no=$((section_no + 1))
         if command -v systemd-analyze &>/dev/null; then
             systemd-analyze 2>/dev/null | head -1 || true
             printf '\nTop 15 slowest services:\n'
@@ -850,9 +858,8 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # USER SERVICES
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[3] USER SERVICES\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "USER SERVICES"
+        section_no=$((section_no + 1))
         local service_output
         if [[ "$journald_available" -eq 1 ]]; then
             service_output="$(timeout 5 journalctl -u "*.service" -p 3 -n 500 "${boot_args[@]}" --no-pager 2>/dev/null)" || true
@@ -867,9 +874,8 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # FAILED SERVICES (systemctl --failed)
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[4] FAILED SERVICES (systemctl --failed)\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "FAILED SERVICES (systemctl --failed)"
+        section_no=$((section_no + 1))
         if command -v systemctl &>/dev/null; then
             local failed_svc
             failed_svc="$(systemctl --failed --no-pager 2>/dev/null)" || true
@@ -886,9 +892,8 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # CORE DUMPS
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[5] CORE DUMPS\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "CORE DUMPS"
+        section_no=$((section_no + 1))
         if command -v coredumpctl &>/dev/null; then
             local coredumps
             coredumps="$(coredumpctl list --no-pager --no-legend 2>/dev/null)" || true
@@ -902,40 +907,21 @@ export_all_logs() {
         fi
         printf '\n\n'
 
-        # ─────────────────────────────────────────────────────────────────────
-        # PACMAN LOGS
-        # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[6] PACMAN LOGS (Errors & Warnings)\n'
-        printf '=============================================================\n\n'
-
-        # Check if Arch-based system before attempting to read pacman log
-        if [[ "$DISTRO_TYPE" != "Arch-based" && "$DISTRO_TYPE" != "Performance Tuned" && \
-              "$DISTRO_NAME" != *"Arch"* && "$DISTRO_NAME" != *"CachyOS"* ]]; then
-            printf 'Skipping pacman scan (non-Arch system)\n'
-            printf 'Note: pacman is the package manager for Arch Linux\n\n'
-        else
-            local pacman_log="/var/log/pacman.log"
-            if [[ -f "$pacman_log" ]]; then
-                local pacman_issues
-                pacman_issues="$(tail -100 "$pacman_log" 2>/dev/null | grep -iE '(error|warning)' | grep -v '^#')" || true
-                if [[ -n "$pacman_issues" ]]; then
-                    printf '%s\n' "$pacman_issues"
-                else
-                    printf 'No pacman errors or warnings found in last 100 lines.\n'
-                fi
-            else
-                printf 'Pacman log not found (may require root).\n'
-            fi
+        if [[ "$(type -t export_pacman_logs_content)" == "function" && "${_DISABLE_PLUGINS:-0}" -eq 0 ]]; then
+            # Arch-specific content is provided by the Arch plugin. Core only owns
+            # the single-file export framing.
+            _export_all_section_header "$section_no" "PACMAN LOGS (Errors & Warnings)"
+            section_no=$((section_no + 1))
+            export_pacman_logs_content
+            printf '\n'
         fi
         printf '\n'
 
         # ─────────────────────────────────────────────────────────────────────
         # MOUNTED FILESYSTEMS
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[7] MOUNTED FILESYSTEMS\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "MOUNTED FILESYSTEMS"
+        section_no=$((section_no + 1))
         if [[ -f /proc/mounts ]]; then
             while read -r device mountpt fstype rest; do
                 [[ "$fstype" == "autofs" ]] && continue
@@ -950,18 +936,16 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # DISK USAGE
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[8] DISK USAGE\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "DISK USAGE"
+        section_no=$((section_no + 1))
         df -h 2>/dev/null || true
         printf '\n\n'
 
         # ─────────────────────────────────────────────────────────────────────
         # USB DEVICES
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[9] USB DEVICES\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "USB DEVICES"
+        section_no=$((section_no + 1))
         if command -v lsusb &>/dev/null; then
             # lsusb -v without root prints "Couldn't open device" to stdout
             if [[ $EUID -eq 0 ]]; then
@@ -977,15 +961,14 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # NETWORK INTERFACES
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[10] NETWORK INTERFACES\n'
-        printf '=============================================================\n\n'
+        _export_all_section_header "$section_no" "NETWORK INTERFACES"
+        section_no=$((section_no + 1))
+        printf '\n'
         _export_network_interfaces_content
         printf '\n'
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[11] GPU / VGA INFO\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "GPU / VGA INFO"
+        section_no=$((section_no + 1))
         printf 'Graphics Card: %s\n\n' "${GPU_INFO}"
         printf 'Display: %s\n\n' "${DISPLAY_INFO}"
         if command -v glxinfo &>/dev/null; then
@@ -997,9 +980,8 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # DRIVER STATUS
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[12] DRIVER STATUS\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "DRIVER STATUS"
+        section_no=$((section_no + 1))
         printf 'Loaded Kernel Modules:\n'
         lsmod 2>/dev/null | head -50 || true
         printf '\n\nPCI Devices with Drivers:\n'
@@ -1009,9 +991,8 @@ export_all_logs() {
         # ─────────────────────────────────────────────────────────────────────
         # SYSTEM INFO
         # ─────────────────────────────────────────────────────────────────────
-        printf '=============================================================\n'
-        printf '[13] SYSTEM INFO\n'
-        printf '=============================================================\n'
+        _export_all_section_header "$section_no" "SYSTEM INFO"
+        section_no=$((section_no + 1))
         printf 'Network Status: %s\n' "$INTERNET_STATUS"
         printf 'CPU: %s\n' "$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d':' -f2 | sed 's/^ *//' || echo 'Unknown')"
         printf 'CPU Cores: %s\n' "$(nproc 2>/dev/null || echo '?')"
