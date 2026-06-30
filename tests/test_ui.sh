@@ -78,4 +78,17 @@ test_scan_vga_info_missing_glx_fields() {
 }
 run_test "scan_vga_info tolerates glxinfo output without OpenGL fields" test_scan_vga_info_missing_glx_fields
 
+test_scan_network_interfaces_preserves_nullglob() {
+    shopt -s nullglob
+
+    scan_network_interfaces >/dev/null
+
+    shopt -q nullglob || {
+        echo "scan_network_interfaces disabled caller nullglob"
+        exit 1
+    }
+    shopt -u nullglob
+}
+run_test "scan_network_interfaces preserves caller nullglob state" test_scan_network_interfaces_preserves_nullglob
+
 suite_end

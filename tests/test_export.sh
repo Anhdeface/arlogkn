@@ -139,4 +139,55 @@ test_export_all_logs_restores_trap_on_mktemp_failure() {
 }
 run_test "export_all_logs restores caller trap when mktemp fails" test_export_all_logs_restores_trap_on_mktemp_failure
 
+test_export_network_content_preserves_nullglob() {
+    shopt -s nullglob
+
+    _export_network_interfaces_content >/dev/null
+
+    shopt -q nullglob || {
+        echo "_export_network_interfaces_content disabled caller nullglob"
+        exit 1
+    }
+    shopt -u nullglob
+}
+run_test "_export_network_interfaces_content preserves caller nullglob state" test_export_network_content_preserves_nullglob
+
+test_export_summary_preserves_nullglob() {
+    OUTPUT_DIR="$TEST_TMPDIR/export_summary_nullglob"
+    mkdir -p "$OUTPUT_DIR"
+    printf 'sample\n' > "$OUTPUT_DIR/sample.txt"
+    DISTRO_NAME="TestOS"
+    DISTRO_TYPE="Test"
+    KERNEL_VER="test-kernel"
+    CPU_GOVERNOR="test"
+    BOOT_OFFSET=0
+
+    shopt -s nullglob
+
+    export_summary >/dev/null
+
+    shopt -q nullglob || {
+        echo "export_summary disabled caller nullglob"
+        exit 1
+    }
+    shopt -u nullglob
+}
+run_test "export_summary preserves caller nullglob state" test_export_summary_preserves_nullglob
+
+test_export_drivers_preserves_nullglob() {
+    OUTPUT_DIR="$TEST_TMPDIR/export_drivers_nullglob"
+    mkdir -p "$OUTPUT_DIR"
+
+    shopt -s nullglob
+
+    export_drivers >/dev/null
+
+    shopt -q nullglob || {
+        echo "export_drivers disabled caller nullglob"
+        exit 1
+    }
+    shopt -u nullglob
+}
+run_test "export_drivers preserves caller nullglob state" test_export_drivers_preserves_nullglob
+
 suite_end

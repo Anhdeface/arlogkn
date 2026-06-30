@@ -302,9 +302,16 @@ _export_network_interfaces_content() {
     printf '=============================================================\n\n'
 
     if [[ -d /sys/class/net ]]; then
+        local _ng_was_set=0
+        shopt -q nullglob && _ng_was_set=1
+        local _old_ret_trap
+        _old_ret_trap="$(trap -p RETURN)"
+        shopt -s nullglob
+        # shellcheck disable=SC2064
+        trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
+
         printf '%-16s %-8s %-10s %-20s %s\n' 'Interface' 'State' 'Speed' 'MAC' 'IP'
         printf '%-16s %-8s %-10s %-20s %s\n' '─────────' '─────' '─────' '───' '──'
-        shopt -s nullglob
         for net_path in /sys/class/net/*; do
             [[ ! -d "$net_path" ]] && continue
             local iface_name
@@ -326,15 +333,17 @@ _export_network_interfaces_content() {
             [[ -f "${net_path}/address" ]] && e_mac="$(< "${net_path}/address" 2>/dev/null)" || e_mac="N/A"
             local e_ip="N/A"
             if command -v ip &>/dev/null; then
-                e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-                if [[ -z "$e_ip" ]]; then
-                    e_ip="$(ip -br addr show dev "$iface_name" 2>/dev/null | awk '{print $3}' | grep -oE '[0-9a-fA-F:]{3,39}(/[0-9]+)?' | head -1)"
+                local ip_line=""
+                ip_line="$(ip -br addr show dev "$iface_name" 2>/dev/null)" || ip_line=""
+                if [[ "$ip_line" =~ ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
+                    e_ip="${BASH_REMATCH[1]}"
+                elif [[ "$ip_line" =~ ([0-9a-fA-F:]{3,39}(/[0-9]+)?) ]]; then
+                    e_ip="${BASH_REMATCH[1]}"
                 fi
                 [[ -z "$e_ip" ]] && e_ip="N/A"
             fi
             printf '%-16s %-8s %-10s %-20s %s\n' "$iface_name" "$e_state" "$e_speed" "$e_mac" "$e_ip"
         done
-        shopt -u nullglob
     else
         printf '/sys/class/net not available.\n'
     fi
@@ -389,6 +398,14 @@ export_drivers() {
     local output_file="${OUTPUT_DIR}/drivers.txt"
     local driver_link
 
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
+    shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
+
     {
         printf '=============================================================\n'
         printf 'DRIVER STATUS - COMPREHENSIVE REPORT\n'
@@ -436,7 +453,6 @@ export_drivers() {
         printf '[4] GPU/DRM DRIVERS\n'
         printf '=============================================================\n\n'
         if [[ -d /sys/class/drm ]]; then
-            shopt -s nullglob
             for card in /sys/class/drm/card*; do
                 [[ ! -d "$card" ]] && continue
                 printf 'Device: %s\n' "$(basename "$card")"
@@ -447,7 +463,6 @@ export_drivers() {
                 fi
                 printf '\n'
             done
-            shopt -u nullglob
         else
             printf 'DRM subsystem not available\n'
         fi
@@ -458,7 +473,6 @@ export_drivers() {
         printf '[5] NETWORK DRIVERS\n'
         printf '=============================================================\n\n'
         if [[ -d /sys/class/net ]]; then
-            shopt -s nullglob
             for iface in /sys/class/net/*; do
                 [[ ! -d "$iface" ]] && continue
                 local iface_name
@@ -471,7 +485,6 @@ export_drivers() {
                 fi
                 printf '\n'
             done
-            shopt -u nullglob
         else
             printf 'Network subsystem not available\n'
         fi
@@ -482,7 +495,6 @@ export_drivers() {
         printf '[6] AUDIO DRIVERS\n'
         printf '=============================================================\n\n'
         if [[ -d /sys/class/sound ]]; then
-            shopt -s nullglob
             for sound in /sys/class/sound/*; do
                 [[ ! -d "$sound" ]] && continue
                 printf 'Device: %s\n' "$(basename "$sound")"
@@ -493,7 +505,6 @@ export_drivers() {
                 fi
                 printf '\n'
             done
-            shopt -u nullglob
         else
             printf 'Sound subsystem not available\n'
         fi
@@ -504,7 +515,6 @@ export_drivers() {
         printf '[7] STORAGE DRIVERS\n'
         printf '=============================================================\n\n'
         if [[ -d /sys/block ]]; then
-            shopt -s nullglob
             for block in /sys/block/*; do
                 [[ ! -d "$block" ]] && continue
                 local bname
@@ -517,7 +527,6 @@ export_drivers() {
                 fi
                 printf '\n'
             done
-            shopt -u nullglob
         else
             printf 'Block subsystem not available\n'
         fi
@@ -528,7 +537,6 @@ export_drivers() {
         printf '[8] INPUT/HID DRIVERS\n'
         printf '=============================================================\n\n'
         if [[ -d /sys/class/input ]]; then
-            shopt -s nullglob
             for input in /sys/class/input/*; do
                 [[ ! -d "$input" ]] && continue
                 printf 'Device: %s\n' "$(basename "$input")"
@@ -539,7 +547,6 @@ export_drivers() {
                 fi
                 printf '\n'
             done
-            shopt -u nullglob
         else
             printf 'Input subsystem not available\n'
         fi
@@ -552,14 +559,12 @@ export_drivers() {
         if [[ -d /sys/bus/platform/drivers ]]; then
             # Use glob instead of ls parsing (safe with special chars)
             local count=0
-            shopt -s nullglob
             for d in /sys/bus/platform/drivers/*/; do
                 [[ -d "$d" ]] || continue
                 printf '%s\n' "${d##*/}"
                 count=$((count + 1))
                 [[ "$count" -ge 50 ]] && break
             done
-            shopt -u nullglob
         else
             printf 'Platform bus not available\n'
         fi
@@ -573,7 +578,6 @@ export_drivers() {
             printf 'PCI Drivers indicating virtualization:\n'
             # Use glob instead of ls parsing (safe with special chars)
             local found=0
-            shopt -s nullglob
             for d in /sys/bus/pci/drivers/*/; do
                 [[ -d "$d" ]] || continue
                 local driver_name="${d##*/}"
@@ -582,7 +586,6 @@ export_drivers() {
                     found=1
                 fi
             done
-            shopt -u nullglob
             [[ "$found" -eq 0 ]] && printf 'No virtual drivers detected\n'
         else
             printf 'PCI bus not available\n'
@@ -623,7 +626,14 @@ EOF
 
     # List all txt files except summary.txt itself
     local f bname fname lines
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
     shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
+
     for f in "$OUTPUT_DIR"/*.txt; do
         bname="$(basename "$f")"
         if [[ "$bname" != "summary.txt" ]]; then
@@ -632,7 +642,6 @@ EOF
             printf '  - %s (%s lines)\n' "$fname" "$lines" >> "$output_file"
         fi
     done
-    shopt -u nullglob
 
     printf '\n=============================================================\n' >> "$output_file"
     info "Summary exported: summary.txt"
@@ -1020,6 +1029,8 @@ export_all_logs() {
         # Hardware temperatures
         printf 'Temperatures:\n'
         if [[ -d /sys/class/hwmon ]]; then
+            local _ng_was_set=0
+            shopt -q nullglob && _ng_was_set=1
             shopt -s nullglob
             local temp_found=0
             for hw_dir in /sys/class/hwmon/hwmon*; do
@@ -1038,7 +1049,9 @@ export_all_logs() {
                     temp_found=1
                 done
             done
-            shopt -u nullglob
+            if [[ "$_ng_was_set" -eq 0 ]]; then
+                shopt -u nullglob
+            fi
             [[ "$temp_found" -eq 0 ]] && printf '  No temperature sensors detected.\n'
         else
             printf '  hwmon not available.\n'

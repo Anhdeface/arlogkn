@@ -898,7 +898,14 @@ _gather_temperatures() {
         return 1
     fi
 
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
     shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
+
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
         [[ ! -d "$hwmon_dir" ]] && continue
 
@@ -945,7 +952,6 @@ _gather_temperatures() {
             printf '%s|%s|%d\n' "$clean_chip" "$clean_label" "$temp_c"
         done
     done
-    shopt -u nullglob
 }
 
 # Helper: Format temperature data for terminal display (with colors)
@@ -1113,6 +1119,14 @@ scan_network_interfaces() {
         return 0
     fi
 
+    local _ng_was_set=0
+    shopt -q nullglob && _ng_was_set=1
+    local _old_ret_trap
+    _old_ret_trap="$(trap -p RETURN)"
+    shopt -s nullglob
+    # shellcheck disable=SC2064
+    trap "$(if [[ $_ng_was_set -eq 0 ]]; then echo 'shopt -u nullglob;'; else echo ':;'; fi) ${_old_ret_trap:-trap - RETURN}" RETURN
+
     draw_table_begin "Interface" 14 "State" 8 "Speed" 10 "IP" 30
 
     # Get IP addresses: try ip command, fallback to /proc/net/fib_trie
@@ -1134,7 +1148,6 @@ scan_network_interfaces() {
     fi
 
     local found=0
-    shopt -s nullglob
     for net_path in /sys/class/net/*; do
         [[ ! -d "$net_path" ]] && continue
         local iface
@@ -1170,7 +1183,6 @@ scan_network_interfaces() {
         tbl_row "$iface" "${state_color}${state}${C_RESET}" "$speed" "$ip"
         found=1
     done
-    shopt -u nullglob
 
     if [[ "$found" -eq 0 ]]; then
         draw_table_end
@@ -1672,6 +1684,8 @@ scan_system_basics() {
                 draw_box_line "  ${C_CYAN}${filename}${C_RESET} (${stype}) — ${color}${used_h}/${size_h} (${use_pct}%)${C_RESET} pri=${priority}"
             done
             # Check for zram specifically
+            local _ng_was_set=0
+            shopt -q nullglob && _ng_was_set=1
             shopt -s nullglob
             for zram_dev in /sys/block/zram*; do
                 if [[ -f "${zram_dev}/comp_algorithm" && -f "${zram_dev}/disksize" ]]; then
@@ -1683,7 +1697,9 @@ scan_system_basics() {
                     draw_box_line "  ${C_CYAN}$(basename "$zram_dev")${C_RESET} algorithm: ${algo} | capacity: ${disksize_mb}M"
                 fi
             done
-            shopt -u nullglob
+            if [[ "$_ng_was_set" -eq 0 ]]; then
+                shopt -u nullglob
+            fi
         else
             draw_box_line "${C_YELLOW}Swap: Not configured${C_RESET}"
         fi
